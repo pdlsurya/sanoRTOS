@@ -15,7 +15,7 @@
 #include "task/task.h"
 #include "mutex/mutex.h"
 #include "scheduler/scheduler.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 #include "conditionVariable.h"
 #include "assert.h"
 
@@ -38,7 +38,7 @@ bool condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 
     taskHandleType *currentTask = taskPool.currentTask;
 
-    taskQueueInsert(&pCondVar->waitQueue, currentTask);
+    taskQueueAdd(&pCondVar->waitQueue, currentTask);
 
     /* Block current task and give CPU to other tasks while waiting on condition variable*/
     taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);

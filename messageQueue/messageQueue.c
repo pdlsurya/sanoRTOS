@@ -12,7 +12,7 @@
 #include "messageQueue.h"
 #include "task/task.h"
 #include "scheduler/scheduler.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 
 /**
  * @brief Insert an item to the queue buffer
@@ -76,7 +76,7 @@ bool msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTi
         {
             taskHandleType *currentTask = taskPool.currentTask;
 
-            taskQueueInsert(&pQueueHandle->producerWaitQueue, currentTask);
+            taskQueueAdd(&pQueueHandle->producerWaitQueue, currentTask);
 
             // Block current task and  give CPU to other tasks while waiting for space to be available
             taskBlock(currentTask, WAIT_FOR_MSG_QUEUE_SPACE, waitTicks);
@@ -117,7 +117,7 @@ bool msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wai
         {
             taskHandleType *currentTask = taskPool.currentTask;
 
-            taskQueueInsert(&pQueueHandle->consumerWaitQueue, currentTask);
+            taskQueueAdd(&pQueueHandle->consumerWaitQueue, currentTask);
 
             // Block current task and give CPU to other tasks while waiting for data to be available
             taskBlock(currentTask, WAIT_FOR_MSG_QUEUE_DATA, waitTicks);

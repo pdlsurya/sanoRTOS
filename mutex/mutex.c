@@ -9,11 +9,12 @@
  *
  */
 #include <stdlib.h>
+#include "osConfig.h"
 #include "task/task.h"
 #include "scheduler/scheduler.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 #include "mutex.h"
-#include "osConfig.h"
+
 
 /**
  * @brief Select next owner of the mutex
@@ -69,7 +70,7 @@ bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
         else if (waitTicks > 0)
         {
             /* Add the tasking waiting on mutex to the wait queue*/
-            taskQueueInsert(&pMutex->waitQueue, currentTask);
+            taskQueueAdd(&pMutex->waitQueue, currentTask);
 
             /* Block current task and give CPU to other tasks while waiting for mutex*/
             taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);

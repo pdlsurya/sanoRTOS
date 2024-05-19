@@ -1,7 +1,7 @@
 /**
- * @file utils.h
+ * @file taskQueue.h
  * @author Surya Poudel
- * @brief Utility functions
+ * @brief Task queue implementation
  * @version 0.1
  * @date 2024-05-08
  *
@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef __SANO_RTOS_UTILS_H
-#define __SANO_RTOS_UTILS_H
+#ifndef __SANO_RTOS_TASK_QUEUE_H
+#define __SANO_RTOS_TASK_QUEUE_H
 
 #include "osConfig.h"
 
@@ -29,7 +29,9 @@ typedef struct
 
 taskHandleType *taskQueueGet(taskQueueType *pTaskQueue);
 
-void taskQueueInsert(taskQueueType *pTaskQueue, taskHandleType *pTask);
+void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
+
+void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
 void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
