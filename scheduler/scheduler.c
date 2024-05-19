@@ -76,6 +76,10 @@ static void checkTimeout()
 
     while (currentTaskNode != NULL)
     {
+        /*Save next task node to avoid losing track of linked list after task node
+         is freed while setting corresponding task to READY */
+        taskNodeType *nextTaskNode = currentTaskNode->nextTaskNode;
+
         if (currentTaskNode->pTask->remainingSleepTicks > 0)
         {
             currentTaskNode->pTask->remainingSleepTicks--;
@@ -87,7 +91,7 @@ static void checkTimeout()
                     taskSetReady(currentTaskNode->pTask, WAIT_TIMEOUT);
             }
         }
-        currentTaskNode = currentTaskNode->nextTaskNode;
+        currentTaskNode = nextTaskNode;
     }
 }
 

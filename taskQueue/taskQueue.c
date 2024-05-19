@@ -78,7 +78,7 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 }
 
 /**
- * @brief Get the highest priority task from the Queue. This corresponds to the 
+ * @brief Get the highest priority task from the Queue. This corresponds to the
  * front task node in the Queue.
  * @param pTaskQueue Pointer to taskQueue struct
  * @return Next highest priority task if Queue is not empty, or NULL otherwise.
@@ -123,6 +123,7 @@ static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
  */
 void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
+
     if (pTask == pTaskQueue->head->pTask)
         taskQueueRemoveHead(pTaskQueue);
 

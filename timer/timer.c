@@ -168,6 +168,9 @@ void processTimers()
         timerNodeType *currentNode = headNode;
         while (currentNode != NULL)
         {
+            // Save next node to avoid losing track of linked list after a time node is deleted while stopping the timer
+            timerNodeType *nextNode = currentNode->nextNode;
+
             // Decrement ticks to expire
             if (currentNode->ticksToExpire > 0)
                 currentNode->ticksToExpire--;
@@ -175,7 +178,6 @@ void processTimers()
             // Check if timer has expired.If set, call the timeoutHandler() and update the ticksToExpire for next event.
             if (currentNode->ticksToExpire == 0)
             {
-                timerNodeType *temp = currentNode->nextNode;
 
                 // add timeout handler to the timeoutHandlersQueue
                 if (timeoutHandlersQueue.handlersCount != MAX_HANDLERS_QUEUE_SIZE)
@@ -183,23 +185,18 @@ void processTimers()
                     timeoutHandlersQueue.handlersBuffer[timeoutHandlersQueue.writeIndex] = currentNode->timeoutHandler;
                     timeoutHandlersQueue.writeIndex = (timeoutHandlersQueue.writeIndex + 1) % MAX_HANDLERS_QUEUE_SIZE;
                     timeoutHandlersQueue.handlersCount++;
+
                     // Check if timer task is suspended. If so, change status to ready to allow execution.
                     if (timerTask.status == TASK_STATUS_BLOCKED)
-                    {
                         taskSetReady(&timerTask, TIMER_TIMEOUT);
-                    }
                 }
                 currentNode->ticksToExpire = currentNode->intervalTicks;
 
                 // Check if the timer mode is SINGLE_SHOT. If true, stop the correponding timer
                 if (currentNode->mode == TIMER_MODE_SINGLE_SHOT)
-                {
                     timerStop(currentNode);
-                    currentNode = temp;
-                    continue;
-                }
             }
-            currentNode = currentNode->nextNode;
+            currentNode = nextNode;
         }
     }
 }
