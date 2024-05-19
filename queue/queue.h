@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef __SANO_RTOS_QUEUE_H
-#define __SANO_RTOS_QUEUE_H
+#ifndef __SANO_RTOS_MSG_QUEUE_H
+#define __SANO_RTOS_MSG_QUEUE_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -18,23 +18,23 @@
 
 typedef struct
 {
-    waitQueueType producerWaitQueue;
-    waitQueueType consumerWaitQueue;
+    taskQueueType producerWaitQueue;
+    taskQueueType consumerWaitQueue;
     uint8_t *buffer;
     uint32_t queueLength;
     uint32_t itemSize;
     uint32_t itemCount;
     uint32_t readIndex;
     uint32_t writeIndex;
-} queueHandleType;
-bool isQueueFull(queueHandleType *pQueueHandle);
+} msgQueueHandleType;
+bool msgQueueFull(msgQueueHandleType *pQueueHandle);
 
-bool isQueueEmpty(queueHandleType *pQueueHandle);
+bool msgQueueEmpty(msgQueueHandleType *pQueueHandle);
 
-bool queueCreate(queueHandleType *pQueueHandle, void *buffer, uint32_t queueLength, uint32_t itemSize);
+bool msgQueueCreate(msgQueueHandleType *pQueueHandle, void *buffer, uint32_t queueLength, uint32_t itemSize);
 
-bool queueSend(queueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
+bool msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
 
-bool queueReceive(queueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
+bool msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
 
 #endif

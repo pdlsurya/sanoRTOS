@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.dts": "c",
+        "utils.h": "c"
+    }
+}

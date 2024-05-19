@@ -14,19 +14,6 @@
 #include "utils/utils.h"
 #include "semaphore.h"
 
-/**
- * @brief Initialize the semaphore
- *
- * @param pSem pointer to an semaphore structure
- * @param initialValue  Initial value of the semaphore
- * @param maxCount Max semaphore count
- */
-void semaphoreInit(semaphoreHandleType *pSem, uint8_t initialCount, uint8_t maxCount)
-{
-    waitQueueInit(&pSem->waitQueue);
-    pSem->maxCount = maxCount;
-    pSem->count = initialCount;
-}
 
 /**
  * @brief Function to take/wait for the semaphore
@@ -41,7 +28,7 @@ bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
     if (pSem)
     {
 
-        if (pSem->waitQueue.count == 0 && pSem->count != 0)
+        if (pSem->waitQueue.head== NULL && pSem->count != 0)
         {
             pSem->count--;
             return true;
@@ -51,10 +38,10 @@ bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
             return false;
         else
         {
-            taskHandleType *currentTask = taskPool.tasks[taskPool.currentTaskId];
+            taskHandleType *currentTask = taskPool.currentTask;
 
             /*Put current task in semaphore's wait queue*/
-            waitQueuePut(&pSem->waitQueue, currentTask);
+            taskQueueInsert(&pSem->waitQueue, currentTask);
 
             /* Block current task and give CPU to other tasks while waiting for semaphore*/
             taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
@@ -82,10 +69,13 @@ bool semaphoreGive(semaphoreHandleType *pSem)
         pSem->count++;
 
         /*Get next task to signal from the wait Queue*/
-        taskHandleType *nextTask = waitQueueGet(&pSem->waitQueue);
+        taskHandleType *nextTask = taskQueueGet(&pSem->waitQueue);
 
         if (nextTask)
+        {
+
             taskSetReady(nextTask, SEMAPHORE_AVAILABLE);
+        }
 
         return true;
     }

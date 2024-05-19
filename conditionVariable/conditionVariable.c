@@ -19,22 +19,6 @@
 #include "conditionVariable.h"
 #include "assert.h"
 
-/**
- * @brief Initialize condition variable
- *
- * @param pCondVar  Pointer to the Condition variable handle struct
- * @param pMutex   Pointer to the Mutex handle struct to be used by the condition variable.
- */
-void condVarInit(condVarHandleType *pCondVar, mutexHandleType *pMutex)
-{
-    assert(pMutex != NULL);
-    // Initialize mutex
-    mutexInit(pMutex);
-
-    pCondVar->pMutex = pMutex;
-
-    waitQueueInit(&pCondVar->waitQueue);
-}
 
 /**
  * @brief Wait on condition variable
@@ -52,9 +36,9 @@ bool condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
     /* Unlock previously acquired mutex;*/
     mutexUnlock(pCondVar->pMutex);
 
-    taskHandleType *currentTask = taskPool.tasks[taskPool.currentTaskId];
+    taskHandleType *currentTask = taskPool.currentTask;
 
-    waitQueuePut(&pCondVar->waitQueue, currentTask);
+    taskQueueInsert(&pCondVar->waitQueue, currentTask);
 
     /* Block current task and give CPU to other tasks while waiting on condition variable*/
     taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
@@ -79,7 +63,7 @@ bool condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
  */
 bool condVarSignal(condVarHandleType *pCondVar)
 {
-    taskHandleType *nextSignalTask = waitQueueGet(&pCondVar->waitQueue);
+    taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
     if (nextSignalTask)
     {
         taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
@@ -98,21 +82,18 @@ bool condVarSignal(condVarHandleType *pCondVar)
  */
 bool condVarBroadcast(condVarHandleType *pCondVar)
 {
-    if (pCondVar->waitQueue.count > 0)
+    if (!taskQueueEmpty(&pCondVar->waitQueue))
     {
-        for (int i = 0; i < pCondVar->waitQueue.count; i++)
+        taskHandleType *pTask = NULL;
+
+        while ((pTask = taskQueueGet(&pCondVar->waitQueue)))
         {
-            if (pCondVar->waitQueue.waitingTasks[i])
+            if (pTask->status != TASK_STATUS_SUSPENDED)
             {
-                /* Signal the task only if it is not suspended*/
-                if (pCondVar->waitQueue.waitingTasks[i]->status != TASK_STATUS_SUSPENDED)
-                {
-                    taskSetReady(pCondVar->waitQueue.waitingTasks[i], COND_VAR_SIGNALLED);
-                    pCondVar->waitQueue.waitingTasks[i] = NULL;
-                }
+                taskSetReady(pTask, COND_VAR_SIGNALLED);
             }
         }
-        pCondVar->waitQueue.count = 0;
+
         return true;
     }
     return false;

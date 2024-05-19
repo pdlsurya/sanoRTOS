@@ -18,18 +18,21 @@
 #include "utils/utils.h"
 #include "osConfig.h"
 
-#define MAX_MUTEXES 16
+#define MUTEX_DEFINE(mutexHandle)   \
+    mutexHandleType mutexHandle = { \
+        .waitQueue = {0},           \
+        .ownerTask = NULL,          \
+        .ownerDefaultPriority = -1, \
+        .locked = false}
 
 typedef struct
 {
-    waitQueueType waitQueue;
+    taskQueueType waitQueue;
     volatile taskHandleType *ownerTask;
     int16_t ownerDefaultPriority;
     bool locked;
 
 } mutexHandleType;
-
-bool mutexInit(mutexHandleType *pMutex);
 
 bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks);
 

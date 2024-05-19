@@ -11,11 +11,12 @@
 
 #include "osConfig.h"
 #include "scheduler/scheduler.h"
+#include "utils/utils.h"
 #include "task.h"
 
 taskPoolType taskPool = {0};
-volatile taskHandleType *currentTask;
-volatile taskHandleType *nextTask;
+taskHandleType *currentTask;
+taskHandleType *nextTask;
 
 /**
  * @brief Function to execute when task returns
@@ -34,15 +35,18 @@ static void taskExitFunction()
  */
 void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
+    if (pTask->status == TASK_STATUS_BLOCKED)
+    {
+        /* Remove  task from the queue of blocked tasks*/
+        taskQueueRemove(&taskPool.blockedQueue, pTask);
+    }
     pTask->status = TASK_STATUS_READY;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = wakeupReason;
     pTask->remainingSleepTicks = 0;
-    taskPool.readyTasksCount++;
-    if (wakeupReason == RESUME)
-        taskPool.suspendedTasksCount--;
-    else
-        taskPool.blockedTasksCount--;
+
+    /* Add task to queue of ready tasks*/
+    taskQueueInsert(&taskPool.readyQueue, pTask);
 }
 
 /**
@@ -58,8 +62,9 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
     pTask->status = TASK_STATUS_BLOCKED;
     pTask->blockedReason = blockedReason;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
-    taskPool.readyTasksCount--;
-    taskPool.blockedTasksCount++;
+
+    // Add task to queue of blocked tasks
+    taskQueueInsert(&taskPool.blockedQueue, pTask);
 
     // Give CPU to other tasks
     taskYield();
@@ -72,14 +77,16 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
  */
 void taskSuspend(taskHandleType *pTask)
 {
+    // If task is in ready queue, remove it from the queue
+    if (pTask->status == TASK_STATUS_READY)
+        taskQueueRemove(&taskPool.readyQueue, pTask);
+
     pTask->remainingSleepTicks = 0;
     pTask->status = TASK_STATUS_SUSPENDED;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
-    taskPool.readyTasksCount--;
-    taskPool.suspendedTasksCount++;
 
-    if (pTask == taskPool.tasks[taskPool.currentTaskId])
+    if (pTask == taskPool.currentTask)
         taskYield();
 }
 
@@ -107,7 +114,7 @@ bool taskResume(taskHandleType *pTask)
  */
 static inline void taskSleep(uint32_t sleepTicks)
 {
-    taskHandleType *currentTask = taskPool.tasks[taskPool.currentTaskId];
+    taskHandleType *currentTask = taskPool.currentTask;
     if (currentTask->status == TASK_STATUS_RUNNING)
     {
         taskBlock(currentTask, SLEEP, sleepTicks);
@@ -146,9 +153,6 @@ void taskSleepUS(uint32_t sleepTimeUS)
 bool taskStart(taskHandleType *pTaskHandle)
 {
 
-    if ((taskPool.taskInsertIndex) == MAX_TASKS_COUNT)
-        return false;
-
     /**********--Task's default stack values--****************************************
     ____ <-- stackBase
    |____|xPSR  --> stackPointer + 16
@@ -181,11 +185,8 @@ bool taskStart(taskHandleType *pTaskHandle)
     *((uint32_t *)pTaskHandle->stackPointer + 15) = (uint32_t)pTaskHandle->taskEntry;
     *((uint32_t *)pTaskHandle->stackPointer + 16) = 0x01000000; // Default xPSR register value
 
-    pTaskHandle->taskId = taskPool.taskInsertIndex;
-
-    /*Store pointer to the taskHandle struct to the taskPool*/
-    taskPool.tasks[taskPool.taskInsertIndex++] = pTaskHandle;
-    taskPool.readyTasksCount++;
+    /*Store pointer to the taskHandle struct to ready queue*/
+    taskQueueInsert(&taskPool.readyQueue, pTaskHandle);
 
     return true;
 }
