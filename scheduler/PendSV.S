@@ -11,16 +11,35 @@ PendSV_Handler:
     cpsid i // Disable interrupts: 
 
     mrs r0, psp
-
+    
+#ifdef __ARM_FP
     /*Check if current task uses fpu instructions.If so, push registers s16-s31 to stack.
     *This will also trigger lazy fp context preservation of S0-S15
     */
     tst lr, #0x10
     it eq
     vstmdbeq r0!, {s16-s31}
+#endif
 
+#ifdef __ARM_ARCH_6M__
+ /*The STMDB inscruction can only save low registers (R0-R7);
+ Hence, we need  to copy registers R8-R11 into R4-R7 and call STMDB twice. */
+    stmdb r0!,{r4-r7}
+
+    mov	r4, r8
+	mov	r5, r9
+	mov	r6, r10
+	mov	r7, r11
+    stmdb r0!,{r4-r7}
+
+    subs r0,#4
+
+    mov r2,lr //Store EXC_RETURN
+    str r2, [r0]
+
+#else
     stmdb r0!, {r4-r11,lr} //push register r4-r11 and EXC_RETURN to current task's stack
-
+#endif
     /*save current task's stack pointer*/
     ldr r1, =currentTask
     ldr r2,[r1] 
@@ -31,13 +50,36 @@ PendSV_Handler:
     ldr r2,[r1]
     ldr r0,[r2] //first member of the taskHandleType struct is stack pointer
 
-    ldmia r0!,{r4-r11,lr} //pop registers r4-r11 and EXC_RETURN from next task's stack
+#ifdef __ARM_ARCH_6M__
 
+    ldr r2, [r0] //Load EXC_RETURN
+    mov lr, r2
+
+    add r0, #4
+
+/*The LDMIA inscruction can only use low registers (R0-R7);
+ Hence, we need  to first load contents of R8-R11 to R4-R7 registers 
+ and later move contents to R8-R11*/
+    ldmia r0!,{r4-r7}
+
+    mov	r8, r4
+    mov	r9, r5
+    mov	r10, r6 
+    mov	r11, r7
+
+    ldmia r0!,{r4-r7}
+
+#else
+    ldmia r0!,{r4-r11,lr} //pop registers r4-r11 and EXC_RETURN from next task's stack
+#endif
+
+#ifdef __ARM_FP
     /*Check if next task uses fpu instructions.If so, pop registers s16-s31 from stack.*/
     tst lr, #0x10
     it eq
     vldmiaeq r0!, {s16-s31}
-    
+#endif
+
     msr psp,r0 //load psp with next task's stack pointer
 
 	cpsie	i // Enable interrupts
