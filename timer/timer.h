@@ -43,7 +43,7 @@ typedef struct timerNode
     timerModeType mode;
     bool isRunning;
 
-} timerNodeType; 
+} timerNodeType;
 
 typedef struct timeoutHandlerNode
 {
@@ -63,10 +63,8 @@ typedef struct
     timerNodeType *head;
 } timerListType;
 
-// Function to start the timer  by adding it to the list of running timers.
 void timerStart(timerNodeType *pTimerNode, uint32_t interval);
 
-// Function to stop the timer
 void timerStop(timerNodeType *pTimerNode);
 
 void processTimers();

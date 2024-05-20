@@ -123,7 +123,7 @@ static inline void timerListNodeDelete(timerListType *pTimerList, timerNodeType 
 }
 
 /**
- * @brief  Function to start the timer. This stores the timer timerNode in the list of running timers.
+ * @brief  Function to start the timer. This stores the timerNode in the list of running timers.
  *
  * @param pTimerNode Pointer timerNode struct
  * @param intervalTicks Timer intervalTicks
