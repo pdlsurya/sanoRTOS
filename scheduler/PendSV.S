@@ -1,5 +1,12 @@
-.syntax unified
-.arch armv7e-m
+#if  defined(__ARM_ARCH_6M__)
+    .arch armv6-m
+#elif defined(__ARM_ARCH_7M__)
+    .syntax unified
+    .arch armv7-m
+#elif defined(__ARM_ARCH_7EM__)
+    .syntax unified
+    .arch armv7e-m
+#endif
 
 .thumb
 .text
