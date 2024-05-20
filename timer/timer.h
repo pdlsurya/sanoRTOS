@@ -22,35 +22,46 @@ typedef enum
 } timerModeType;
 
 /* Macro to define  timer node struct */
-#define TIMER_DEF(name) timerNodeType name
-
-#define MAX_TIMERS_CNT 16 // Maximum number of timer nodes allowed
-
-#define MAX_HANDLERS_QUEUE_SIZE 16
+#define TIMER_DEFINE(name, timeout_handler, timer_mode) \
+    void timeout_handler(void);                         \
+    timerNodeType name = {                              \
+        .isRunning = false,                             \
+        .mode = timer_mode,                             \
+        .timeoutHandler = timeout_handler,              \
+        .ticksToExpire = 0,                             \
+        .intervalTicks = 0,                             \
+        .nextNode = NULL}
 
 typedef void (*timeoutHandlerType)(void); // Timeout handler function
 
 typedef struct timerNode
 {
-    bool isRunning;
-    timerModeType mode;
     timeoutHandlerType timeoutHandler;
     uint32_t intervalTicks;
     uint32_t ticksToExpire;
     struct timerNode *nextNode;
-} timerNodeType; // Timer node structure
+    timerModeType mode;
+    bool isRunning;
+
+} timerNodeType; 
+
+typedef struct timeoutHandlerNode
+{
+    timeoutHandlerType timeoutHandler;
+    struct timeoutHandlerNode *nextNode;
+
+} timeoutHandlerNodeType;
 
 typedef struct
 {
-    timeoutHandlerType handlersBuffer[MAX_HANDLERS_QUEUE_SIZE];
-    uint8_t handlersCount;
-    uint8_t readIndex;
-    uint8_t writeIndex;
-} timeoutHandlersQueueType;
+    timeoutHandlerNodeType *head;
+    timeoutHandlerNodeType *tail;
+} timeoutHandlerQueueType;
 
-// Function to create a timer by initializing the timer node instance.
-void timerCreate(timerNodeType *pTimerNode,
-                 timeoutHandlerType timeout_handler, timerModeType mode);
+typedef struct
+{
+    timerNodeType *head;
+} timerListType;
 
 // Function to start the timer  by adding it to the list of running timers.
 void timerStart(timerNodeType *pTimerNode, uint32_t interval);

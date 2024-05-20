@@ -20,84 +20,97 @@
 
 #define TIMER_TASK_PRIORITY TASK_HIGHEST_PRIORITY // timer task has the highest possible priority [lower the value, higher the priority]
 
-static uint8_t timersCount; // Number of running timers in the list
+static timerListType timerList = {0}; // List of running timers
 
-static timerNodeType *headNode = NULL; // head node in the list
-
-static timeoutHandlersQueueType timeoutHandlersQueue;
+static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout handlers to be executed
 
 /*Define timer task with highest possible priority*/
 TASK_DEFINE(timerTask, 256, timerTaskFunction, NULL, TIMER_TASK_PRIORITY);
 
-void timerTaskFunction(void *args)
+/**
+ * @brief Insert timeoutHandler node at the end of the Queue
+ *
+ * @param pTimeoutHandlerQueue Pointer to the timeoutHandlerQueue struct
+ * @param timeoutHandler timeoutHandler function 
+ */
+static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue, timeoutHandlerType timeoutHandler)
 {
-    (void)args;
+    timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)malloc(sizeof(timeoutHandlerNodeType));
+    newNode->timeoutHandler = timeoutHandler;
+    newNode->nextNode = NULL;
 
-    while (1)
+    if (pTimeoutHandlerQueue->head == NULL)
     {
-        if (timeoutHandlersQueue.handlersCount > 0)
-        {
-            timeoutHandlerType timeoutHandler = timeoutHandlersQueue.handlersBuffer[timeoutHandlersQueue.readIndex];
-            timeoutHandlersQueue.readIndex = (timeoutHandlersQueue.readIndex + 1) % MAX_HANDLERS_QUEUE_SIZE;
-            timeoutHandlersQueue.handlersCount--;
-            timeoutHandler();
-        }
-        else
-        {
-            // Block timer task and give cpu to other tasks while waiting for timeout
-            taskBlock(&timerTask, WAIT_FOR_TIMER_TIMEOUT, 0);
-        }
+        pTimeoutHandlerQueue->head = newNode;
+        pTimeoutHandlerQueue->tail = pTimeoutHandlerQueue->head;
+    }
+    else
+    {
+        pTimeoutHandlerQueue->tail->nextNode = newNode;
+        pTimeoutHandlerQueue->tail = newNode;
     }
 }
 
-/*Function to add an timer node instance in the queue of running timers.
- *This forms a linked list of running timers
+/**
+ * @brief Get timeoutHandler node from the front of the Queue
+ *
+ * @param pTimeoutHandlerQueue
+ * @return timeoutHandler function
  */
-static void timerListNodeAdd(timerNodeType *pTimerNode)
+static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeoutHandlerQueue)
 {
-    // if no timers in the list, assign the head node with first timer node.
-    if (headNode == NULL)
-    {
-        headNode = pTimerNode;
-        headNode->nextNode = NULL;
-        timersCount++;
-        return;
-    }
+    timeoutHandlerNodeType *temp = pTimeoutHandlerQueue->head->nextNode;
 
-    timerNodeType *currentNode = headNode;
-    // traverse over the list until the last node
-    while (currentNode->nextNode != NULL)
-    {
-        currentNode = currentNode->nextNode;
-    }
-    currentNode->nextNode = pTimerNode;
-    currentNode->nextNode->nextNode = NULL;
-    timersCount++;
+    timeoutHandlerType timeoutHandler = pTimeoutHandlerQueue->head->timeoutHandler;
+
+    free(pTimeoutHandlerQueue->head);
+
+    pTimeoutHandlerQueue->head = temp;
+
+    return timeoutHandler;
 }
 
-/*Function to delete the timer node from the beginning of the list.
- * This removes the head node and reassigns head node with the next timer in the list.
+/**
+ * @brief Add a timer node to the list of running timers
+ *
+ * @param pTimerList  Pointer to the timer list struct
+ * @param pTimerNode  Pointer to the timerNode struct
  */
-static inline void timerListDeleteFirstNode(timerNodeType **headNode)
+static void timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
-    timerNodeType *temp_node = (*headNode)->nextNode;
-    (*headNode)->nextNode = NULL;
-    *headNode = temp_node;
+    timerNodeType *tempNode = pTimerList->head;
+
+    pTimerList->head = pTimerNode;
+    pTimerList->head->nextNode = tempNode;
 }
 
-/*Function to delete the timer from the list
+/**
+ * @brief Delete the timerNode from the beginning of the list
+ *
+ * @param pTimerList Pointer to the timerNode struct
  */
-static inline void timerListNodeDelete(timerNodeType *pTimerNode)
+static inline void timerListDeleteFirstNode(timerListType *pTimerList)
 {
-    timerNodeType *currentNode = headNode;
+    timerNodeType *tempNode = pTimerList->head->nextNode;
+
+    pTimerList->head->nextNode = NULL;
+
+    pTimerList->head = tempNode;
+}
+
+/**
+ * @brief Delete a specified timerNode from the list of running timers.
+ *
+ * @param pTimerList Pointer to the timerList struct.
+ * @param pTimerNode Pointer to the timerNode struct.
+ */
+static inline void timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerNode)
+{
+    timerNodeType *currentNode = pTimerList->head;
 
     // if the timer correponds to the head node in the list, remove the timer node and reassign head node.
-    if (pTimerNode == headNode && headNode->nextNode != NULL)
-        timerListDeleteFirstNode(&headNode);
-
-    // if there is only one timer node in the list, unlink the node by making head node NULL.
-    else if (pTimerNode == headNode && headNode->nextNode == NULL)
-        headNode = NULL;
+    if (pTimerNode == pTimerList->head)
+        timerListDeleteFirstNode(pTimerList);
 
     else
     {
@@ -107,25 +120,12 @@ static inline void timerListNodeDelete(timerNodeType *pTimerNode)
         currentNode->nextNode = pTimerNode->nextNode;
         pTimerNode->nextNode = NULL;
     }
-    timersCount--;
-}
-
-/*Function to create a timer by initizing the timer pTimerNode with corresponding timer parameters.
- * This does not start the timer. timerStart function should be called to start
- * the corresponding timer.
- */
-void timerCreate(timerNodeType *pTimerNode, timeoutHandlerType timeoutHandler, timerModeType mode)
-{
-    pTimerNode->mode = mode;
-    pTimerNode->isRunning = false;
-    pTimerNode->timeoutHandler = timeoutHandler;
-    pTimerNode->nextNode = NULL;
 }
 
 /**
- * @brief  Function to start the timer pTimerNodes. This stores the timer pTimerNodes in a running timer queue and loads CC register with next minimum RTC ticks.
+ * @brief  Function to start the timer. This stores the timer timerNode in the list of running timers.
  *
- * @param pTimerNode Pointer to the timer pTimerNode
+ * @param pTimerNode Pointer timerNode struct
  * @param intervalTicks Timer intervalTicks
  */
 void timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
@@ -134,38 +134,39 @@ void timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
     if (pTimerNode->isRunning)
         return;
 
-    // Check for maximum number of allowed pTimerNode to run and generate an error accordingly.
-    if (timersCount == MAX_TIMERS_CNT)
-        return;
-
     // Set isRunning flag for the started timer pTimerNode.
     pTimerNode->isRunning = true;
 
     pTimerNode->ticksToExpire = pTimerNode->intervalTicks = intervalTicks;
 
     // add the timer in the queue of running timers
-    timerListNodeAdd(pTimerNode);
+    timerListNodeAdd(&timerList, pTimerNode);
 }
 
-/* Function to stop the corresponding timer pTimerNode.
- * This sets isRunning flag to false to prevent subsequent events from this timer.
+/**
+ * @brief Function to stop the specified timerNode. This sets isRunning flag to false to prevent subsequent events from this timer
+ *  and delete timer from the list of running timers
+ *
+ * @param pTimerNode Pointer to timerNode struct
  */
 void timerStop(timerNodeType *pTimerNode)
 {
     if (pTimerNode->isRunning)
     {
         pTimerNode->isRunning = false;
-        timerListNodeDelete(pTimerNode);
+        timerListNodeDelete(&timerList, pTimerNode);
     }
 }
 
-/*Function to check for timers timeout and trigger correspondig timeoutHandler
+/**
+ * @brief Check for timer timeout and add the corresponding timeout handler to the
+ *  Queue of timeout handlers
  */
 void processTimers()
 {
-    if (timersCount > 0)
+    if (timerList.head != NULL)
     {
-        timerNodeType *currentNode = headNode;
+        timerNodeType *currentNode = timerList.head;
         while (currentNode != NULL)
         {
             // Save next node to avoid losing track of linked list after a time node is deleted while stopping the timer
@@ -179,17 +180,13 @@ void processTimers()
             if (currentNode->ticksToExpire == 0)
             {
 
-                // add timeout handler to the timeoutHandlersQueue
-                if (timeoutHandlersQueue.handlersCount != MAX_HANDLERS_QUEUE_SIZE)
-                {
-                    timeoutHandlersQueue.handlersBuffer[timeoutHandlersQueue.writeIndex] = currentNode->timeoutHandler;
-                    timeoutHandlersQueue.writeIndex = (timeoutHandlersQueue.writeIndex + 1) % MAX_HANDLERS_QUEUE_SIZE;
-                    timeoutHandlersQueue.handlersCount++;
+                // add timeout handler to the timeoutHandlerQueue
+                timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler);
 
-                    // Check if timer task is suspended. If so, change status to ready to allow execution.
-                    if (timerTask.status == TASK_STATUS_BLOCKED)
-                        taskSetReady(&timerTask, TIMER_TIMEOUT);
-                }
+                // Check if timer task is suspended. If so, change status to ready to allow execution.
+                if (timerTask.status == TASK_STATUS_BLOCKED)
+                    taskSetReady(&timerTask, TIMER_TIMEOUT);
+
                 currentNode->ticksToExpire = currentNode->intervalTicks;
 
                 // Check if the timer mode is SINGLE_SHOT. If true, stop the correponding timer
@@ -209,4 +206,28 @@ void timerTaskStart()
 {
 
     taskStart(&timerTask);
+}
+
+/**
+ * @brief RTOS timer task function
+ *
+ * @param args
+ */
+void timerTaskFunction(void *args)
+{
+    (void)args;
+
+    while (1)
+    {
+        if (timeoutHandlerQueue.head != NULL) // Check for non-empty condition
+        {
+            timeoutHandlerType timeoutHandler = timeoutHandlerQueuePop(&timeoutHandlerQueue);
+            timeoutHandler();
+        }
+        else
+        {
+            // Block timer task and give cpu to other tasks while waiting for timeout
+            taskBlock(&timerTask, WAIT_FOR_TIMER_TIMEOUT, 0);
+        }
+    }
 }
