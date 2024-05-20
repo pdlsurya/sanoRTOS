@@ -155,30 +155,32 @@ bool taskStart(taskHandleType *pTaskHandle)
 {
 
     /**********--Task's default stack values--****************************************
-    ____ <-- stackBase
-   |____|xPSR  --> stackPointer + 16
-   |____|Return address(PC) <-Task Entry --> stackPointer + 15
-   |____|LR --> stackPointer + 14
-   |____|R12
-   |____|R3
-   |____|R2
-   |____|R1
-   |____|R0 <-Task params --> stackPointer + 9
-   |____|EXC_RETURN --> stackPointer + 8
-   |____|R11
-   |____|R10
-   |____|R9
-   |____|R8
-   |____|R7
-   |____|R6
-   |____|R5
-   |____|R4 <--stackPointer=(stackBase - 17)
-      |
-      |
-   |____|
-   |____|
- <-32bits->
-   *************************************************************************************/
+        ____ <-- stackBase
+       |____|xPSR  --> stackPointer + 16
+       |____|Return address(PC) <-Task Entry --> stackPointer + 15
+       |____|LR --> stackPointer + 14
+       |____|R12
+       |____|R3
+       |____|R2
+       |____|R1
+       |____|R0 <-Task params --> stackPointer + 9
+       |____|EXC_RETURN --> stackPointer + 8
+
+      <--Cortex-M3/M4/M7-->               <--Cortex-MO/M0+--->
+       |____|R11                                 |____|R7
+       |____|R10                                 |____|R6
+       |____|R9                                  |____|R5
+       |____|R8                                  |____|R4
+       |____|R7                                  |____|R11
+       |____|R6                                  |____|R10
+       |____|R5                                  |____|R9
+       |____|R4 <--stackPointer=(stackBase - 17) |____|R8 <--stackPointer=(stackBase - 17)
+          |                                         |
+          |                                         |
+       |____|                                    |____|
+       |____|                                    |____|
+     <-32bits->                                 <-32bits->
+    *************************************************************************************/
 
     *((uint32_t *)pTaskHandle->stackPointer + 8) = EXC_RETURN_THREAD_PSP;
     *((uint32_t *)pTaskHandle->stackPointer + 9) = (uint32_t)pTaskHandle->params;

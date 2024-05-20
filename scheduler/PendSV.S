@@ -29,6 +29,11 @@ PendSV_Handler:
 #endif
 
 #ifdef __ARM_ARCH_6M__
+    sub r0, #4
+
+    mov r2,lr //Store EXC_RETURN
+    str r2, [r0]
+
  /*The STMDB inscruction can only save low registers (R0-R7);
  Hence, we need  to copy registers R8-R11 into R4-R7 and call STMDB twice. */
     stmdb r0!,{r4-r7}
@@ -38,17 +43,12 @@ PendSV_Handler:
 	mov	r6, r10
 	mov	r7, r11
     stmdb r0!,{r4-r7}
-
-    subs r0,#4
-
-    mov r2,lr //Store EXC_RETURN
-    str r2, [r0]
-
 #else
 
     stmdb r0!, {r4-r11,lr} //push register r4-r11 and EXC_RETURN to current task's stack
 
 #endif
+
     /*save current task's stack pointer*/
     ldr r1, =currentTask
     ldr r2,[r1] 
@@ -60,12 +60,6 @@ PendSV_Handler:
     ldr r0,[r2] //first member of the taskHandleType struct is stack pointer
 
 #ifdef __ARM_ARCH_6M__
-
-    ldr r2, [r0] //Load EXC_RETURN
-    mov lr, r2
-
-    add r0, #4
-
 /*The LDMIA inscruction can only use low registers (R0-R7);
  Hence, we need  to first load contents of R8-R11 to R4-R7 registers 
  and later move contents to R8-R11*/
@@ -77,6 +71,11 @@ PendSV_Handler:
     mov	r11, r7
 
     ldmia r0!,{r4-r7}
+
+    ldr r2, [r0] //Load EXC_RETURN
+    mov lr, r2
+
+    add r0, #4
 
 #else
 
