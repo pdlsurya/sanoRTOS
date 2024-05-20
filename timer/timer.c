@@ -78,10 +78,9 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
  */
 static void timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
-    timerNodeType *tempNode = pTimerList->head;
+    pTimerNode->nextNode = pTimerList->head;
 
     pTimerList->head = pTimerNode;
-    pTimerList->head->nextNode = tempNode;
 }
 
 /**
