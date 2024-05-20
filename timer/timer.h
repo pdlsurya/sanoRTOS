@@ -1,7 +1,7 @@
 /**
  * @file timer.h
  * @author Surya Poudel
- * @brief Software timer implementation
+ * @brief RTOS software Timer implementation
  * @version 0.1
  * @date 2024-04-26
  *
