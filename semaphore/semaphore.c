@@ -27,7 +27,7 @@ bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
     if (pSem)
     {
 
-        if (pSem->waitQueue.head == NULL && pSem->count != 0)
+        if (taskQueueEmpty(&pSem->waitQueue) && pSem->count != 0)
         {
             pSem->count--;
             return true;
