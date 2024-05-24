@@ -23,11 +23,11 @@
  * @retval SUCCESS if semaphore is taken succesfully.
  * @retval -EBUSY if semaphore is not available
  * @retval -ETIMEOUT if timeout occured while waiting for semaphore
- * @retval -EINVAL if invalid arguments passed
+ * @retval -EINVAL if invalid argument passed
  */
 int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
-    if (pSem)
+    if (pSem != NULL)
     {
         if (pSem->count != 0)
         {

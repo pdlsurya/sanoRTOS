@@ -69,13 +69,13 @@ extern "C"
         timerNodeType *head;
     } timerListType;
 
-    void timerStart(timerNodeType *pTimerNode, uint32_t interval);
+    int timerStart(timerNodeType *pTimerNode, uint32_t interval);
 
-    void timerStop(timerNodeType *pTimerNode);
+    int timerStop(timerNodeType *pTimerNode);
 
     void processTimers();
 
-    void timerTaskStart();
+    int timerTaskStart();
 
 #ifdef __cplusplus
 }

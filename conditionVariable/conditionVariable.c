@@ -24,34 +24,35 @@
  *
  * @param pCondVar Pointer to condVarHandle struct
  * @param waitTicks Number of ticks to wait until timeout
- * @retval SUCCESS(0) if wait succeeded\n,
- * @retval -EINVAL if mutex is not specified
+ * @retval SUCCESS(0) if wait succeeded
+ * @retval -EINVAL if invalid arguments passed
  * @retval -ETIMEOUT if timeout occured while waiting
  */
 int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 {
-    if (!pCondVar->pMutex)
-        return -EINVAL;
+    if (pCondVar != NULL && pCondVar->pMutex != NULL)
+    {
+        /* Unlock previously acquired mutex;*/
+        mutexUnlock(pCondVar->pMutex);
 
-    /* Unlock previously acquired mutex;*/
-    mutexUnlock(pCondVar->pMutex);
+        taskHandleType *currentTask = taskPool.currentTask;
 
-    taskHandleType *currentTask = taskPool.currentTask;
+        taskQueueAdd(&pCondVar->waitQueue, currentTask);
 
-    taskQueueAdd(&pCondVar->waitQueue, currentTask);
+        /* Block current task and give CPU to other tasks while waiting on condition variable*/
+        taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
 
-    /* Block current task and give CPU to other tasks while waiting on condition variable*/
-    taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
+        /*Task has been woken up either due to timeout or by another task by signalling the condtion variable. Re-acquire previously
+        release mutex and return */
+        mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
 
-    /*Task has been woken up either due to timeout or by another task by signalling the condtion variable. Re-acquire previously
-    release mutex and return */
-    mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
+        /* Return false if wait timed out.*/
+        if (currentTask->wakeupReason == WAIT_TIMEOUT)
+            return -ETIMEOUT;
 
-    /* Return false if wait timed out.*/
-    if (currentTask->wakeupReason == WAIT_TIMEOUT)
-        return -ETIMEOUT;
-
-    return SUCCESS;
+        return SUCCESS;
+    }
+    return -EINVAL;
 }
 
 /**
@@ -60,17 +61,22 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
  * @param pCondVar Pointer to condVarHandle struct
  * @retval SUCCESS if signal succeeded,
  * @retval -ENOTASK if no tasks available to signal
+ * @retval -EINVAL if invalid argument passed
  */
 int condVarSignal(condVarHandleType *pCondVar)
 {
-    taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
-    if (nextSignalTask)
+    if (pCondVar != NULL)
     {
-        taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
-        return SUCCESS;
-    }
+        taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
+        if (nextSignalTask)
+        {
+            taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
+            return SUCCESS;
+        }
 
-    return -ENOTASK;
+        return -ENOTASK;
+    }
+    return -EINVAL;
 }
 
 /**
@@ -79,22 +85,27 @@ int condVarSignal(condVarHandleType *pCondVar)
  * @param pCondVar Pointer to condVarHandle struct
  * @retval SUCCESS if broadcast succeeded,
  * @retval -ENOTASK if not tasks available to broadcast
+ * @retval -EINVAL if invalid argument passed
  */
 int condVarBroadcast(condVarHandleType *pCondVar)
 {
-    if (!taskQueueEmpty(&pCondVar->waitQueue))
+    if (pCondVar != NULL)
     {
-        taskHandleType *pTask = NULL;
-
-        while ((pTask = taskQueueGet(&pCondVar->waitQueue)))
+        if (!taskQueueEmpty(&pCondVar->waitQueue))
         {
-            if (pTask->status != TASK_STATUS_SUSPENDED)
-            {
-                taskSetReady(pTask, COND_VAR_SIGNALLED);
-            }
-        }
+            taskHandleType *pTask = NULL;
 
-        return SUCCESS;
+            while ((pTask = taskQueueGet(&pCondVar->waitQueue)))
+            {
+                if (pTask->status != TASK_STATUS_SUSPENDED)
+                {
+                    taskSetReady(pTask, COND_VAR_SIGNALLED);
+                }
+            }
+
+            return SUCCESS;
+        }
+        return -ENOTASK;
     }
-    return -ENOTASK;
+    return -EINVAL;
 }

@@ -39,7 +39,7 @@ static inline taskNodeType *newNode(taskHandleType *pTask)
  */
 int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    if (pTaskQueue && pTask)
+    if (pTaskQueue != NULL && pTask != NULL)
     {
         taskNodeType *newTaskNode = newNode(pTask);
 
@@ -61,7 +61,7 @@ int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
  */
 int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    if (pTaskQueue && pTask)
+    if (pTaskQueue != NULL && pTask != NULL)
     {
         taskNodeType *newTaskNode = newNode(pTask);
 
@@ -125,7 +125,7 @@ taskHandleType *taskQueueGet(taskQueueType *ptaskQueue)
  */
 static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
-    if (pTaskQueue)
+    if (pTaskQueue != NULL)
     {
         taskNodeType *temp = pTaskQueue->head->nextTaskNode;
 
@@ -148,7 +148,7 @@ static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
  */
 int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    if (pTaskQueue && pTask)
+    if (pTaskQueue != NULL && pTask != NULL)
     {
 
         if (pTask == pTaskQueue->head->pTask)

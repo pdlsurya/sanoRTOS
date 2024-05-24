@@ -64,7 +64,7 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
  */
 int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
-    if (pQueueHandle)
+    if (pQueueHandle != NULL)
     {
         /*Write to msgQueue buffer if messageQueue is not full*/
         if (!msgQueueFull(pQueueHandle))
@@ -112,7 +112,7 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
  */
 int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
-    if (pQueueHandle)
+    if (pQueueHandle != NULL)
     {
 
         if (!msgQueueEmpty(pQueueHandle))
