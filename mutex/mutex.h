@@ -18,6 +18,11 @@
 #include "taskQueue/taskQueue.h"
 #include "osConfig.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define MUTEX_DEFINE(mutexHandle)   \
     mutexHandleType mutexHandle = { \
         .waitQueue = {0},           \
@@ -25,17 +30,21 @@
         .ownerDefaultPriority = -1, \
         .locked = false}
 
-typedef struct
-{
-    taskQueueType waitQueue;
-    volatile taskHandleType *ownerTask;
-    int16_t ownerDefaultPriority;
-    bool locked;
+    typedef struct
+    {
+        taskQueueType waitQueue;
+        volatile taskHandleType *ownerTask;
+        int16_t ownerDefaultPriority;
+        bool locked;
 
-} mutexHandleType;
+    } mutexHandleType;
 
-bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks);
+    int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks);
 
-bool mutexUnlock(mutexHandleType *pMutex);
+    int mutexUnlock(mutexHandleType *pMutex);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

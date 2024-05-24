@@ -14,48 +14,57 @@
 
 #include "osConfig.h"
 
-typedef struct taskHandle taskHandleType;
-
-typedef struct taskNode
+#ifdef __cplusplus
+extern "C"
 {
-    taskHandleType *pTask;
-    struct taskNode *nextTaskNode;
-} taskNodeType;
+#endif
 
-typedef struct
-{
-    taskNodeType *head;
-} taskQueueType;
+    typedef struct taskHandle taskHandleType;
 
-taskHandleType *taskQueueGet(taskQueueType *pTaskQueue);
+    typedef struct taskNode
+    {
+        taskHandleType *pTask;
+        struct taskNode *nextTaskNode;
+    } taskNodeType;
 
-void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    typedef struct
+    {
+        taskNodeType *head;
+    } taskQueueType;
 
-void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    taskHandleType *taskQueueGet(taskQueueType *pTaskQueue);
 
-void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
-/**
- * @brief Check if taskQueue is empty
- * 
- * @param pTaskQueue 
- * @return true 
- * @return false 
- */
-static inline bool taskQueueEmpty(taskQueueType *pTaskQueue)
-{
-    return pTaskQueue->head == NULL;
+    int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
+
+    int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
+
+    /**
+     * @brief Check if taskQueue is empty
+     *
+     * @param pTaskQueue
+     * @return true
+     * @return false
+     */
+    static inline bool taskQueueEmpty(taskQueueType *pTaskQueue)
+    {
+        return pTaskQueue->head == NULL;
+    }
+
+    /**
+     * @brief Get task corresponding to front node from the task queue without removing the node
+     *
+     * @param pTaskQueue Pointer to the taskQueue struct
+     * @return Pointer to taskHandle struct corresponding to front node
+     */
+    static inline taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
+    {
+        return pTaskQueue->head->pTask;
+    }
+
+#ifdef __cplusplus
 }
-
-/**
- * @brief Get task corresponding to front node from the task queue without removing the node
- * 
- * @param pTaskQueue Pointer to the taskQueue struct
- * @return Pointer to taskHandle struct corresponding to front node
- */
-static inline taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
-{
-    return pTaskQueue->head->pTask;
-}
+#endif
 
 #endif

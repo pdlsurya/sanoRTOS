@@ -18,21 +18,30 @@
 #include "task/task.h"
 #include "taskQueue/taskQueue.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define SEMAPHORE_DEFINE(semHandle, initialCount, maxCnt) \
     semaphoreHandleType semHandle = {                     \
         .waitQueue = {0},                                 \
         .count = initialCount,                            \
         .maxCount = maxCnt}
 
-typedef struct
-{
-    taskQueueType waitQueue;
-    uint8_t count;
-    uint8_t maxCount;
-} semaphoreHandleType;
+    typedef struct
+    {
+        taskQueueType waitQueue;
+        uint8_t count;
+        uint8_t maxCount;
+    } semaphoreHandleType;
 
-bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks);
+    int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks);
 
-bool semaphoreGive(semaphoreHandleType *pSem);
+    int semaphoreGive(semaphoreHandleType *pSem);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

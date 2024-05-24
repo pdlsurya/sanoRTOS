@@ -8,18 +8,24 @@
  * @copyright Copyright (c) 2024
  *
  */
-#include <stdint.h>
-#include <stdbool.h>
-#include "osConfig.h"
 
 #ifndef __SANO_RTOS_TIMER_H
 #define __SANO_RTOS_TIMER_H
 
-typedef enum
+#include <stdint.h>
+#include <stdbool.h>
+#include "osConfig.h"
+
+#ifdef __cplusplus
+extern "C"
 {
-    TIMER_MODE_SINGLE_SHOT,
-    TIMER_MODE_PERIODIC
-} timerModeType;
+#endif
+
+    typedef enum
+    {
+        TIMER_MODE_SINGLE_SHOT,
+        TIMER_MODE_PERIODIC
+    } timerModeType;
 
 /* Macro to define  timer node struct */
 #define TIMER_DEFINE(name, timeout_handler, timer_mode) \
@@ -32,43 +38,47 @@ typedef enum
         .intervalTicks = 0,                             \
         .nextNode = NULL}
 
-typedef void (*timeoutHandlerType)(void); // Timeout handler function
+    typedef void (*timeoutHandlerType)(void); // Timeout handler function
 
-typedef struct timerNode
-{
-    timeoutHandlerType timeoutHandler;
-    uint32_t intervalTicks;
-    uint32_t ticksToExpire;
-    struct timerNode *nextNode;
-    timerModeType mode;
-    bool isRunning;
+    typedef struct timerNode
+    {
+        timeoutHandlerType timeoutHandler;
+        uint32_t intervalTicks;
+        uint32_t ticksToExpire;
+        struct timerNode *nextNode;
+        timerModeType mode;
+        bool isRunning;
 
-} timerNodeType;
+    } timerNodeType;
 
-typedef struct timeoutHandlerNode
-{
-    timeoutHandlerType timeoutHandler;
-    struct timeoutHandlerNode *nextNode;
+    typedef struct timeoutHandlerNode
+    {
+        timeoutHandlerType timeoutHandler;
+        struct timeoutHandlerNode *nextNode;
 
-} timeoutHandlerNodeType;
+    } timeoutHandlerNodeType;
 
-typedef struct
-{
-    timeoutHandlerNodeType *head;
-    timeoutHandlerNodeType *tail;
-} timeoutHandlerQueueType;
+    typedef struct
+    {
+        timeoutHandlerNodeType *head;
+        timeoutHandlerNodeType *tail;
+    } timeoutHandlerQueueType;
 
-typedef struct
-{
-    timerNodeType *head;
-} timerListType;
+    typedef struct
+    {
+        timerNodeType *head;
+    } timerListType;
 
-void timerStart(timerNodeType *pTimerNode, uint32_t interval);
+    void timerStart(timerNodeType *pTimerNode, uint32_t interval);
 
-void timerStop(timerNodeType *pTimerNode);
+    void timerStop(timerNodeType *pTimerNode);
 
-void processTimers();
+    void processTimers();
 
-void timerTaskStart();
+    void timerTaskStart();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

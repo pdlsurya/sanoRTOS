@@ -12,26 +12,26 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "osConfig.h"
+#include "retCodes.h"
 #include "task/task.h"
 #include "mutex/mutex.h"
 #include "scheduler/scheduler.h"
 #include "taskQueue/taskQueue.h"
 #include "conditionVariable.h"
-#include "assert.h"
-
 
 /**
  * @brief Wait on condition variable
  *
  * @param pCondVar Pointer to condVarHandle struct
  * @param waitTicks Number of ticks to wait until timeout
- * @return true if wait succeeded
- * @return false if wait failed due to invalid mutex parameter or timeout
+ * @retval SUCCESS(0) if wait succeeded\n,
+ * @retval -EINVAL if mutex is not specified
+ * @retval -ETIMEOUT if timeout occured while waiting
  */
-bool condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
+int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 {
     if (!pCondVar->pMutex)
-        return false;
+        return -EINVAL;
 
     /* Unlock previously acquired mutex;*/
     mutexUnlock(pCondVar->pMutex);
@@ -49,38 +49,38 @@ bool condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 
     /* Return false if wait timed out.*/
     if (currentTask->wakeupReason == WAIT_TIMEOUT)
-        return false;
+        return -ETIMEOUT;
 
-    return true;
+    return SUCCESS;
 }
 
 /**
  * @brief Signal a task waiting on conditional variable.
  *
  * @param pCondVar Pointer to condVarHandle struct
- * @return true if signal succeeded,
- * @return false if signal failed
+ * @retval SUCCESS if signal succeeded,
+ * @retval -ENOTASK if no tasks available to signal
  */
-bool condVarSignal(condVarHandleType *pCondVar)
+int condVarSignal(condVarHandleType *pCondVar)
 {
     taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
     if (nextSignalTask)
     {
         taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
-        return true;
+        return SUCCESS;
     }
 
-    return false;
+    return -ENOTASK;
 }
 
 /**
  * @brief Signal all the waiting tasks waiting on conditional variable
  *
  * @param pCondVar Pointer to condVarHandle struct
- * @return true if broadcast succeeded,
- * @return false if broadcast failed
+ * @retval SUCCESS if broadcast succeeded,
+ * @retval -ENOTASK if not tasks available to broadcast
  */
-bool condVarBroadcast(condVarHandleType *pCondVar)
+int condVarBroadcast(condVarHandleType *pCondVar)
 {
     if (!taskQueueEmpty(&pCondVar->waitQueue))
     {
@@ -94,7 +94,7 @@ bool condVarBroadcast(condVarHandleType *pCondVar)
             }
         }
 
-        return true;
+        return SUCCESS;
     }
-    return false;
+    return -ENOTASK;
 }

@@ -9,6 +9,7 @@
  *
  */
 #include <string.h>
+#include "retCodes.h"
 #include "messageQueue.h"
 #include "task/task.h"
 #include "scheduler/scheduler.h"
@@ -56,10 +57,12 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
  * @param pQueueHandle Pointer to queueHandle struct
  * @param pItem Pointer to the item to be sent to the Queue
  * @param waitTicks Number of ticks to wait if space is not available/Queue is full
- * @return true on Success
- * @return false on Fail
+ * @retval SUCCESS if message sent successfully
+ * @retval -ENOSPACE if Queue is full
+ * @retval -ETIMEOUT if timeout occured
+ * @retval -EINVAL if invalid argument passed
  */
-bool msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
+int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
     if (pQueueHandle)
     {
@@ -68,10 +71,10 @@ bool msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTi
         {
             msgQueueBufferWrite(pQueueHandle, pItem);
 
-            return true;
+            return SUCCESS;
         }
         else if (waitTicks == TASK_NO_WAIT)
-            return false;
+            return -ENOSPACE;
         else
         {
             taskHandleType *currentTask = taskPool.currentTask;
@@ -85,11 +88,15 @@ bool msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTi
             {
                 msgQueueBufferWrite(pQueueHandle, pItem);
 
-                return true;
+                return SUCCESS;
+            }
+            else
+            {
+                return -ETIMEOUT;
             }
         }
     }
-    return false;
+    return -EINVAL;
 }
 
 /**
@@ -98,10 +105,12 @@ bool msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTi
  * @param pQueueHandle Pointer to queueHandle struct
  * @param pItem Pointe to the variable to be assigned the data received from the Queue.
  * @param waitTicks Number of ticks to wait if Queue is empty
- * @return true on Success
- * @return false on Fail
+ * @retval SUCCESS if message received successfully
+ * @retval -ENODATA if Queue is empty
+ * @retval -ETIMEOUT if timeout occured
+ * @retval -EINVAL if invalid argument passed
  */
-bool msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
+int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
     if (pQueueHandle)
     {
@@ -109,10 +118,10 @@ bool msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wai
         if (!msgQueueEmpty(pQueueHandle))
         {
             msgQueueBufferRead(pQueueHandle, pItem);
-            return true;
+            return SUCCESS;
         }
         else if (waitTicks == TASK_NO_WAIT)
-            return false;
+            return -ENODATA;
         else
         {
             taskHandleType *currentTask = taskPool.currentTask;
@@ -126,9 +135,13 @@ bool msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wai
             {
                 msgQueueBufferRead(pQueueHandle, pItem);
 
-                return true;
+                return SUCCESS;
+            }
+            else
+            {
+                return -ETIMEOUT;
             }
         }
     }
-    return false;
+    return -EINVAL;
 }

@@ -9,6 +9,7 @@
  *
  */
 #include <stdlib.h>
+#include "retCodes.h"
 #include "task/task.h"
 #include "scheduler/scheduler.h"
 #include "taskQueue/taskQueue.h"
@@ -19,21 +20,25 @@
  *
  * @param pSem  pointer to the semaphore structure
  * @param waitTicks Number of ticks to wait if semaphore is not available
- * @return true, if semaphore is taken succesfully.
- * @return false, if semaphore could not be taken
+ * @retval SUCCESS if semaphore is taken succesfully.
+ * @retval -EBUSY if semaphore is not available
+ * @retval -ETIMEOUT if timeout occured while waiting for semaphore
+ * @retval -EINVAL if invalid arguments passed
  */
-bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
+int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
     if (pSem)
     {
         if (pSem->count != 0)
         {
             pSem->count--;
-            return true;
+            return SUCCESS;
         }
 
         else if (waitTicks == TASK_NO_WAIT)
-            return false;
+        {
+            return -EBUSY;
+        }
         else
         {
             taskHandleType *currentTask = taskPool.currentTask;
@@ -46,20 +51,24 @@ bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 
             if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
             {
-                return true;
+                return SUCCESS;
+            }
+            else
+            {
+                return -ETIMEOUT;
             }
         }
     }
-    return false;
+    return -EINVAL;
 }
 
 /**
  * @brief Function to give/signal semaphore
  * @param pSem  pointer to the semaphoreHandle struct.
- * @return true if semaphore given successfully
- * @return  false if semaphore could not be given
+ * @retval SUCCESS if semaphore given successfully
+ * @retval  -EINVAL if invalid argument passed or semaphore count limit reached
  */
-bool semaphoreGive(semaphoreHandleType *pSem)
+int semaphoreGive(semaphoreHandleType *pSem)
 {
     if (pSem != NULL && pSem->count != pSem->maxCount)
     {
@@ -73,8 +82,8 @@ bool semaphoreGive(semaphoreHandleType *pSem)
         else
             pSem->count++;
 
-        return true;
+        return SUCCESS;
     }
 
-    return false;
+    return -EINVAL;
 }

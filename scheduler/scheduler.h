@@ -13,21 +13,30 @@
 
 #include "osConfig.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #ifdef STM32F401xC
 #define SYSTICK_HANDLER osSysTick_Handler
 /*For STM32 SoCs, SysTick timer time initialized during ClockConfig stage;
  Hence, we dont need it re-initialize SysTick timer for STM32 platform.*/
 #define SYSTICK_CONFIG()
-void osSysTick_Handler();
+    void osSysTick_Handler();
 #else
 #define SYSTICK_HANDLER SysTick_Handler
 #define SYSTICK_CONFIG() SysTick_Config(OS_INTERVAL_CPU_TICKS)
 #endif
 
-#define MAX_WAITING_TASKS 
+#define MAX_WAITING_TASKS
 
-void osStartScheduler();
+    void osStartScheduler();
 
-void taskYield();
+    void taskYield();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
