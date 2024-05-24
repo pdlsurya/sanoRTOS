@@ -34,8 +34,8 @@ static inline taskNodeType *newNode(taskHandleType *pTask)
  *
  * @param pTaskQueue Pointer to the taskQueue struct.
  * @param pTask  Pointer to the taskHandle struct
- * @retval SUCCESS if task added successfully
- * @retval -EINVAL if invalid arguments passed
+ * @retval RET_SUCCESS if task added successfully
+ * @retval RET_INVAL if invalid arguments passed
  */
 int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
@@ -46,9 +46,9 @@ int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
         newTaskNode->nextTaskNode = pTaskQueue->head;
 
         pTaskQueue->head = newTaskNode;
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
@@ -56,8 +56,8 @@ int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
  * their priority
  * @param pTaskQueue
  * @param pTask
- * @retval SUCCESS if task added to the Queue successfully
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if task added to the Queue successfully
+ * @retval RET_INVAL if invalid argument passed
  */
 int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
@@ -87,9 +87,9 @@ int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 
             currentTaskNode->nextTaskNode = newTaskNode;
         }
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
@@ -120,8 +120,8 @@ taskHandleType *taskQueueGet(taskQueueType *ptaskQueue)
  * @brief Remove head node from Queue
  *
  * @param pTaskQueue
- * @retval SUCCESS if removed successfully
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if removed successfully
+ * @retval RET_INVAL if invalid argument passed
  */
 static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
@@ -133,9 +133,9 @@ static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
 
         pTaskQueue->head = temp;
 
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
@@ -143,8 +143,8 @@ static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
  *
  * @param pTaskQueue
  * @param pTask
- * @retval SUCCESS if task removed successfully
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if task removed successfully
+ * @retval RET_INVAL if invalid argument passed
  */
 int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
@@ -169,7 +169,7 @@ int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 
             currentTaskNode->nextTaskNode = temp;
         }
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }

@@ -24,9 +24,9 @@
  *
  * @param pCondVar Pointer to condVarHandle struct
  * @param waitTicks Number of ticks to wait until timeout
- * @retval SUCCESS(0) if wait succeeded
- * @retval -EINVAL if invalid arguments passed
- * @retval -ETIMEOUT if timeout occured while waiting
+ * @retval RET_SUCCESS(0) if wait succeeded
+ * @retval RET_INVAL if invalid arguments passed
+ * @retval RET_TIMEOUT if timeout occured while waiting
  */
 int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 {
@@ -48,44 +48,44 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 
         /* Return false if wait timed out.*/
         if (currentTask->wakeupReason == WAIT_TIMEOUT)
-            return -ETIMEOUT;
+            return RET_TIMEOUT;
 
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
  * @brief Signal a task waiting on conditional variable.
  *
  * @param pCondVar Pointer to condVarHandle struct
- * @retval SUCCESS if signal succeeded,
- * @retval -ENOTASK if no tasks available to signal
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if signal succeeded,
+ * @retval RET_NOTASK if no tasks available to signal
+ * @retval RET_INVAL if invalid argument passed
  */
 int condVarSignal(condVarHandleType *pCondVar)
 {
     if (pCondVar != NULL)
     {
         taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
-        if (nextSignalTask)
+        if (nextSignalTask != NULL)
         {
             taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
-            return SUCCESS;
+            return RET_SUCCESS;
         }
 
-        return -ENOTASK;
+        return RET_NOTASK;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
  * @brief Signal all the waiting tasks waiting on conditional variable
  *
  * @param pCondVar Pointer to condVarHandle struct
- * @retval SUCCESS if broadcast succeeded,
- * @retval -ENOTASK if not tasks available to broadcast
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if broadcast succeeded,
+ * @retval RET_NOTASK if not tasks available to broadcast
+ * @retval RET_INVAL if invalid argument passed
  */
 int condVarBroadcast(condVarHandleType *pCondVar)
 {
@@ -103,9 +103,9 @@ int condVarBroadcast(condVarHandleType *pCondVar)
                 }
             }
 
-            return SUCCESS;
+            return RET_SUCCESS;
         }
-        return -ENOTASK;
+        return RET_NOTASK;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }

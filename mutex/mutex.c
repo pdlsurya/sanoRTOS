@@ -21,10 +21,10 @@
  *
  * @param pMutex Pointer to the mutex structure
  * @param waitTicks Number of ticks to wait if mutex is not available
- * @retval SUCCESS if mutex locked successfully
- * @retval -EBUSY  if mutex not available
- * @retval -ETIMEOUT if timeout occured while waiting for mutex
- * @retval -EINVAL if invalid arguments passed
+ * @retval RET_SUCCESS if mutex locked successfully
+ * @retval RET_BUSY  if mutex not available
+ * @retval RET_TIMEOUT if timeout occured while waiting for mutex
+ * @retval RET_INVAL if invalid arguments passed
  */
 int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
@@ -48,12 +48,12 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
         {
             pMutex->locked = true;
             pMutex->ownerTask = currentTask;
-            return SUCCESS;
+            return RET_SUCCESS;
         }
 
         else if (waitTicks == TASK_NO_WAIT && pMutex->locked)
         {
-            return -EBUSY;
+            return RET_BUSY;
         }
 
         else if (waitTicks > 0)
@@ -66,23 +66,23 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 
             if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
             {
-                return SUCCESS;
+                return RET_SUCCESS;
             }
             else
             {
-                return -ETIMEOUT;
+                return RET_TIMEOUT;
             }
         }
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
  * @brief Unlock/Release mutex
  * @param pMutex Pointer to the mutex structure
- * @retval SUCCESS if mutex unlocked successfully
- * @retval -ENOTOWNER if current owner doesnot owns the mutex
- * @retval -EINVAL on Invalid operation or invalid argument passed
+ * @retval RET_SUCCESS if mutex unlocked successfully
+ * @retval RET_NOTOWNER if current owner doesnot owns the mutex
+ * @retval RET_INVAL on Invalid operation or invalid argument passed
  */
 int mutexUnlock(mutexHandleType *pMutex)
 {
@@ -120,14 +120,14 @@ int mutexUnlock(mutexHandleType *pMutex)
                     pMutex->locked = false;
                 }
 
-                return SUCCESS;
+                return RET_SUCCESS;
             }
         }
         else
         {
-            return -ENOTOWNER;
+            return RET_NOTOWNER;
         }
     }
 
-    return -EINVAL;
+    return RET_INVAL;
 }

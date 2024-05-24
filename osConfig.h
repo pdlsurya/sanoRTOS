@@ -13,6 +13,8 @@
 #include "cmsis_gcc.h"
 #include "core_cm4.h"
 
+#include "retCodes.h"
+
 #ifdef __cplusplus
 extern "C"
 {

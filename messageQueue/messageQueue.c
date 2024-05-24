@@ -29,7 +29,7 @@ static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 
     // Get next waiting consumer task to unblock
     taskHandleType *consumer = taskQueueGet(&pQueueHandle->consumerWaitQueue);
-    if (consumer)
+    if (consumer != NULL)
         taskSetReady(consumer, MSG_QUEUE_DATA_AVAILABLE);
 }
 
@@ -47,7 +47,7 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 
     // Get next waiting producer task to unblock
     taskHandleType *producer = taskQueueGet(&pQueueHandle->producerWaitQueue);
-    if (producer)
+    if (producer != NULL)
         taskSetReady(producer, MSG_QUEUE_SPACE_AVAILABE);
 }
 
@@ -57,10 +57,10 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
  * @param pQueueHandle Pointer to queueHandle struct
  * @param pItem Pointer to the item to be sent to the Queue
  * @param waitTicks Number of ticks to wait if space is not available/Queue is full
- * @retval SUCCESS if message sent successfully
- * @retval -ENOSPACE if Queue is full
- * @retval -ETIMEOUT if timeout occured
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if message sent successfully
+ * @retval RET_FULL if Queue is full
+ * @retval RET_TIMEOUT if timeout occured
+ * @retval RET_INVAL if invalid argument passed
  */
 int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
@@ -71,10 +71,10 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
         {
             msgQueueBufferWrite(pQueueHandle, pItem);
 
-            return SUCCESS;
+            return RET_SUCCESS;
         }
         else if (waitTicks == TASK_NO_WAIT)
-            return -ENOSPACE;
+            return RET_FULL;
         else
         {
             taskHandleType *currentTask = taskPool.currentTask;
@@ -88,15 +88,15 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
             {
                 msgQueueBufferWrite(pQueueHandle, pItem);
 
-                return SUCCESS;
+                return RET_SUCCESS;
             }
             else
             {
-                return -ETIMEOUT;
+                return RET_TIMEOUT;
             }
         }
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
@@ -105,10 +105,10 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
  * @param pQueueHandle Pointer to queueHandle struct
  * @param pItem Pointe to the variable to be assigned the data received from the Queue.
  * @param waitTicks Number of ticks to wait if Queue is empty
- * @retval SUCCESS if message received successfully
- * @retval -ENODATA if Queue is empty
- * @retval -ETIMEOUT if timeout occured
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if message received successfully
+ * @retval RET_EMPTY if Queue is empty
+ * @retval RET_TIMEOUT if timeout occured
+ * @retval RET_INVAL if invalid argument passed
  */
 int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
@@ -118,10 +118,10 @@ int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wait
         if (!msgQueueEmpty(pQueueHandle))
         {
             msgQueueBufferRead(pQueueHandle, pItem);
-            return SUCCESS;
+            return RET_SUCCESS;
         }
         else if (waitTicks == TASK_NO_WAIT)
-            return -ENODATA;
+            return RET_EMPTY;
         else
         {
             taskHandleType *currentTask = taskPool.currentTask;
@@ -135,13 +135,13 @@ int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wait
             {
                 msgQueueBufferRead(pQueueHandle, pItem);
 
-                return SUCCESS;
+                return RET_SUCCESS;
             }
             else
             {
-                return -ETIMEOUT;
+                return RET_TIMEOUT;
             }
         }
     }
-    return -EINVAL;
+    return RET_INVAL;
 }

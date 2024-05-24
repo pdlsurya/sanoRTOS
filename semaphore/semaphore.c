@@ -20,10 +20,10 @@
  *
  * @param pSem  pointer to the semaphore structure
  * @param waitTicks Number of ticks to wait if semaphore is not available
- * @retval SUCCESS if semaphore is taken succesfully.
- * @retval -EBUSY if semaphore is not available
- * @retval -ETIMEOUT if timeout occured while waiting for semaphore
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if semaphore is taken succesfully.
+ * @retval RET_BUSY if semaphore is not available
+ * @retval RET_TIMEOUT if timeout occured while waiting for semaphore
+ * @retval RET_INVAL if invalid argument passed
  */
 int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
@@ -32,12 +32,12 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
         if (pSem->count != 0)
         {
             pSem->count--;
-            return SUCCESS;
+            return RET_SUCCESS;
         }
 
         else if (waitTicks == TASK_NO_WAIT)
         {
-            return -EBUSY;
+            return RET_BUSY;
         }
         else
         {
@@ -51,22 +51,22 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 
             if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
             {
-                return SUCCESS;
+                return RET_SUCCESS;
             }
             else
             {
-                return -ETIMEOUT;
+                return RET_TIMEOUT;
             }
         }
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
  * @brief Function to give/signal semaphore
  * @param pSem  pointer to the semaphoreHandle struct.
- * @retval SUCCESS if semaphore given successfully
- * @retval  -EINVAL if invalid argument passed or semaphore count limit reached
+ * @retval RET_SUCCESS if semaphore given successfully
+ * @retval  RET_INVAL if invalid argument passed or semaphore count limit reached
  */
 int semaphoreGive(semaphoreHandleType *pSem)
 {
@@ -80,10 +80,12 @@ int semaphoreGive(semaphoreHandleType *pSem)
             taskSetReady(nextTask, SEMAPHORE_TAKEN);
         }
         else
+        {
             pSem->count++;
+        }
 
-        return SUCCESS;
+        return RET_SUCCESS;
     }
 
-    return -EINVAL;
+    return RET_INVAL;
 }

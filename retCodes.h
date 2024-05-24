@@ -6,17 +6,16 @@ extern "C"
 {
 #endif
 
-#define SUCCESS 0        /*Success*/
-#define EINVAL 1         /*Invalid argument or Invalid Operation*/
-#define ETIMEOUT 2       /*Wait Timeout*/
-#define ENODATA 3        /*No data available*/
-#define ENOSPACE 4       /*No space available*/
-#define ENOTASK 5        /*No task available*/
-#define EBUSY 6          /*Resource busy*/
-#define ENOTOWNER 7      /*Not owner*/
-#define ENOTACTIVE 8     /*Timer/Task not running*/
-#define EALREADYACTIVE 9 /*Timer/Task already running*/
-#define EEMPTY 10        /*Empty list/queue*/
+#define RET_SUCCESS 0        /*Success*/
+#define RET_INVAL -1         /*Invalid argument or Invalid Operation*/
+#define RET_TIMEOUT -2       /*Wait Timeout*/
+#define RET_EMPTY -3         /*Empty List/Queue*/
+#define RET_FULL -4          /*FUll List/Queuee*/
+#define RET_NOTASK -5        /*No task available*/
+#define RET_BUSY -6          /*Resource busy*/
+#define RET_NOTOWNER -7      /*Not owner*/
+#define RET_NOTACTIVE -8     /*Timer/Task not running*/
+#define RET_ALREADYACTIVE -9 /*Timer/Task already running*/
 
 #ifdef __cplusplus
 }

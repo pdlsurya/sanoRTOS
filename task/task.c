@@ -32,8 +32,8 @@ static void taskExitFunction()
 /**
  * @brief Change task's status to ready
  * @param pTask Pointer to the taskHandle struct.
- * @retval SUCCESS if task enqueued to readyQueue successfully
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if task enqueued to readyQueue successfully
+ * @retval RET_INVAL if invalid argument passed
  */
 int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
@@ -51,9 +51,9 @@ int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 
         /* Add task to queue of ready tasks*/
         taskQueueAdd(&taskPool.readyQueue, pTask);
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
@@ -62,8 +62,8 @@ int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
  * @param pTask Pointer to taskHandle struct.
  * @param blockReason Block reason
  * @param ticks Number to ticks to block the task for.
- * @retval SUCCESS if task blocked successfully
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if task blocked successfully
+ * @retval RET_INVAL if invalid argument passed
  */
 int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
 {
@@ -81,17 +81,17 @@ int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t t
         // Give CPU to other tasks
         taskYield();
 
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
  * @brief Suspend task
  *
  * @param pTask Pointer to taskHandle struct.
- * @retval SUCCESS if task suspended successfully
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if task suspended successfully
+ * @retval RET_INVAL if invalid argument passed
  */
 int taskSuspend(taskHandleType *pTask)
 {
@@ -110,17 +110,17 @@ int taskSuspend(taskHandleType *pTask)
         {
             taskYield();
         }
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
  * @brief Resume task from suspended state
  *
  * @param pTask Pointer to taskHandle struct
- * @return SUCCESS if task resumed succesfully
- * @return -EINVAL if invalid argument passed or task was not in suspended state
+ * @return RET_SUCCESS if task resumed succesfully
+ * @return RET_INVAL if invalid argument passed or task was not in suspended state
  */
 int taskResume(taskHandleType *pTask)
 {
@@ -129,18 +129,18 @@ int taskResume(taskHandleType *pTask)
         if (pTask->status == TASK_STATUS_SUSPENDED)
         {
             taskSetReady(pTask, RESUME);
-            return SUCCESS;
+            return RET_SUCCESS;
         }
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
 
 /**
  * @brief Block task for specified number of OS Ticks
  *
  * @param sleepTicks
- * @retval SUCCESS if task put to sleep successfullly
- * @retval -EINVAL if task is not running
+ * @retval RET_SUCCESS if task put to sleep successfullly
+ * @retval RET_NOTACTIVE if task is not running
  */
 static inline int taskSleep(uint32_t sleepTicks)
 {
@@ -149,15 +149,15 @@ static inline int taskSleep(uint32_t sleepTicks)
     {
         return taskBlock(currentTask, SLEEP, sleepTicks);
     }
-    return -EINVAL;
+    return RET_NOTACTIVE;
 }
 
 /**
  * @brief Block task for specified number of milliseconds
  *
  * @param sleepTimeMS
- * @retval SUCCESS if task put to sleep successfullly
- * @retval -EINVAL if task is not running
+ * @retval RET_SUCCESS if task put to sleep successfullly
+ * @retval RET_NOTACTIVE if task is not running
  */
 int taskSleepMS(uint32_t sleepTimeMS)
 {
@@ -169,8 +169,8 @@ int taskSleepMS(uint32_t sleepTimeMS)
  * @brief Block task for specified number of microseconds
  *
  * @param sleepTimeUS
- * @retval SUCCESS if task put to sleep successfullly
- * @retval -EINVAL if task is not running
+ * @retval RET_SUCCESS if task put to sleep successfullly
+ * @retval RET_NOTACTIVE if task is not running
  */
 int taskSleepUS(uint32_t sleepTimeUS)
 {
@@ -183,8 +183,8 @@ int taskSleepUS(uint32_t sleepTimeUS)
  * called from  main after calling taskStart. If this function is called from other running tasks, execution happens based on priority of the task.
  *
  * @param pTaskHandle Pointer to taskHandle struct
- * @retval SUCCESS if task enqueued to readyQueue successfully
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if task enqueued to readyQueue successfully
+ * @retval RET_INVAL if invalid argument passed
  */
 int taskStart(taskHandleType *pTaskHandle)
 {
@@ -227,7 +227,7 @@ int taskStart(taskHandleType *pTaskHandle)
         /*Store pointer to the taskHandle struct to ready queue*/
         taskQueueAdd(&taskPool.readyQueue, pTaskHandle);
 
-        return SUCCESS;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_INVAL;
 }
