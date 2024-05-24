@@ -44,9 +44,8 @@ bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
             /* Block current task and give CPU to other tasks while waiting for semaphore*/
             taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
 
-            if (currentTask->wakeupReason == SEMAPHORE_AVAILABLE && pSem->count != 0)
+            if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
             {
-                pSem->count--;
                 return true;
             }
         }
@@ -62,15 +61,17 @@ bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
  */
 bool semaphoreGive(semaphoreHandleType *pSem)
 {
-    if (pSem && pSem->count != pSem->maxCount)
+    if (pSem != NULL && pSem->count != pSem->maxCount)
     {
-        pSem->count++;
-
         /*Get next task to signal from the wait Queue*/
         taskHandleType *nextTask = taskQueueGet(&pSem->waitQueue);
 
-        if (nextTask)
-            taskSetReady(nextTask, SEMAPHORE_AVAILABLE);
+        if (nextTask != NULL)
+        {
+            taskSetReady(nextTask, SEMAPHORE_TAKEN);
+        }
+        else
+            pSem->count++;
 
         return true;
     }

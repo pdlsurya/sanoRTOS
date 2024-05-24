@@ -16,21 +16,6 @@
 #include "mutex.h"
 
 /**
- * @brief Select next owner of the mutex
- *
- * @param pMutex Pointer to mutexHandle struct.
- */
-static inline void selectNextOwner(mutexHandleType *pMutex)
-{
-    taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
-
-    pMutex->ownerTask = nextOwner;
-
-    if (nextOwner)
-        taskSetReady(nextOwner, MUTEX_AVAILABLE);
-}
-
-/**
  * @brief Lock/acquire the mutex
  *
  * @param pMutex Pointer to the mutex structure
@@ -56,7 +41,7 @@ bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
         }
 #endif
         /* Check if mutex is free and no owner has been assigned. If so, lock mutex immediately.*/
-        if (!pMutex->locked && pMutex->ownerTask == NULL)
+        if (!pMutex->locked)
         {
             pMutex->locked = true;
             pMutex->ownerTask = currentTask;
@@ -74,9 +59,9 @@ bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
             /* Block current task and give CPU to other tasks while waiting for mutex*/
             taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
 
-            if (currentTask->wakeupReason == MUTEX_AVAILABLE && pMutex->ownerTask == currentTask && !pMutex->locked)
+            if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
             {
-                pMutex->locked = true;
+
                 return true;
             }
         }
@@ -111,9 +96,18 @@ bool mutexUnlock(mutexHandleType *pMutex)
             }
 #endif
             /* select next owner of the mutex*/
-            selectNextOwner(pMutex);
+            taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
 
-            pMutex->locked = false;
+            pMutex->ownerTask = nextOwner;
+
+            if (nextOwner!=NULL)
+            {
+                taskSetReady(nextOwner, MUTEX_LOCKED);
+            }
+            else
+            {
+                pMutex->locked = false;
+            }
 
             return true;
         }
