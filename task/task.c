@@ -168,11 +168,11 @@ int taskSleepUS(uint32_t sleepTimeUS)
  * function from main does not start execution of the task if Scheduler is not started.To start executeion of task, osStartScheduler must be
  * called from  main after calling taskStart. If this function is called from other running tasks, execution happens based on priority of the task.
  *
- * @param pTaskHandle Pointer to taskHandle struct
+ * @param pTask Pointer to taskHandle struct
  */
-void taskStart(taskHandleType *pTaskHandle)
+void taskStart(taskHandleType *pTask)
 {
-    assert(pTaskHandle != NULL);
+    assert(pTask != NULL);
     /**********--Task's default stack values--****************************************
         ____ <-- stackBase
        |____|xPSR  --> stackPointer + 16
@@ -201,12 +201,12 @@ void taskStart(taskHandleType *pTaskHandle)
      <-32bits->                                 <-32bits->
     *************************************************************************************/
 
-    *((uint32_t *)pTaskHandle->stackPointer + 8) = EXC_RETURN_THREAD_PSP;
-    *((uint32_t *)pTaskHandle->stackPointer + 9) = (uint32_t)pTaskHandle->params;
-    *((uint32_t *)pTaskHandle->stackPointer + 14) = (uint32_t)taskExitFunction;
-    *((uint32_t *)pTaskHandle->stackPointer + 15) = (uint32_t)pTaskHandle->taskEntry;
-    *((uint32_t *)pTaskHandle->stackPointer + 16) = 0x01000000; // Default xPSR register value
+    *((uint32_t *)pTask->stackPointer + 8) = EXC_RETURN_THREAD_PSP;
+    *((uint32_t *)pTask->stackPointer + 9) = (uint32_t)pTask->params;
+    *((uint32_t *)pTask->stackPointer + 14) = (uint32_t)taskExitFunction;
+    *((uint32_t *)pTask->stackPointer + 15) = (uint32_t)pTask->taskEntry;
+    *((uint32_t *)pTask->stackPointer + 16) = 0x01000000; // Default xPSR register value
 
     /*Store pointer to the taskHandle struct to ready queue*/
-    taskQueueAdd(&taskPool.readyQueue, pTaskHandle);
+    taskQueueAdd(&taskPool.readyQueue, pTask);
 }

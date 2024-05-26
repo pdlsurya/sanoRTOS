@@ -97,6 +97,8 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
  */
 taskHandleType *taskQueueGet(taskQueueType *ptaskQueue)
 {
+    assert(ptaskQueue != NULL);
+
     if (!taskQueueEmpty(ptaskQueue))
     {
         taskHandleType *pTask = ptaskQueue->head->pTask;

@@ -18,7 +18,7 @@
 extern "C"
 {
 #endif
-
+    /*Forward declaration of taskHandleType*/
     typedef struct taskHandle taskHandleType;
 
     typedef struct taskNode
@@ -44,8 +44,8 @@ extern "C"
      * @brief Check if taskQueue is empty
      *
      * @param pTaskQueue
-     * @return true
-     * @return false
+     * @retval true if taskQueue is empty
+     * @retval false, otherwise
      */
     static inline bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {

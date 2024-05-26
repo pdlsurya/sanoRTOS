@@ -77,6 +77,7 @@ extern "C"
 
     } wakeupReasonType;
 
+    /*Task control block struct*/
     typedef struct taskHandle
     {
         uint32_t stackPointer;
@@ -102,7 +103,7 @@ extern "C"
     extern taskHandleType *nextTask;
     extern taskPoolType taskPool;
 
-    void taskStart(taskHandleType *pTaskHandle);
+    void taskStart(taskHandleType *pTask);
 
     int taskSleepMS(uint32_t sleepTimeMS);
 
