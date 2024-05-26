@@ -1,7 +1,7 @@
 /**
  * @file taskQueue.h
  * @author Surya Poudel
- * @brief Task Queue implementation with FIFO or Priority sorting
+ * @brief Priority Task Queue implementation
  * @version 0.1
  * @date 2024-05-08
  *
