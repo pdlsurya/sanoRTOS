@@ -9,6 +9,7 @@
  *
  */
 #include <stdlib.h>
+#include <assert.h>
 #include "retCodes.h"
 #include "task/task.h"
 #include "scheduler/scheduler.h"
@@ -23,54 +24,51 @@
  * @retval RET_SUCCESS if semaphore is taken succesfully.
  * @retval RET_BUSY if semaphore is not available
  * @retval RET_TIMEOUT if timeout occured while waiting for semaphore
- * @retval RET_INVAL if invalid argument passed
  */
 int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
-    if (pSem != NULL)
+    assert(pSem != NULL);
+
+    if (pSem->count != 0)
     {
-        if (pSem->count != 0)
+        pSem->count--;
+        return RET_SUCCESS;
+    }
+
+    else if (waitTicks == TASK_NO_WAIT)
+    {
+        return RET_BUSY;
+    }
+    else
+    {
+        taskHandleType *currentTask = taskPool.currentTask;
+
+        /*Put current task in semaphore's wait queue*/
+        taskQueueAdd(&pSem->waitQueue, currentTask);
+
+        /* Block current task and give CPU to other tasks while waiting for semaphore*/
+        taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
+
+        if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
         {
-            pSem->count--;
             return RET_SUCCESS;
         }
 
-        else if (waitTicks == TASK_NO_WAIT)
-        {
-            return RET_BUSY;
-        }
-        else
-        {
-            taskHandleType *currentTask = taskPool.currentTask;
-
-            /*Put current task in semaphore's wait queue*/
-            taskQueueAdd(&pSem->waitQueue, currentTask);
-
-            /* Block current task and give CPU to other tasks while waiting for semaphore*/
-            taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
-
-            if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
-            {
-                return RET_SUCCESS;
-            }
-            else
-            {
-                return RET_TIMEOUT;
-            }
-        }
+        return RET_TIMEOUT;
     }
-    return RET_INVAL;
 }
 
 /**
  * @brief Function to give/signal semaphore
  * @param pSem  pointer to the semaphoreHandle struct.
- * @retval RET_SUCCESS if semaphore given successfully
- * @retval  RET_INVAL if invalid argument passed or semaphore count limit reached
+ * @retval RET_SUCCESS if semaphore give succesfully.
+ * @retval RET_NOSEM no semaphore available to give
  */
 int semaphoreGive(semaphoreHandleType *pSem)
 {
-    if (pSem != NULL && pSem->count != pSem->maxCount)
+    assert(pSem != NULL);
+
+    if (pSem->count != pSem->maxCount)
     {
         /*Get next task to signal from the wait Queue*/
         taskHandleType *nextTask = taskQueueGet(&pSem->waitQueue);
@@ -87,5 +85,5 @@ int semaphoreGive(semaphoreHandleType *pSem)
         return RET_SUCCESS;
     }
 
-    return RET_INVAL;
+    return RET_NOSEM;
 }

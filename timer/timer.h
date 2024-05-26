@@ -75,7 +75,7 @@ extern "C"
 
     void processTimers();
 
-    int timerTaskStart();
+    void timerTaskStart();
 
 #ifdef __cplusplus
 }

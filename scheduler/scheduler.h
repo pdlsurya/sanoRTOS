@@ -29,8 +29,6 @@ extern "C"
 #define SYSTICK_CONFIG() SysTick_Config(OS_INTERVAL_CPU_TICKS)
 #endif
 
-#define MAX_WAITING_TASKS
-
     void osStartScheduler();
 
     void taskYield();

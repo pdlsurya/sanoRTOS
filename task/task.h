@@ -102,17 +102,17 @@ extern "C"
     extern taskHandleType *nextTask;
     extern taskPoolType taskPool;
 
-    int taskStart(taskHandleType *pTaskHandle);
+    void taskStart(taskHandleType *pTaskHandle);
 
     int taskSleepMS(uint32_t sleepTimeMS);
 
     int taskSleepUS(uint32_t sleepTimeUS);
 
-    int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
+    void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
 
-    int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
+    void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
 
-    int taskSuspend(taskHandleType *pTask);
+    void taskSuspend(taskHandleType *pTask);
 
     int taskResume(taskHandleType *pTask);
 
