@@ -122,8 +122,6 @@ taskHandleType *taskQueueGet(taskQueueType *ptaskQueue)
  */
 static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
-    assert(pTaskQueue != NULL);
-
     taskNodeType *temp = pTaskQueue->head->nextTaskNode;
 
     free(pTaskQueue->head);

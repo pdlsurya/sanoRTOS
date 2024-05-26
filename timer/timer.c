@@ -86,7 +86,6 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
 static void timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
     assert(pTimerList != NULL);
-    assert(pTimerNode != NULL);
 
     pTimerNode->nextNode = pTimerList->head;
 
@@ -118,9 +117,8 @@ static inline void timerListDeleteFirstNode(timerListType *pTimerList)
 static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
     assert(pTimerList != NULL);
-    assert(pTimerNode != NULL);
 
-    if (pTimerList->head != NULL)
+    if (pTimerList->head != NULL) //Check if timerList is empty
     {
         timerNodeType *currentNode = pTimerList->head;
 
@@ -195,7 +193,7 @@ int timerStop(timerNodeType *pTimerNode)
  */
 void processTimers()
 {
-    if (timerList.head != NULL)
+    if (timerList.head != NULL) //Check if timer list is empty
     {
         timerNodeType *currentNode = timerList.head;
         while (currentNode != NULL)
