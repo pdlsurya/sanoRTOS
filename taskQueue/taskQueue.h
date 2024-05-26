@@ -34,11 +34,11 @@ extern "C"
 
     taskHandleType *taskQueueGet(taskQueueType *pTaskQueue);
 
-    int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
-    int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
-    int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
     /**
      * @brief Check if taskQueue is empty

@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "retCodes.h"
 #include "osConfig.h"
 #include "task/task.h"
@@ -34,21 +35,17 @@ static inline taskNodeType *newNode(taskHandleType *pTask)
  *
  * @param pTaskQueue Pointer to the taskQueue struct.
  * @param pTask  Pointer to the taskHandle struct
- * @retval RET_SUCCESS if task added successfully
- * @retval RET_INVAL if invalid arguments passed
  */
-int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
+void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    if (pTaskQueue != NULL && pTask != NULL)
-    {
-        taskNodeType *newTaskNode = newNode(pTask);
+    assert(pTaskQueue != NULL);
+    assert(pTask != NULL);
 
-        newTaskNode->nextTaskNode = pTaskQueue->head;
+    taskNodeType *newTaskNode = newNode(pTask);
 
-        pTaskQueue->head = newTaskNode;
-        return RET_SUCCESS;
-    }
-    return RET_INVAL;
+    newTaskNode->nextTaskNode = pTaskQueue->head;
+
+    pTaskQueue->head = newTaskNode;
 }
 
 /**
@@ -56,47 +53,44 @@ int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
  * their priority
  * @param pTaskQueue
  * @param pTask
- * @retval RET_SUCCESS if task added to the Queue successfully
- * @retval RET_INVAL if invalid argument passed
  */
-int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
+void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    if (pTaskQueue != NULL && pTask != NULL)
+    assert(pTaskQueue != NULL);
+    assert(pTask != NULL);
+
+    taskNodeType *newTaskNode = newNode(pTask);
+
+    if (taskQueueEmpty(pTaskQueue))
     {
-        taskNodeType *newTaskNode = newNode(pTask);
-
-        if (taskQueueEmpty(pTaskQueue))
-        {
-            pTaskQueue->head = newTaskNode;
-        }
-        else if (pTaskQueue->head->pTask->priority > pTask->priority)
-        {
-            newTaskNode->nextTaskNode = pTaskQueue->head;
-
-            pTaskQueue->head = newTaskNode;
-        }
-        else
-        {
-            taskNodeType *currentTaskNode = pTaskQueue->head;
-            while (currentTaskNode->nextTaskNode && currentTaskNode->nextTaskNode->pTask->priority <= pTask->priority)
-            {
-                currentTaskNode = currentTaskNode->nextTaskNode;
-            }
-
-            newTaskNode->nextTaskNode = currentTaskNode->nextTaskNode;
-
-            currentTaskNode->nextTaskNode = newTaskNode;
-        }
-        return RET_SUCCESS;
+        pTaskQueue->head = newTaskNode;
     }
-    return RET_INVAL;
+    else if (pTaskQueue->head->pTask->priority > pTask->priority)
+    {
+        newTaskNode->nextTaskNode = pTaskQueue->head;
+
+        pTaskQueue->head = newTaskNode;
+    }
+    else
+    {
+        taskNodeType *currentTaskNode = pTaskQueue->head;
+        while (currentTaskNode->nextTaskNode && currentTaskNode->nextTaskNode->pTask->priority <= pTask->priority)
+        {
+            currentTaskNode = currentTaskNode->nextTaskNode;
+        }
+
+        newTaskNode->nextTaskNode = currentTaskNode->nextTaskNode;
+
+        currentTaskNode->nextTaskNode = newTaskNode;
+    }
 }
 
 /**
  * @brief Get the highest priority task from the Queue. This corresponds to the
  * front task node in the Queue.
  * @param pTaskQueue Pointer to taskQueue struct
- * @return Next highest priority task if Queue is not empty, or NULL otherwise.
+ * @retval Next highest priority task if exists
+ * @retval NULL if Queue is empty
  */
 taskHandleType *taskQueueGet(taskQueueType *ptaskQueue)
 {
@@ -120,22 +114,16 @@ taskHandleType *taskQueueGet(taskQueueType *ptaskQueue)
  * @brief Remove head node from Queue
  *
  * @param pTaskQueue
- * @retval RET_SUCCESS if removed successfully
- * @retval RET_INVAL if invalid argument passed
  */
-static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
+static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
-    if (pTaskQueue != NULL)
-    {
-        taskNodeType *temp = pTaskQueue->head->nextTaskNode;
+    assert(pTaskQueue != NULL);
 
-        free(pTaskQueue->head);
+    taskNodeType *temp = pTaskQueue->head->nextTaskNode;
 
-        pTaskQueue->head = temp;
+    free(pTaskQueue->head);
 
-        return RET_SUCCESS;
-    }
-    return RET_INVAL;
+    pTaskQueue->head = temp;
 }
 
 /**
@@ -143,33 +131,28 @@ static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
  *
  * @param pTaskQueue
  * @param pTask
- * @retval RET_SUCCESS if task removed successfully
- * @retval RET_INVAL if invalid argument passed
  */
-int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
+void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    if (pTaskQueue != NULL && pTask != NULL)
+    assert(pTaskQueue != NULL);
+    assert(pTask != NULL);
+
+    if (pTask == pTaskQueue->head->pTask)
     {
-
-        if (pTask == pTaskQueue->head->pTask)
-        {
-            taskQueueRemoveHead(pTaskQueue);
-        }
-
-        else
-        {
-            taskNodeType *currentTaskNode = pTaskQueue->head;
-
-            while (currentTaskNode->nextTaskNode->pTask != pTask)
-                currentTaskNode = currentTaskNode->nextTaskNode;
-
-            taskNodeType *temp = currentTaskNode->nextTaskNode->nextTaskNode;
-
-            free(currentTaskNode->nextTaskNode);
-
-            currentTaskNode->nextTaskNode = temp;
-        }
-        return RET_SUCCESS;
+        taskQueueRemoveHead(pTaskQueue);
     }
-    return RET_INVAL;
+
+    else
+    {
+        taskNodeType *currentTaskNode = pTaskQueue->head;
+
+        while (currentTaskNode->nextTaskNode->pTask != pTask)
+            currentTaskNode = currentTaskNode->nextTaskNode;
+
+        taskNodeType *temp = currentTaskNode->nextTaskNode->nextTaskNode;
+
+        free(currentTaskNode->nextTaskNode);
+
+        currentTaskNode->nextTaskNode = temp;
+    }
 }
