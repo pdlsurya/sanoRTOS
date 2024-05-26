@@ -35,8 +35,6 @@ TASK_DEFINE(timerTask, 256, timerTaskFunction, NULL, TIMER_TASK_PRIORITY);
  */
 static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue, timeoutHandlerType timeoutHandler)
 {
-    assert(pTimeoutHandlerQueue != NULL);
-
     timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)malloc(sizeof(timeoutHandlerNodeType));
 
     assert(newNode != NULL);
@@ -64,7 +62,6 @@ static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueu
  */
 static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeoutHandlerQueue)
 {
-    assert(pTimeoutHandlerQueue != NULL);
 
     timeoutHandlerNodeType *temp = pTimeoutHandlerQueue->head->nextNode;
 
@@ -85,7 +82,6 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
  */
 static void timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
-    assert(pTimerList != NULL);
 
     pTimerNode->nextNode = pTimerList->head;
 
@@ -116,9 +112,8 @@ static inline void timerListDeleteFirstNode(timerListType *pTimerList)
  */
 static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
-    assert(pTimerList != NULL);
 
-    if (pTimerList->head != NULL) //Check if timerList is empty
+    if (pTimerList->head != NULL) // Check if timerList is empty
     {
         timerNodeType *currentNode = pTimerList->head;
 
@@ -193,7 +188,7 @@ int timerStop(timerNodeType *pTimerNode)
  */
 void processTimers()
 {
-    if (timerList.head != NULL) //Check if timer list is empty
+    if (timerList.head != NULL) // Check if timer list is empty
     {
         timerNodeType *currentNode = timerList.head;
         while (currentNode != NULL)
