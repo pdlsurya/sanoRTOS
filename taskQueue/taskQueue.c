@@ -20,11 +20,14 @@
  * @brief Dynamically allocate memory for new task Node.
  *
  * @param pTask Pointer to taskHandle struct
- * @return Poiter to new task node
+ * @return Pointer to new task node
  */
 static inline taskNodeType *newNode(taskHandleType *pTask)
 {
     taskNodeType *newTaskNode = (taskNodeType *)malloc(sizeof(taskNodeType));
+
+    assert(newTaskNode != NULL);
+
     newTaskNode->pTask = pTask;
     newTaskNode->nextTaskNode = NULL;
     return newTaskNode;

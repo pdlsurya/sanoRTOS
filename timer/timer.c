@@ -38,6 +38,9 @@ static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueu
     assert(pTimeoutHandlerQueue != NULL);
 
     timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)malloc(sizeof(timeoutHandlerNodeType));
+
+    assert(newNode != NULL);
+
     newNode->timeoutHandler = timeoutHandler;
     newNode->nextNode = NULL;
 

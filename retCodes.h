@@ -17,8 +17,9 @@ extern "C"
 #define RET_NOTACTIVE -8     /*Timer/Task not running*/
 #define RET_ALREADYACTIVE -9 /*Timer/Task already running*/
 #define RET_NOTSUSPENDED -10 /*Task is not suspended*/
-#define RET_NOSEM -11 /*No semaphore available to signal*/
-#define RET_NOTLOCKED -12 /*Mutex not locked*/
+#define RET_NOSEM -11        /*No semaphore available to signal*/
+#define RET_NOTLOCKED -12    /*Mutex not locked*/
+#define RET_NOMEM -13        /*Memory could not be allocated*/
 
 #ifdef __cplusplus
 }
