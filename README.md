@@ -5,6 +5,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 
 - Priority based preemptive scheduling
 - Optional priority inheritance to avoid priority inversion problem while using mutexes
+- Configurable tick rate
 - Task synchronization
 - Task communication
 - Lightweight and minimalistic design
@@ -90,8 +91,8 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
    #include "scheduler/scheduler.h"
    #include "task/task.h"
 
-   TASK_DEFINE(task1, 128, firstTask, NULL, 1);
-   TASK_DEFINE(task2, 128, secondTask, NULL, 1);
+   TASK_DEFINE(task1, 512, firstTask, NULL, 1);
+   TASK_DEFINE(task2, 512, secondTask, NULL, 1);
 
     void firstTask(void *args){
 
