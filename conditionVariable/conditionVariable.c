@@ -3,9 +3,9 @@
  * @author Surya Poudel
  * @brief Condition variable implementation
  * @version 0.1
- * @date 2024-05-10
+ * @date 2024-05-10 
  *
- * @copyright Copyright (c) 2024
+ * @copyright Copyright (c) 2024 Surya Poudel
  *
  */
 

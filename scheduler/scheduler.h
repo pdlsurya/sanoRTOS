@@ -1,11 +1,11 @@
 /**
  * @file scheduler.h
  * @author Surya Poudel
- * @brief
+ * @brief RTOS scheduler APIs
  * @version 0.1
  * @date 2024-04-09
  *
- * @copyright Copyright (c) 2024
+ * @copyright Copyright (c) 2024 Surya Poudel
  *
  */
 #ifndef __SANO_RTOS_SCHEDULER_H

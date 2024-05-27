@@ -1,11 +1,11 @@
 /**
  * @file messageQueue.h
  * @author Surya Poudel
- * @brief  Message queue implementation for inter-task communication
+ * @brief  Message queue APIs
  * @version 0.1
  * @date 2024-04-15
  *
- * @copyright Copyright (c) 2024
+ * @copyright Copyright (c) 2024 Surya Poudel
  *
  */
 
