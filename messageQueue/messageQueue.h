@@ -1,7 +1,7 @@
 /**
- * @file queue.h
+ * @file messageQueue.h
  * @author Surya Poudel
- * @brief FIFO Message Queue implementation for inter-task communication
+ * @brief  Message queue implementation for inter-task communication
  * @version 0.1
  * @date 2024-04-15
  *
