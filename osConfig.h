@@ -1,5 +1,7 @@
-#ifndef __MY_RTOS_H
-#define __MY_RTOS_H
+#ifndef __OS_CONFIG_H
+#define __OS_CONFIG_H
+
+#define PLATFORM_STM32
 
 #include <stdbool.h>
 #include <stdint.h>
