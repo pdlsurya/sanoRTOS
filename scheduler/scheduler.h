@@ -18,7 +18,7 @@ extern "C"
 {
 #endif
 
-#ifdef STM32F401xC
+#ifdef PLATFORM_STM32
 #define SYSTICK_HANDLER osSysTick_Handler
 /*For STM32 SoCs, SysTick timer time initialized during ClockConfig stage;
  Hence, we dont need it re-initialize SysTick timer for STM32 platform.*/
