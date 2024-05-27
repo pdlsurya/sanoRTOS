@@ -27,7 +27,13 @@ extern "C"
         TIMER_MODE_PERIODIC
     } timerModeType;
 
-/* Macro to define  timer node struct */
+/**
+ * @brief Statically define and initialize a timer.
+ * @param name Name of the timer.
+ * @param timeout_handler Function to execute on timer timeout.
+ * @param timer_mode Timer mode[PERIODIC or SINGLE_SHOT].
+ *
+ */
 #define TIMER_DEFINE(name, timeout_handler, timer_mode) \
     void timeout_handler(void);                         \
     timerNodeType name = {                              \
@@ -38,8 +44,9 @@ extern "C"
         .intervalTicks = 0,                             \
         .nextNode = NULL}
 
-    typedef void (*timeoutHandlerType)(void); // Timeout handler function
+    typedef void (*timeoutHandlerType)(void); // Timeout handler function type definition
 
+    /*Timer node structure*/
     typedef struct timerNode
     {
         timeoutHandlerType timeoutHandler;

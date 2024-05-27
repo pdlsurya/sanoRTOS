@@ -20,9 +20,15 @@ extern "C"
 {
 #endif
 
-#define CONDVAR_DEFINE(condVarHandle, p_mutex) \
-    condVarHandleType condVarHandle = {        \
-        .waitQueue = {0},                      \
+/**
+ * @brief Statically define and initialize a condition variable. Condition variable internally
+ * uses a mutex to serialize the access.
+ * @param name Name of the condition variable
+ * @param p_mutex Pointer to a mutex that condition variable uses internally.
+ */
+#define CONDVAR_DEFINE(name, p_mutex) \
+    condVarHandleType name = {        \
+        .waitQueue = {0},             \
         .pMutex = p_mutex}
 
     typedef struct
