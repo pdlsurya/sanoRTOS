@@ -4,8 +4,14 @@
  * @brief RTOS task management APIs implementation
  * @version 0.1
  * @date 2024-04-09
+<<<<<<< HEAD
  * 
  * @copyright Copyright (c) 2024 Surya Poudel
+=======
+ *
+ * @copyright Copyright (c) 2024 Surya Poudel
+ *
+>>>>>>> b688f8b (Added copyright descriptions)
  */
 #include <assert.h>
 #include "retCodes.h"
