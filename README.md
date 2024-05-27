@@ -4,7 +4,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 # Features
 
 - Priority based preemptive scheduling
-- Optional priority inheritance to avoid priority inversion problem while using mutexes.
+- Optional priority inheritance to avoid priority inversion problem while using mutexes
 - Task synchronization
 - Task communication
 - Lightweight and minimalistic design
