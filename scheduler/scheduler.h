@@ -20,9 +20,9 @@ extern "C"
 
 #ifdef PLATFORM_STM32
 #define SYSTICK_HANDLER osSysTick_Handler
-/*For STM32 SoCs, SysTick timer time initialized during ClockConfig stage;
+/*For STM32 SoCs, SysTick timer is initialized during ClockConfig stage;
  Hence, we dont need it re-initialize SysTick timer for STM32 platform.*/
-#define SYSTICK_CONFIG()
+#define SYSTICK_CONFIG() ((void)0)
     void osSysTick_Handler();
 #else
 #define SYSTICK_HANDLER SysTick_Handler
