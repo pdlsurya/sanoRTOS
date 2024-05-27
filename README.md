@@ -76,10 +76,10 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
    - Open **osConfig.h** file and define the macro **PLATFORM_STM32**
 
 6. Edit **stm32xxxx_it.c** file:
-  - STM32 initializes the SysTick timer during its clock initialization process and defines the `SysTick_Handler` ISR function for the implementation of the delay function in the 
+   - STM32 initializes the SysTick timer during its clock initialization process and defines the `SysTick_Handler` ISR function for the implementation of the delay function in the 
    **Core > Src > stm32xxxx_it.c** file. Hence, the `SysTick_Handler` ISR function cannot be redefined inside the sanoRTOS. Instead, we need to call the function `osSysTick_Handler` from the `SysTick_Handler` ISR function.
     
- - Moreover, **sanoRTOS** includes definition for `PendSV_Handler` and `SVC_Handler` ISRs used for task scheduling and context switching. STM32 also 
+   - Moreover, **sanoRTOS** includes definition for `PendSV_Handler` and `SVC_Handler` ISRs used for task scheduling and context switching. STM32 also 
    defines these ISRs in **stm32xxxx_it.c** file; Hence, we need to remove the definition of these ISRs from the **stm32xxxx_it.c** file to avoid multiple definition error. 
 
  
