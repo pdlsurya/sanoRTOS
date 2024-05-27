@@ -6,7 +6,7 @@
 #include <string.h>
 #if defined(NRF52840_XXAA)
 #include "nrf52840.h"
-#elif defined(STM32F401xC)
+#elif defined(PLATFORM_STM32)
 #include "stm32f4xx_hal.h"
 #endif
 
