@@ -24,8 +24,8 @@ extern "C"
 
 /**
  * @brief Statically define and initialize a message queue. The message queue internally uses a ring buffer,
- * which is (length * item_size) bytes long, to store message items.The message queue operates
- * in First In First Out(FIFO) manner.
+ * which is (length * item_size) bytes long, to store message items. The ring buffer's access is serialized using a mutex locak.
+ * The message queue operates in First In First Out(FIFO) manner.
  * @param name Name of the message queue.
  * @param length Maximum number of message items the message queue can hold.
  * @param item_size Size of a message item in bytes.

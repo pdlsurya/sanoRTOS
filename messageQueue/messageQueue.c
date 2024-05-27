@@ -62,14 +62,14 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 }
 
 /**
- * @brief Send an item to the queue. If the queue if full, block the for specified
- * wait ticks.
- * @param pQueueHandle Pointer to queueHandle struct
- * @param pItem Pointer to the item to be sent to the Queue
- * @param waitTicks Number of ticks to wait if space is not available/Queue is full
- * @retval RET_SUCCESS if message sent successfully
- * @retval RET_FULL if Queue is full
- * @retval RET_TIMEOUT if timeout occured
+ * @brief Send an item to the queue. If the queue if full,
+ * block the task for specified number ofwait ticks.
+ * @param pQueueHandle Pointer to queueHandle struct.
+ * @param pItem Pointer to the item to be sent to the Queue.
+ * @param waitTicks Number of ticks to wait if Queue is full.
+ * @retval RET_SUCCESS if message sent successfully.
+ * @retval RET_FULL if Queue is full.
+ * @retval RET_TIMEOUT if wait timeout occured.
  */
 int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
@@ -106,14 +106,14 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
 }
 
 /**
- * @brief Receive an item from the queue. If the queue is empty, block the task for specified wait ticks.
- *
+ * @brief Receive an item from the queue. If the queue is empty,
+ * block the task for specified  number of wait ticks.
  * @param pQueueHandle Pointer to queueHandle struct
- * @param pItem Pointe to the variable to be assigned the data received from the Queue.
- * @param waitTicks Number of ticks to wait if Queue is empty
- * @retval RET_SUCCESS if message received successfully
- * @retval RET_EMPTY if Queue is empty
- * @retval RET_TIMEOUT if timeout occured
+ * @param pItem Pointer to the variable to be assigned the data received from the Queue.
+ * @param waitTicks Number of ticks to wait if Queue is empty.
+ * @retval RET_SUCCESS if message received successfully.
+ * @retval RET_EMPTY if Queue is empty.
+ * @retval RET_TIMEOUT if wait timeout occured.
  */
 int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
