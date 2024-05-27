@@ -12,6 +12,7 @@
 #include <assert.h>
 #include "retCodes.h"
 #include "messageQueue.h"
+#include "mutex/mutex.h"
 #include "task/task.h"
 #include "scheduler/scheduler.h"
 #include "taskQueue/taskQueue.h"
@@ -24,6 +25,8 @@
  */
 static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 {
+    mutexLock(&pQueueHandle->mutex, TASK_MAX_WAIT);
+
     memcpy(&pQueueHandle->buffer[pQueueHandle->writeIndex], pItem, pQueueHandle->itemSize);
     pQueueHandle->writeIndex = (pQueueHandle->writeIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
     pQueueHandle->itemCount++;
@@ -32,6 +35,8 @@ static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
     taskHandleType *consumer = taskQueueGet(&pQueueHandle->consumerWaitQueue);
     if (consumer != NULL)
         taskSetReady(consumer, MSG_QUEUE_DATA_AVAILABLE);
+
+    mutexUnlock(&pQueueHandle->mutex);
 }
 
 /**
@@ -42,6 +47,8 @@ static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
  */
 static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 {
+    mutexLock(&pQueueHandle->mutex, TASK_MAX_WAIT);
+
     memcpy(pItem, &pQueueHandle->buffer[pQueueHandle->readIndex], pQueueHandle->itemSize);
     pQueueHandle->readIndex = (pQueueHandle->readIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
     pQueueHandle->itemCount--;
@@ -50,6 +57,8 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
     taskHandleType *producer = taskQueueGet(&pQueueHandle->producerWaitQueue);
     if (producer != NULL)
         taskSetReady(producer, MSG_QUEUE_SPACE_AVAILABE);
+
+    mutexUnlock(&pQueueHandle->mutex);
 }
 
 /**
