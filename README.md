@@ -75,11 +75,12 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 5. Specify STM32 platform:
    - Open **osConfig.h** file and define the macro **PLATFORM_STM32**
 
-6. Add `osSystick_Handler` function
-   STM32 initializes the SysTick timer during its clock initialization process and defines the SysTick_Handler ISR function for the implementation of the delay function in the **Core > 
-   Src > stm32xxxx_it.c** file. Hence, the `SysTick_Handler` ISR function cannot be redefined in the RTOS. Instead, we need to call the function `osSysTick_Handler` from the 
+6. Add `osSystick_Handler` function:
+   STM32 initializes the SysTick timer during its clock initialization process and defines the SysTick_Handler ISR function for the implementation of the delay function in the **Core 
+   > Src > stm32xxxx_it.c** file. Hence, the `SysTick_Handler` ISR function cannot be redefined in the RTOS. Instead, we need to call the function `osSysTick_Handler` from the 
    `SysTick_Handler` ISR function. 
-   
+
+ 
 8. Example Code:
     ```c
    #include "main.h"
@@ -93,37 +94,38 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
     void firstTask(void *args){
 
         while(1){
-             //Task1 code.
+             //Task1 code to run repeatedly
 
-           }
-     }
+              }
+    }
 
     void secondTask(void * args){
 
        while(1){
-           //Task2 code.
-        }
+           //Task2 code to run repeatedly
+
+              }
      
     }
 
     int main(){
 
-      //STM32 initialization....
+      //STM32 Clock and peripheral initialization ...
 
+
+       //Start  tasks
        taskStart(&task1);
        taskStart(&task2);
 
-        shcedulerStart();
+       //Start the RTOS scheduler
+       shcedulerStart();
+
+       //Control should never reach here
      
        return 0;
     }
     
-
-
-    
     ```
-  
-
 
 # License
 This project is licensed under the MIT License-see the [LICENSE](LICENSE) file for details.
