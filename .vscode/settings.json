@@ -1,7 +1,6 @@
 {
     "files.associations": {
         "*.dts": "c",
-        "utils.h": "c",
         "stdlib.h": "c",
         "retcodes.h": "c"
     }
