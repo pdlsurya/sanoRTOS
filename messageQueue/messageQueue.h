@@ -48,7 +48,6 @@ extern "C"
     msgQueueHandleType name = {                   \
         .producerWaitQueue = {0},                 \
         .consumerWaitQueue = {0},                 \
-        .mutex = {.ownerDefaultPriority = -1},    \
         .buffer = name##Buffer,                   \
         .queueLength = length,                    \
         .itemSize = item_size,                    \
@@ -60,7 +59,6 @@ extern "C"
     {
         taskQueueType producerWaitQueue;
         taskQueueType consumerWaitQueue;
-        mutexHandleType mutex;
         uint8_t *buffer;
         uint32_t queueLength;
         uint32_t itemSize;

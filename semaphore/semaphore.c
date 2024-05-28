@@ -31,8 +31,8 @@
 #include "semaphore.h"
 
 /**
- * @brief Function to take/wait for the semaphore
- *
+ * @brief Function to take/wait for the semaphore. If calling this function from an ISR, the parameter waitTicks
+ * should be set to TASK_NO_WAIT.
  * @param pSem  pointer to the semaphore structure
  * @param waitTicks Number of ticks to wait if semaphore is not available
  * @retval RET_SUCCESS if semaphore is taken succesfully.
@@ -43,15 +43,20 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
     assert(pSem != NULL);
 
+    int retCode;
+
+    ENTER_CRITICAL_SECTION();
+
     if (pSem->count != 0)
     {
         pSem->count--;
-        return RET_SUCCESS;
+
+        retCode = RET_SUCCESS;
     }
 
     else if (waitTicks == TASK_NO_WAIT)
     {
-        return RET_BUSY;
+        retCode = RET_BUSY;
     }
     else
     {
@@ -60,16 +65,28 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
         /*Put current task in semaphore's wait queue*/
         taskQueueAdd(&pSem->waitQueue, currentTask);
 
+        /*Exit from critical section before blocking the task*/
+        EXIT_CRITICAL_SECTION();
+
         /* Block current task and give CPU to other tasks while waiting for semaphore*/
         taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
 
+        /*Re-enter critical section after being unblocked*/
+        ENTER_CRITICAL_SECTION();
+
         if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
         {
-            return RET_SUCCESS;
+            retCode = RET_SUCCESS;
         }
-
-        return RET_TIMEOUT;
+        else
+        {
+            /*Wait timed out*/
+            retCode = RET_TIMEOUT;
+        }
     }
+    EXIT_CRITICAL_SECTION();
+
+    return retCode;
 }
 
 /**
@@ -82,22 +99,46 @@ int semaphoreGive(semaphoreHandleType *pSem)
 {
     assert(pSem != NULL);
 
+    int retCode;
+
+    bool contextSwitchRequired = false;
+
+    ENTER_CRITICAL_SECTION();
+
     if (pSem->count != pSem->maxCount)
     {
-        /*Get next task to signal from the wait Queue*/
+        /*Get next highest priority task to unblock from the wait Queue*/
         taskHandleType *nextTask = taskQueueGet(&pSem->waitQueue);
 
         if (nextTask != NULL)
         {
             taskSetReady(nextTask, SEMAPHORE_TAKEN);
+
+            /*Perform context switch if unblocked task has equal or
+             *higher priority[lower priority value] than that of current task */
+            if (nextTask->priority <= taskPool.currentTask->priority)
+            {
+                contextSwitchRequired = true;
+            }
         }
         else
         {
             pSem->count++;
         }
 
-        return RET_SUCCESS;
+        retCode = RET_SUCCESS;
+    }
+    else
+    {
+        retCode = RET_NOSEM;
     }
 
-    return RET_NOSEM;
+    EXIT_CRITICAL_SECTION();
+
+    if (contextSwitchRequired)
+    {
+        taskYield();
+    }
+
+    return retCode;
 }

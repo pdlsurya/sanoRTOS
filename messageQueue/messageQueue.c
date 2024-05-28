@@ -39,7 +39,10 @@
  */
 static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 {
-    mutexLock(&pQueueHandle->mutex, TASK_MAX_WAIT);
+
+    bool contextSwitchRequired = false;
+
+    ENTER_CRITICAL_SECTION();
 
     memcpy(&pQueueHandle->buffer[pQueueHandle->writeIndex], pItem, pQueueHandle->itemSize);
     pQueueHandle->writeIndex = (pQueueHandle->writeIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
@@ -48,9 +51,23 @@ static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
     // Get next waiting consumer task to unblock
     taskHandleType *consumer = taskQueueGet(&pQueueHandle->consumerWaitQueue);
     if (consumer != NULL)
+    {
         taskSetReady(consumer, MSG_QUEUE_DATA_AVAILABLE);
 
-    mutexUnlock(&pQueueHandle->mutex);
+        /*Perform context switch if  unblocked consumer task has equal or
+         *higher priority[lower priority value] than that of current task */
+        if (consumer->priority <= taskPool.currentTask->priority)
+        {
+            contextSwitchRequired = true;
+        }
+    }
+
+    EXIT_CRITICAL_SECTION();
+
+    if (contextSwitchRequired)
+    {
+        taskYield();
+    }
 }
 
 /**
@@ -61,7 +78,9 @@ static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
  */
 static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 {
-    mutexLock(&pQueueHandle->mutex, TASK_MAX_WAIT);
+    bool contextSwitchRequired = false;
+
+    ENTER_CRITICAL_SECTION();
 
     memcpy(pItem, &pQueueHandle->buffer[pQueueHandle->readIndex], pQueueHandle->itemSize);
     pQueueHandle->readIndex = (pQueueHandle->readIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
@@ -70,14 +89,28 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
     // Get next waiting producer task to unblock
     taskHandleType *producer = taskQueueGet(&pQueueHandle->producerWaitQueue);
     if (producer != NULL)
+    {
         taskSetReady(producer, MSG_QUEUE_SPACE_AVAILABE);
 
-    mutexUnlock(&pQueueHandle->mutex);
+        /*Perform context switch if unblocked producer task has equal or
+         *higher priority[lower priority value] than that of current task */
+        if (producer->priority <= taskPool.currentTask->priority)
+        {
+            contextSwitchRequired = true;
+        }
+    }
+
+    EXIT_CRITICAL_SECTION();
+
+    if (contextSwitchRequired)
+    {
+        taskYield();
+    }
 }
 
 /**
- * @brief Send an item to the queue. If the queue if full,
- * block the task for specified number ofwait ticks.
+ * @brief Send an item to the queue. If the queue if full, block the task for specified number of wait ticks.
+ * If calling this function from an ISR, the parameter waitTicksshould be set to TASK_NO_WAIT.
  * @param pQueueHandle Pointer to queueHandle struct.
  * @param pItem Pointer to the item to be sent to the Queue.
  * @param waitTicks Number of ticks to wait if Queue is full.
@@ -120,8 +153,8 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
 }
 
 /**
- * @brief Receive an item from the queue. If the queue is empty,
- * block the task for specified  number of wait ticks.
+ * @brief Receive an item from the queue. If the queue is empty, block the task for specified  number of wait ticks.
+ * If calling this function from an ISR, the parameter waitTicks should be set to TASK_NO_WAIT.
  * @param pQueueHandle Pointer to queueHandle struct
  * @param pItem Pointer to the variable to be assigned the data received from the Queue.
  * @param waitTicks Number of ticks to wait if Queue is empty.
