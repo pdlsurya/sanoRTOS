@@ -28,6 +28,7 @@ PendSV_Handler:
     vstmdbeq r0!, {s16-s31}
 #endif
 
+
 #ifdef __ARM_ARCH_6M__
     sub r0, #4
 
@@ -58,6 +59,7 @@ PendSV_Handler:
     ldr r1, =nextTask
     ldr r2,[r1]
     ldr r0,[r2] //first member of the taskHandleType struct is stack pointer
+
 
 #ifdef __ARM_ARCH_6M__
 /*The LDMIA instruction can only use low registers (R0-R7);
