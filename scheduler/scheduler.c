@@ -203,6 +203,11 @@ void SYSTICK_HANDLER()
     __enable_irq();
 }
 
+/**
+ * @brief SVC interrupt service routine(ISR). SVC interrupt is triggered via SYSCALL
+ * with a specific SVC number. SVC number is decoded to perform corresponding action.
+ *
+ */
 void SVC_Handler()
 {
 
@@ -238,6 +243,7 @@ void SVC_Handler()
         __set_BASEPRI(0);
         break;
     case CONTEXT_SWITCH:
+        /*Perform context switch if required*/
         scheduleNextTask();
         break;
     default:
