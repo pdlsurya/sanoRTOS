@@ -15,13 +15,16 @@
 #include "mutex/mutex.h"
 #include "utils/utils.h"
 
+#define CONDVAR_DEFINE(condVarHandle, p_mutex) \
+    condVarHandleType condVarHandle = {        \
+        .waitQueue = {0},                      \
+        .pMutex = p_mutex}
+
 typedef struct
 {
-    waitQueueType waitQueue;
+    taskQueueType waitQueue;
     mutexHandleType *pMutex;
 } condVarHandleType;
-
-void condVarInit(condVarHandleType *pCondVar, mutexHandleType *pMutex);
 
 bool condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks);
 

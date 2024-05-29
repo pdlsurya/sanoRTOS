@@ -18,14 +18,18 @@
 #include "task/task.h"
 #include "utils/utils.h"
 
+#define SEMAPHORE_DEFINE(semHandle, initialCount, maxCnt) \
+    semaphoreHandleType semHandle = {                     \
+        .waitQueue = {0},                                 \
+        .count = initialCount,                            \
+        .maxCount = maxCnt}
+
 typedef struct
 {
-    waitQueueType waitQueue;
+    taskQueueType waitQueue;
     uint8_t count;
     uint8_t maxCount;
 } semaphoreHandleType;
-
-void semaphoreInit(semaphoreHandleType *pSem, uint8_t initialCount, uint8_t maxCount);
 
 bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks);
 

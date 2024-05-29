@@ -13,13 +13,14 @@
 #define __SANO_RTOS_TASK_H
 
 #include "osConfig.h"
+#include "utils/utils.h"
 
 #define TASK_LOWEST_PRIORITY 0xff
 #define TASK_HIGHEST_PRIORITY 0
 
 #define TASK_DEFINE(taskHandle, stackDepth, taskEntryFunction, taskParams, taskPriority) \
     void taskEntryFunction(void *);                                                      \
-    uint32_t taskHandle##Stack[stackDepth];                                              \
+    uint32_t taskHandle##Stack[stackDepth] = {0};                                        \
     taskHandleType taskHandle = {                                                        \
         .stackPointer = (uint32_t)(taskHandle##Stack + stackDepth - 17),                 \
         .priority = taskPriority,                                                        \
@@ -46,8 +47,8 @@ typedef enum
     SLEEP,
     WAIT_FOR_SEMAPHORE,
     WAIT_FOR_MUTEX,
-    WAIT_FOR_QUEUE_DATA,
-    WAIT_FOR_QUEUE_SPACE,
+    WAIT_FOR_MSG_QUEUE_DATA,
+    WAIT_FOR_MSG_QUEUE_SPACE,
     WAIT_FOR_COND_VAR,
     WAIT_FOR_TIMER_TIMEOUT,
 
@@ -60,15 +61,15 @@ typedef enum
     SLEEP_TIME_TIMEOUT,
     SEMAPHORE_AVAILABLE,
     MUTEX_AVAILABLE,
-    QUEUE_DATA_AVAILABLE,
-    QUEUE_SPACE_AVAILABE,
+    MSG_QUEUE_DATA_AVAILABLE,
+    MSG_QUEUE_SPACE_AVAILABE,
     COND_VAR_SIGNALLED,
     TIMER_TIMEOUT,
     RESUME
 
 } wakeupReasonType;
 
-typedef struct
+typedef struct taskHandle
 {
     uint32_t stackPointer;
     taskFunctionType taskEntry;
@@ -77,24 +78,20 @@ typedef struct
     taskStatusType status;
     blockedReasonType blockedReason;
     wakeupReasonType wakeupReason;
-    int16_t taskId;
     uint8_t priority;
+
 } taskHandleType;
 
 typedef struct
 {
-    taskHandleType *tasks[MAX_TASKS_COUNT]; // extra 2 tasks including idle and timer task.
-    taskHandleType *readyTasks[MAX_TASKS_COUNT];
-    uint8_t taskInsertIndex;
-    uint8_t currentTaskId;
-    uint8_t readyTasksCount;
-    uint8_t blockedTasksCount;
-    uint8_t suspendedTasksCount;
+    taskQueueType readyQueue;
+    taskQueueType blockedQueue;
+    taskHandleType *currentTask;
 
 } taskPoolType;
 
-volatile extern taskHandleType *currentTask;
-volatile extern taskHandleType *nextTask;
+extern taskHandleType *currentTask;
+extern taskHandleType *nextTask;
 extern taskPoolType taskPool;
 
 bool taskStart(taskHandleType *pTaskHandle);

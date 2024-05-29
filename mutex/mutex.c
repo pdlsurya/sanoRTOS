@@ -22,33 +22,12 @@
  */
 static inline void selectNextOwner(mutexHandleType *pMutex)
 {
-    taskHandleType *nextOwner = waitQueueGet(&pMutex->waitQueue);
+    taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
 
     pMutex->ownerTask = nextOwner;
 
     if (nextOwner)
         taskSetReady(nextOwner, MUTEX_AVAILABLE);
-}
-
-/**
- * @brief Initialize mutex
- *
- * @param pMutex Pointer to mutexHandle struct
- * @return true on Success
- * @return false on Fail
- */
-bool mutexInit(mutexHandleType *pMutex)
-{
-    if (pMutex)
-    {
-        pMutex->locked = false;
-        pMutex->ownerTask = NULL;
-        pMutex->ownerDefaultPriority = -1;
-        waitQueueInit(&pMutex->waitQueue);
-
-        return true;
-    }
-    return false;
 }
 
 /**
@@ -63,7 +42,7 @@ bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
     if (pMutex)
     {
-        taskHandleType *currentTask = taskPool.tasks[taskPool.currentTaskId];
+        taskHandleType *currentTask = taskPool.currentTask;
 #if MUTEX_USE_PRIORITY_INHERITANCE
         /* Priority inheritance*/
         if (pMutex->ownerTask && currentTask->priority < pMutex->ownerTask->priority)
@@ -90,7 +69,7 @@ bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
         else if (waitTicks > 0)
         {
             /* Add the tasking waiting on mutex to the wait queue*/
-            waitQueuePut(&pMutex->waitQueue, currentTask);
+            taskQueueInsert(&pMutex->waitQueue, currentTask);
 
             /* Block current task and give CPU to other tasks while waiting for mutex*/
             taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
@@ -113,7 +92,7 @@ bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
  */
 bool mutexUnlock(mutexHandleType *pMutex)
 {
-    taskHandleType *currentTask = taskPool.tasks[taskPool.currentTaskId];
+    taskHandleType *currentTask = taskPool.currentTask;
 
     /*Unlocking the mutex is possible only if current task owns it*/
     if (pMutex != NULL && pMutex->ownerTask == currentTask)

@@ -13,24 +13,29 @@
 #define __SANO_RTOS_UTILS_H
 
 #include "osConfig.h"
-#include "task/task.h"
 
-#define WAIT_QUEUE_MAX_SIZE (MAX_TASKS_COUNT - 3)
+typedef struct taskHandle taskHandleType;
+
+typedef struct taskNode
+{
+    taskHandleType *pTask;
+    struct taskNode *nextTaskNode;
+} taskNodeType;
 
 typedef struct
 {
-    taskHandleType *waitingTasks[WAIT_QUEUE_MAX_SIZE];
-    uint8_t count;
-} waitQueueType;
+    taskNodeType *head;
+} taskQueueType;
 
-taskHandleType *waitQueueGet(waitQueueType *pWaitQueue);
+taskHandleType *taskQueueGet(taskQueueType *pTaskQueue);
 
-bool waitQueuePut(waitQueueType *pWaitQueue, taskHandleType *pTask);
+void taskQueueInsert(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
-void waitQueueInit(waitQueueType *pWaitQueue);
+void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
-int sortCompareFunction(const void *pTask1, const void *pTask2);
-
-int getTaskIndex(taskHandleType **array, uint8_t len, volatile taskHandleType *pTask);
+static inline bool taskQueueEmpty(taskQueueType *pTaskQueue)
+{
+    return pTaskQueue->head == NULL;
+}
 
 #endif
