@@ -230,7 +230,7 @@ void SVC_Handler()
     switch (svcNumber)
     {
     case DISABLE_INTERRUPTS:
-        /*Disable all the interrupts whose priority value is 1 or higher*/
+        /*Disable all the interrupts with priority values 1 or higher*/
         __set_BASEPRI(1);
         break;
     case ENABLE_INTERUPPTS:
