@@ -126,20 +126,20 @@ static void checkTimeout()
  */
 void taskYield()
 {
-    if (TASKS_RUN_PRIV)
-    {
-        __disable_irq();
+#if (TASK_RUN_PRIVILEGED)
 
-        scheduleNextTask();
+    __disable_irq();
 
-        __enable_irq();
-    }
+    scheduleNextTask();
 
+    __enable_irq();
+
+#else
     /*We need to be in privileged mode to trigger PendSV interrupt, We can use SVC call
      to switch to privileged mode and trigger PendSV interrupt from SVC handler.
      */
-    else
-        __asm volatile("svc #0xff");
+    SYSCALL(CONTEXT_SWITCH);
+#endif
 }
 
 /**
@@ -156,6 +156,9 @@ void schedulerStart()
     /* Assign lowest priority to PendSV*/
     NVIC_SetPriority(PendSV_IRQn, 0xff);
 
+    /* Assign lowest priority to SysTick*/
+    NVIC_SetPriority(SysTick_IRQn, SYSTICK_PRIORITY);
+
     /* Configure SysTick to generate interrupt every OS_INTERVAL_CPU_TICKS */
     SYSTICK_CONFIG();
 
@@ -169,7 +172,7 @@ void schedulerStart()
     __set_PSP(currentTask->stackPointer);
 
     /* Switch to Unprivileged or Privileged  Mode depending on OS_RUN_PRIV flag with PSP as the stack pointer */
-    __set_CONTROL(TASKS_RUN_PRIV ? 0x02 : 0x03);
+    __set_CONTROL(TASK_RUN_PRIVILEGED ? 0x02 : 0x03);
 
     /* Execute ISB after changing CONTORL register */
     __ISB();
@@ -185,11 +188,16 @@ void SYSTICK_HANDLER()
 {
     __disable_irq();
 
+    /*Check for timer timeout*/
     processTimers();
 
+    /*Check for wait timeout of blocked tasks*/
     if (!taskQueueEmpty(&taskPool.blockedQueue))
+    {
         checkTimeout();
+    }
 
+    /*Perform context switch if required*/
     scheduleNextTask();
 
     __enable_irq();
@@ -197,12 +205,42 @@ void SYSTICK_HANDLER()
 
 void SVC_Handler()
 {
-    /*Now we are in privileged mode. We can select next task and trigger
-    PendSV interrupt to perform actual context switch.
-    */
-    __disable_irq();
 
-    scheduleNextTask();
+    /*Get the stack pointer of the task which triggered the SVC interrupt*/
+    uint32_t *stackPointer = (uint32_t *)__get_PSP();
 
-    __enable_irq();
+    /*Get PC from exception stack frame which hold address of instruction after the SVC instruction
+        ____ <-- stackBase
+       |____|xPSR stackPointer[7]
+       |____|PC stackPointer[6]
+       |____|LR stackPointer[5]
+       |____|R12 stackPointer[4]
+       |____|R3 stackPointer[3]
+       |____|R2 stackPointer[2]
+       |____|R1 stackPointer[1]
+       |____|R0 stackPointer[0]*/
+
+    uint32_t PC = stackPointer[6];
+
+    /*Extract the SVC number from the SVC instruction, which resides just before the address in the PC.
+     The SVC instruction is a 16-bit instruction, whose LSB byte is the SVC number.
+     Hence, the SVC number is extracted by accessing the value at the memory location which is two bytes before the address in the PC.*/
+    uint8_t svcNumber = *((uint8_t *)PC - 2);
+
+    switch (svcNumber)
+    {
+    case DISABLE_INTERRUPTS:
+        /*Disable all the interrupts whose priority value is 1 or higher*/
+        __set_BASEPRI(1);
+        break;
+    case ENABLE_INTERUPPTS:
+        /*Enable all the interrupts*/
+        __set_BASEPRI(0);
+        break;
+    case CONTEXT_SWITCH:
+        scheduleNextTask();
+        break;
+    default:
+        break;
+    }
 }

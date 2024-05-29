@@ -32,8 +32,24 @@ extern "C"
 {
 #endif
 
-#define ENTER_CRITICAL_SECTION __disable_irq
-#define EXIT_CRITICAL_SECTION __enable_irq
+    typedef enum
+    {
+        DISABLE_INTERRUPTS = 1,
+        ENABLE_INTERUPPTS,
+        CONTEXT_SWITCH,
+
+    } SysCodeType;
+
+/*Macro to trigger SVC interrupt with specified SVC number*/
+#define SYSCALL(svcNum) __asm volatile("svc %0" : : "I"(svcNum) : "memory");
+
+#if (TASK_RUN_PRIVILEGED)
+#define ENTER_CRITICAL_SECTION() __disable_irq()
+#define EXIT_CRITICAL_SECTION() __enable_irq()
+#else
+#define ENTER_CRITICAL_SECTION() SYSCALL(DISABLE_INTERRUPTS)
+#define EXIT_CRITICAL_SECTION() SYSCALL(ENABLE_INTERUPPTS)
+#endif
 
 #ifdef PLATFORM_STM32
 #define SYSTICK_HANDLER osSysTick_Handler

@@ -46,7 +46,9 @@ extern "C"
 {
 #endif
 
-#define TASKS_RUN_PRIV 1 // macro to set whether tasks should run in privileged mode.
+#define SYSTICK_PRIORITY 0xff // Priority of SysTick Timer.
+
+#define TASK_RUN_PRIVILEGED 1 // macro to set whether tasks should run in privileged mode.
 
 #define MUTEX_USE_PRIORITY_INHERITANCE 1
 
