@@ -35,10 +35,8 @@
 #elif defined(PLATFORM_STM32)
 #include "stm32f4xx_hal.h"
 #endif
-
 #include "cmsis_gcc.h"
 #include "core_cm4.h"
-
 #include "retCodes.h"
 
 #ifdef __cplusplus
