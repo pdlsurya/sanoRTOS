@@ -47,6 +47,7 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 
     ENTER_CRITICAL_SECTION();
 
+retry:
     if (pSem->count != 0)
     {
         pSem->count--;
@@ -63,6 +64,7 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
         taskHandleType *currentTask = taskPool.currentTask;
 
         /*Put current task in semaphore's wait queue*/
+
         taskQueueAdd(&pSem->waitQueue, currentTask);
 
         /*Exit from critical section before blocking the task*/
@@ -78,10 +80,19 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
         {
             retCode = RET_SUCCESS;
         }
-        else
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
+            /*Wait timed out,remove task from  the waitQueue.*/
+            taskQueueRemove(&pSem->waitQueue, currentTask);
+
             /*Wait timed out*/
             retCode = RET_TIMEOUT;
+        }
+        /*Task might have been suspended while waiting for semaphore and later resumed.
+          In this case, retry taking the semaphore again */
+        else if (currentTask->wakeupReason == RESUME)
+        {
+            goto retry;
         }
     }
     EXIT_CRITICAL_SECTION();
@@ -103,15 +114,23 @@ int semaphoreGive(semaphoreHandleType *pSem)
 
     bool contextSwitchRequired = false;
 
+    taskHandleType *nextTask = NULL;
+
     ENTER_CRITICAL_SECTION();
 
     if (pSem->count != pSem->maxCount)
     {
         /*Get next highest priority task to unblock from the wait Queue*/
-        taskHandleType *nextTask = taskQueueGet(&pSem->waitQueue);
+    getNextTask:
+        nextTask = taskQueueGet(&pSem->waitQueue);
 
         if (nextTask != NULL)
         {
+            /*If task was suspended while waiting for Semaphore, skip the task and get another waiting task from the waitQueue.*/
+            if (nextTask->status == TASK_STATUS_SUSPENDED)
+            {
+                goto getNextTask;
+            }
             taskSetReady(nextTask, SEMAPHORE_TAKEN);
 
             /*Perform context switch if unblocked task has equal or

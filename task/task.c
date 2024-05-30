@@ -98,15 +98,23 @@ void taskSuspend(taskHandleType *pTask)
 {
     assert(pTask != NULL);
 
-    // If task is in ready queue, remove it from the queue
+    /* If task status is ready, remove it from the readyQueue*/
     if (pTask->status == TASK_STATUS_READY)
+    {
         taskQueueRemove(&taskPool.readyQueue, pTask);
+    }
+    /*If task status is blocked, remove it from the blockedQueue*/
+    else if (pTask->status == TASK_STATUS_BLOCKED)
+    {
+        taskQueueRemove(&taskPool.blockedQueue, pTask);
+    }
 
     pTask->remainingSleepTicks = 0;
     pTask->status = TASK_STATUS_SUSPENDED;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
+    /*If self suspended, give CPU to other tasks*/
     if (pTask == taskPool.currentTask)
     {
         taskYield();

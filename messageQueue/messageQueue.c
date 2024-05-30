@@ -42,6 +42,8 @@ static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 
     bool contextSwitchRequired = false;
 
+    taskHandleType *consumer = NULL;
+
     ENTER_CRITICAL_SECTION();
 
     memcpy(&pQueueHandle->buffer[pQueueHandle->writeIndex], pItem, pQueueHandle->itemSize);
@@ -49,9 +51,15 @@ static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
     pQueueHandle->itemCount++;
 
     // Get next waiting consumer task to unblock
-    taskHandleType *consumer = taskQueueGet(&pQueueHandle->consumerWaitQueue);
+getNextConsumer:
+    consumer = taskQueueGet(&pQueueHandle->consumerWaitQueue);
     if (consumer != NULL)
     {
+        /*If task was suspended while waiting for Queue data, skipt the task and get another waiting task from the waitQueue*/
+        if (consumer->status == TASK_STATUS_SUSPENDED)
+        {
+            goto getNextConsumer;
+        }
         taskSetReady(consumer, MSG_QUEUE_DATA_AVAILABLE);
 
         /*Perform context switch if  unblocked consumer task has equal or
@@ -80,6 +88,8 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 {
     bool contextSwitchRequired = false;
 
+    taskHandleType *producer = NULL;
+
     ENTER_CRITICAL_SECTION();
 
     memcpy(pItem, &pQueueHandle->buffer[pQueueHandle->readIndex], pQueueHandle->itemSize);
@@ -87,9 +97,15 @@ static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
     pQueueHandle->itemCount--;
 
     // Get next waiting producer task to unblock
-    taskHandleType *producer = taskQueueGet(&pQueueHandle->producerWaitQueue);
+getNextProducer:
+    producer = taskQueueGet(&pQueueHandle->producerWaitQueue);
     if (producer != NULL)
     {
+        /*If task was suspended while waiting for Queue space, skip the task and get another waiting task from the wait Queue*/
+        if (producer->status == TASK_STATUS_SUSPENDED)
+        {
+            goto getNextProducer;
+        }
         taskSetReady(producer, MSG_QUEUE_SPACE_AVAILABE);
 
         /*Perform context switch if unblocked producer task has equal or
@@ -123,15 +139,20 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
     assert(pQueueHandle != NULL);
     assert(pItem != NULL);
 
+    int retCode;
+
     /*Write to msgQueue buffer if messageQueue is not full*/
+retry:
     if (!msgQueueFull(pQueueHandle))
     {
         msgQueueBufferWrite(pQueueHandle, pItem);
 
-        return RET_SUCCESS;
+        retCode = RET_SUCCESS;
     }
     else if (waitTicks == TASK_NO_WAIT)
-        return RET_FULL;
+    {
+        retCode = RET_FULL;
+    }
     else
     {
         taskHandleType *currentTask = taskPool.currentTask;
@@ -145,11 +166,24 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
         {
             msgQueueBufferWrite(pQueueHandle, pItem);
 
-            return RET_SUCCESS;
+            retCode = RET_SUCCESS;
         }
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
+        {
 
-        return RET_TIMEOUT;
+            /*Wait timed out,remove task from wait Queue.*/
+            taskQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
+
+            retCode = RET_TIMEOUT;
+        }
+        /*Task might have been suspended while waiting for space to be available and later resumed.
+          In this case, retry sending to the msgQueue again */
+        else if (currentTask->wakeupReason == RESUME)
+        {
+            goto retry;
+        }
     }
+    return retCode;
 }
 
 /**
@@ -167,13 +201,18 @@ int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wait
     assert(pQueueHandle != NULL);
     assert(pItem != NULL);
 
+    int retCode;
+
+retry:
     if (!msgQueueEmpty(pQueueHandle))
     {
         msgQueueBufferRead(pQueueHandle, pItem);
-        return RET_SUCCESS;
+        retCode = RET_SUCCESS;
     }
     else if (waitTicks == TASK_NO_WAIT)
-        return RET_EMPTY;
+    {
+        retCode = RET_EMPTY;
+    }
     else
     {
         taskHandleType *currentTask = taskPool.currentTask;
@@ -187,9 +226,22 @@ int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wait
         {
             msgQueueBufferRead(pQueueHandle, pItem);
 
-            return RET_SUCCESS;
+            retCode = RET_SUCCESS;
         }
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
+        {
 
-        return RET_TIMEOUT;
+            /*Wait timed out,remove task from wait Queue.*/
+            taskQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
+
+            retCode = RET_TIMEOUT;
+        }
+        /*Task might have been suspended while waiting for data to be available and later resumed.
+        In this case, retry receiving from the msgQueue again */
+        else if (currentTask->wakeupReason == RESUME)
+        {
+            goto retry;
+        }
     }
+    return retCode;
 }

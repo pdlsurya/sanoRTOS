@@ -46,25 +46,42 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
     assert(pCondVar != NULL);
     assert(pCondVar->pMutex != NULL);
 
+    int retCode;
+
     /* Unlock previously acquired mutex;*/
     mutexUnlock(pCondVar->pMutex);
 
     taskHandleType *currentTask = taskPool.currentTask;
 
+wait:
     taskQueueAdd(&pCondVar->waitQueue, currentTask);
 
     /* Block current task and give CPU to other tasks while waiting on condition variable*/
     taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
 
-    /*Task has been woken up either due to timeout or by another task by signalling the condtion variable. Re-acquire previously
-    release mutex and return */
+    /*Task has been woken up either due to wait timeout or by another task by signalling the condtion variable.*/
+    if (currentTask->wakeupReason == COND_VAR_SIGNALLED)
+    {
+        retCode = RET_SUCCESS;
+    }
+    else if (currentTask->wakeupReason == WAIT_TIMEOUT)
+    {
+        /*Wait timed out,remove task from  the waitQueue.*/
+        taskQueueRemove(&pCondVar->waitQueue, currentTask);
+
+        retCode = RET_TIMEOUT;
+    }
+    /*Task might have been suspended while waiting on condition variable and later resumed.
+      In this case, retry waiting on condition variable again */
+    else if (currentTask->wakeupReason == RESUME)
+    {
+        goto wait;
+    }
+
+    /*Re-acquire previously released mutex*/
     mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
 
-    /* Return false if wait timed out.*/
-    if (currentTask->wakeupReason == COND_VAR_SIGNALLED)
-        return RET_SUCCESS;
-
-    return RET_TIMEOUT;
+    return retCode;
 }
 
 /**
@@ -78,11 +95,19 @@ int condVarSignal(condVarHandleType *pCondVar)
 {
     assert(pCondVar != NULL);
 
+    taskHandleType *nextSignalTask = NULL;
+
     /*Get next highest priority waiting task to unblock*/
-    taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
+getNextSignalTask:
+    nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
 
     if (nextSignalTask != NULL)
     {
+        /*If task was suspended while waiting on condition varibale, skip the task and get another waiting task from the waitQueue*/
+        if (nextSignalTask->status == TASK_STATUS_SUSPENDED)
+        {
+            goto getNextSignalTask;
+        }
         taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
 
         /*Perform context switch if unblocked task has equal or
