@@ -90,7 +90,7 @@ retry:
         }
         /*Task might have been suspended while waiting for semaphore and later resumed.
           In this case, retry taking the semaphore again */
-        else if (currentTask->wakeupReason == RESUME)
+        else
         {
             goto retry;
         }
