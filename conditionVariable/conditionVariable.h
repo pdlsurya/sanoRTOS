@@ -13,7 +13,7 @@
 
 #include "task/task.h"
 #include "mutex/mutex.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 
 #define CONDVAR_DEFINE(condVarHandle, p_mutex) \
     condVarHandleType condVarHandle = {        \

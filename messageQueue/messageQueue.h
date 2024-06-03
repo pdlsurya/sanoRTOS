@@ -14,7 +14,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 
 #define MSG_QUEUE_DEFINE(msgQueueHandle, length, item_size) \
     uint8_t msgQueueHandle##Buffer[length * item_size];     \

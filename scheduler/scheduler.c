@@ -11,10 +11,8 @@
 #include <stdlib.h>
 #include "osConfig.h"
 #include "task/task.h"
-#include "queue/queue.h"
-#include "mutex/mutex.h"
 #include "timer/timer.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 #include "scheduler.h"
 
 #define IDLE_TASK_PRIORITY TASK_LOWEST_PRIORITY // Idle task has lowest possible priority[higher the value lower the priority]
@@ -48,7 +46,7 @@ static void scheduleNextTask()
         if (currentTask->status == TASK_STATUS_RUNNING)
         {
             currentTask->status = TASK_STATUS_READY;
-            taskQueueInsert(&taskPool.readyQueue, taskPool.currentTask);
+            taskQueueAdd(&taskPool.readyQueue, taskPool.currentTask);
         }
 
         // Get the next highest priority task

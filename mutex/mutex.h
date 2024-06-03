@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "task/task.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 #include "osConfig.h"
 
 #define MUTEX_DEFINE(mutexHandle)   \

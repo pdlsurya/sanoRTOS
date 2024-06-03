@@ -11,7 +11,7 @@
 
 #include "osConfig.h"
 #include "scheduler/scheduler.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 #include "task.h"
 
 taskPoolType taskPool = {0};
@@ -46,7 +46,7 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
     pTask->remainingSleepTicks = 0;
 
     /* Add task to queue of ready tasks*/
-    taskQueueInsert(&taskPool.readyQueue, pTask);
+    taskQueueAdd(&taskPool.readyQueue, pTask);
 }
 
 /**
@@ -63,8 +63,8 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
     pTask->blockedReason = blockedReason;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    // Add task to queue of blocked tasks
-    taskQueueInsert(&taskPool.blockedQueue, pTask);
+    // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
+    taskQueueAddToFront(&taskPool.blockedQueue, pTask);
 
     // Give CPU to other tasks
     taskYield();
@@ -186,7 +186,7 @@ bool taskStart(taskHandleType *pTaskHandle)
     *((uint32_t *)pTaskHandle->stackPointer + 16) = 0x01000000; // Default xPSR register value
 
     /*Store pointer to the taskHandle struct to ready queue*/
-    taskQueueInsert(&taskPool.readyQueue, pTaskHandle);
+    taskQueueAdd(&taskPool.readyQueue, pTaskHandle);
 
     return true;
 }

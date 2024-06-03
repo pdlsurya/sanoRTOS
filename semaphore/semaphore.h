@@ -16,7 +16,7 @@
 #include <stdbool.h>
 #include "osConfig.h"
 #include "task/task.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 
 #define SEMAPHORE_DEFINE(semHandle, initialCount, maxCnt) \
     semaphoreHandleType semHandle = {                     \

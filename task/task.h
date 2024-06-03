@@ -13,7 +13,7 @@
 #define __SANO_RTOS_TASK_H
 
 #include "osConfig.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 
 #define TASK_LOWEST_PRIORITY 0xff
 #define TASK_HIGHEST_PRIORITY 0

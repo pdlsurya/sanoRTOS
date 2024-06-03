@@ -11,9 +11,8 @@
 #include <stdlib.h>
 #include "task/task.h"
 #include "scheduler/scheduler.h"
-#include "utils/utils.h"
+#include "taskQueue/taskQueue.h"
 #include "semaphore.h"
-
 
 /**
  * @brief Function to take/wait for the semaphore
@@ -28,7 +27,7 @@ bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
     if (pSem)
     {
 
-        if (pSem->waitQueue.head== NULL && pSem->count != 0)
+        if (pSem->waitQueue.head == NULL && pSem->count != 0)
         {
             pSem->count--;
             return true;
@@ -41,7 +40,7 @@ bool semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
             taskHandleType *currentTask = taskPool.currentTask;
 
             /*Put current task in semaphore's wait queue*/
-            taskQueueInsert(&pSem->waitQueue, currentTask);
+            taskQueueAdd(&pSem->waitQueue, currentTask);
 
             /* Block current task and give CPU to other tasks while waiting for semaphore*/
             taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
@@ -72,10 +71,7 @@ bool semaphoreGive(semaphoreHandleType *pSem)
         taskHandleType *nextTask = taskQueueGet(&pSem->waitQueue);
 
         if (nextTask)
-        {
-
             taskSetReady(nextTask, SEMAPHORE_AVAILABLE);
-        }
 
         return true;
     }
