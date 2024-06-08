@@ -58,6 +58,7 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
  */
 void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
 {
+
     pTask->remainingSleepTicks = ticks;
     pTask->status = TASK_STATUS_BLOCKED;
     pTask->blockedReason = blockedReason;
