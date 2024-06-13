@@ -30,7 +30,7 @@ static void taskExitFunction()
 }
 
 /**
- * @brief Change a task's status to ready
+ * @brief Change task's status to ready
  * @param pTask Pointer to the taskHandle struct.
  */
 void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)

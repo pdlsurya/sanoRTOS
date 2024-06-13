@@ -13,9 +13,6 @@
 #include "cmsis_gcc.h"
 #include "core_cm4.h"
 
-#define MAX_USER_TASKS_COUNT 10 // maximum number of  user tasks allowed.
-
-#define MAX_TASKS_COUNT (MAX_USER_TASKS_COUNT + 2)
 
 #define TASKS_RUN_PRIV 1 // macro to set whether tasks should run in privileged mode.
 
@@ -32,7 +29,5 @@
 #define US_TO_OS_TICKS(us) ((uint32_t)(US_TO_CPU_TICKS(us) / OS_INTERVAL_CPU_TICKS))
 #define MS_TO_OS_TICKS(ms) ((uint32_t)(MS_TO_CPU_TICKS(ms) / OS_INTERVAL_CPU_TICKS))
 
-#define TASK_NO_WAIT 0
-#define TASK_MAX_WAIT 0xffffffffUL
 
 #endif

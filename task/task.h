@@ -18,6 +18,10 @@
 #define TASK_LOWEST_PRIORITY 0xff
 #define TASK_HIGHEST_PRIORITY 0
 
+#define TASK_NO_WAIT 0
+#define TASK_MAX_WAIT 0xffffffffUL
+
+
 #define TASK_DEFINE(taskHandle, stackDepth, taskEntryFunction, taskParams, taskPriority) \
     void taskEntryFunction(void *);                                                      \
     uint32_t taskHandle##Stack[stackDepth] = {0};                                        \
