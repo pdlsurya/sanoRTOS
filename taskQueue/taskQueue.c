@@ -38,9 +38,9 @@ void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
     taskNodeType *newTaskNode = newNode(pTask);
 
-    taskNodeType *temp = pTaskQueue->head;
+    newTaskNode->nextTaskNode = pTaskQueue->head;
+
     pTaskQueue->head = newTaskNode;
-    pTaskQueue->head->nextTaskNode = temp;
 }
 
 /**
@@ -59,9 +59,9 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
     }
     else if (pTaskQueue->head->pTask->priority > pTask->priority)
     {
-        taskNodeType *tempHead = pTaskQueue->head;
+        newTaskNode->nextTaskNode = pTaskQueue->head;
+
         pTaskQueue->head = newTaskNode;
-        pTaskQueue->head->nextTaskNode = tempHead;
     }
     else
     {
