@@ -38,7 +38,9 @@ PendSV_Handler:
     str r2, [r0]
 
 #else
+
     stmdb r0!, {r4-r11,lr} //push register r4-r11 and EXC_RETURN to current task's stack
+
 #endif
     /*save current task's stack pointer*/
     ldr r1, =currentTask
@@ -70,7 +72,9 @@ PendSV_Handler:
     ldmia r0!,{r4-r7}
 
 #else
+
     ldmia r0!,{r4-r11,lr} //pop registers r4-r11 and EXC_RETURN from next task's stack
+    
 #endif
 
 #ifdef __ARM_FP
