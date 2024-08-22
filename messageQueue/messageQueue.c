@@ -63,14 +63,14 @@ bool msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTi
 {
     if (pQueueHandle)
     {
-
-        if (taskQueueEmpty(&pQueueHandle->producerWaitQueue) && !msgQueueFull(pQueueHandle))
+        /*Write to msgQueue buffer if messageQueue is not full*/
+        if (!msgQueueFull(pQueueHandle))
         {
             msgQueueBufferWrite(pQueueHandle, pItem);
 
             return true;
         }
-        else if (waitTicks == TASK_NO_WAIT && msgQueueFull(pQueueHandle))
+        else if (waitTicks == TASK_NO_WAIT)
             return false;
         else
         {
@@ -106,12 +106,12 @@ bool msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wai
     if (pQueueHandle)
     {
 
-        if (taskQueueEmpty(&pQueueHandle->consumerWaitQueue) && !msgQueueEmpty(pQueueHandle))
+        if (!msgQueueEmpty(pQueueHandle))
         {
             msgQueueBufferRead(pQueueHandle, pItem);
             return true;
         }
-        else if (waitTicks == TASK_NO_WAIT && msgQueueEmpty(pQueueHandle))
+        else if (waitTicks == TASK_NO_WAIT)
             return false;
         else
         {

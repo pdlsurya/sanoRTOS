@@ -1,7 +1,7 @@
 /**
  * @file mutex.c
  * @author Surya Poudel
- * @brief Mutex implementation
+ * @brief Mutex lock implementation
  * @version 0.1
  * @date 2024-04-09
  *
@@ -14,7 +14,6 @@
 #include "scheduler/scheduler.h"
 #include "taskQueue/taskQueue.h"
 #include "mutex.h"
-
 
 /**
  * @brief Select next owner of the mutex
@@ -100,7 +99,6 @@ bool mutexUnlock(mutexHandleType *pMutex)
     {
         if (pMutex->locked)
         {
-            pMutex->locked = false;
 
 #if MUTEX_USE_PRIORITY_INHERITANCE
             /* Assign owner task its default priority if priority inheritance was perforemd while locking the mutex*/
@@ -114,6 +112,8 @@ bool mutexUnlock(mutexHandleType *pMutex)
 #endif
             /* select next owner of the mutex*/
             selectNextOwner(pMutex);
+
+            pMutex->locked = false;
 
             return true;
         }

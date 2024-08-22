@@ -35,33 +35,45 @@ static inline void triggerPendSV()
 }
 
 /**
- * @brief Select next ready task for execution and trigger PendSV to perform actual context switch.
+ * @brief Select next highest priority ready task for execution and trigger PendSV to perform actual context switch.
  */
 static void scheduleNextTask()
 {
-    if (taskPool.readyQueue.head)
+    if (!taskQueueEmpty(&taskPool.readyQueue))
     {
-        currentTask = taskPool.currentTask;
 
-        if (currentTask->status == TASK_STATUS_RUNNING)
+        if (taskPool.currentTask->status == TASK_STATUS_RUNNING)
         {
-            currentTask->status = TASK_STATUS_READY;
-            taskQueueAdd(&taskPool.readyQueue, taskPool.currentTask);
+            /*Perform context switch only if next highest priority ready task has equal or higher priority[lower priority value]
+            than the current running task*/
+
+            taskHandleType *nextReadyTask = taskQueuePeek(&taskPool.readyQueue);
+
+            if (nextReadyTask->priority <= taskPool.currentTask->priority)
+            {
+                /*Change current task's status to ready and add it to the readyQueue*/
+                taskPool.currentTask->status = TASK_STATUS_READY;
+                taskQueueAdd(&taskPool.readyQueue, taskPool.currentTask);
+            }
+            else
+            {
+                /*Current running task has higher priority than the next highest priority ready task;Hence, no need to perform context
+                  switch. Return from here */
+                return;
+            }
         }
 
-        // Get the next highest priority task
+        currentTask = taskPool.currentTask;
+
+        // Get the next highest priority  ready task
         nextTask = taskQueueGet(&taskPool.readyQueue);
 
         taskPool.currentTask = nextTask;
 
         nextTask->status = TASK_STATUS_RUNNING;
 
-        // Perform context switch only if next task to execute is different than the current task
-        if (currentTask != nextTask)
-        {
-            /* Trigger PendSV to perform  context switch after all pending ISRs have been serviced: */
-            triggerPendSV();
-        }
+        /* Trigger PendSV to perform  context switch after all pending ISRs have been serviced: */
+        triggerPendSV();
     }
 }
 
