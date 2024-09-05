@@ -13,10 +13,14 @@
 #include "cmsis_gcc.h"
 #include "core_cm4.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 #define TASKS_RUN_PRIV 1 // macro to set whether tasks should run in privileged mode.
 
-#define MUTEX_USE_PRIORITY_INHERITANCE 0
+#define MUTEX_USE_PRIORITY_INHERITANCE 1
 
 #define OS_TICK_INTERVAL_US 1000 // Generate SysTick interrupt every 1ms.
 
@@ -29,5 +33,8 @@
 #define US_TO_OS_TICKS(us) ((uint32_t)(US_TO_CPU_TICKS(us) / OS_INTERVAL_CPU_TICKS))
 #define MS_TO_OS_TICKS(ms) ((uint32_t)(MS_TO_CPU_TICKS(ms) / OS_INTERVAL_CPU_TICKS))
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif

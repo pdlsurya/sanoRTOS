@@ -12,89 +12,100 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "osConfig.h"
+#include "retCodes.h"
 #include "task/task.h"
 #include "mutex/mutex.h"
 #include "scheduler/scheduler.h"
 #include "taskQueue/taskQueue.h"
 #include "conditionVariable.h"
-#include "assert.h"
-
 
 /**
  * @brief Wait on condition variable
  *
  * @param pCondVar Pointer to condVarHandle struct
  * @param waitTicks Number of ticks to wait until timeout
- * @return true if wait succeeded
- * @return false if wait failed due to invalid mutex parameter or timeout
+ * @retval SUCCESS(0) if wait succeeded
+ * @retval -EINVAL if invalid arguments passed
+ * @retval -ETIMEOUT if timeout occured while waiting
  */
-bool condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
+int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 {
-    if (!pCondVar->pMutex)
-        return false;
+    if (pCondVar != NULL && pCondVar->pMutex != NULL)
+    {
+        /* Unlock previously acquired mutex;*/
+        mutexUnlock(pCondVar->pMutex);
 
-    /* Unlock previously acquired mutex;*/
-    mutexUnlock(pCondVar->pMutex);
+        taskHandleType *currentTask = taskPool.currentTask;
 
-    taskHandleType *currentTask = taskPool.currentTask;
+        taskQueueAdd(&pCondVar->waitQueue, currentTask);
 
-    taskQueueAdd(&pCondVar->waitQueue, currentTask);
+        /* Block current task and give CPU to other tasks while waiting on condition variable*/
+        taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
 
-    /* Block current task and give CPU to other tasks while waiting on condition variable*/
-    taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
+        /*Task has been woken up either due to timeout or by another task by signalling the condtion variable. Re-acquire previously
+        release mutex and return */
+        mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
 
-    /*Task has been woken up either due to timeout or by another task by signalling the condtion variable. Re-acquire previously
-    release mutex and return */
-    mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
+        /* Return false if wait timed out.*/
+        if (currentTask->wakeupReason == WAIT_TIMEOUT)
+            return -ETIMEOUT;
 
-    /* Return false if wait timed out.*/
-    if (currentTask->wakeupReason == WAIT_TIMEOUT)
-        return false;
-
-    return true;
+        return SUCCESS;
+    }
+    return -EINVAL;
 }
 
 /**
  * @brief Signal a task waiting on conditional variable.
  *
  * @param pCondVar Pointer to condVarHandle struct
- * @return true if signal succeeded,
- * @return false if signal failed
+ * @retval SUCCESS if signal succeeded,
+ * @retval -ENOTASK if no tasks available to signal
+ * @retval -EINVAL if invalid argument passed
  */
-bool condVarSignal(condVarHandleType *pCondVar)
+int condVarSignal(condVarHandleType *pCondVar)
 {
-    taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
-    if (nextSignalTask)
+    if (pCondVar != NULL)
     {
-        taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
-        return true;
-    }
+        taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
+        if (nextSignalTask)
+        {
+            taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
+            return SUCCESS;
+        }
 
-    return false;
+        return -ENOTASK;
+    }
+    return -EINVAL;
 }
 
 /**
  * @brief Signal all the waiting tasks waiting on conditional variable
  *
  * @param pCondVar Pointer to condVarHandle struct
- * @return true if broadcast succeeded,
- * @return false if broadcast failed
+ * @retval SUCCESS if broadcast succeeded,
+ * @retval -ENOTASK if not tasks available to broadcast
+ * @retval -EINVAL if invalid argument passed
  */
-bool condVarBroadcast(condVarHandleType *pCondVar)
+int condVarBroadcast(condVarHandleType *pCondVar)
 {
-    if (!taskQueueEmpty(&pCondVar->waitQueue))
+    if (pCondVar != NULL)
     {
-        taskHandleType *pTask = NULL;
-
-        while ((pTask = taskQueueGet(&pCondVar->waitQueue)))
+        if (!taskQueueEmpty(&pCondVar->waitQueue))
         {
-            if (pTask->status != TASK_STATUS_SUSPENDED)
-            {
-                taskSetReady(pTask, COND_VAR_SIGNALLED);
-            }
-        }
+            taskHandleType *pTask = NULL;
 
-        return true;
+            while ((pTask = taskQueueGet(&pCondVar->waitQueue)))
+            {
+                if (pTask->status != TASK_STATUS_SUSPENDED)
+                {
+                    taskSetReady(pTask, COND_VAR_SIGNALLED);
+                }
+            }
+
+            return SUCCESS;
+        }
+        return -ENOTASK;
     }
-    return false;
+    return -EINVAL;
 }

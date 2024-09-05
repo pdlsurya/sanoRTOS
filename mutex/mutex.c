@@ -10,6 +10,7 @@
  */
 #include <stdlib.h>
 #include "osConfig.h"
+#include "retCodes.h"
 #include "task/task.h"
 #include "scheduler/scheduler.h"
 #include "taskQueue/taskQueue.h"
@@ -20,12 +21,14 @@
  *
  * @param pMutex Pointer to the mutex structure
  * @param waitTicks Number of ticks to wait if mutex is not available
- * @return true, if mutex is locked successfully
- * @return false, if mutex could not be locked
+ * @retval SUCCESS if mutex locked successfully
+ * @retval -EBUSY  if mutex not available
+ * @retval -ETIMEOUT if timeout occured while waiting for mutex
+ * @retval -EINVAL if invalid arguments passed
  */
-bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
+int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
-    if (pMutex)
+    if (pMutex != NULL)
     {
         taskHandleType *currentTask = taskPool.currentTask;
 #if MUTEX_USE_PRIORITY_INHERITANCE
@@ -45,11 +48,13 @@ bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
         {
             pMutex->locked = true;
             pMutex->ownerTask = currentTask;
-            return true;
+            return SUCCESS;
         }
 
         else if (waitTicks == TASK_NO_WAIT && pMutex->locked)
-            return false;
+        {
+            return -EBUSY;
+        }
 
         else if (waitTicks > 0)
         {
@@ -61,57 +66,68 @@ bool mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 
             if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
             {
-
-                return true;
+                return SUCCESS;
+            }
+            else
+            {
+                return -ETIMEOUT;
             }
         }
     }
-    return false;
+    return -EINVAL;
 }
 
 /**
  * @brief Unlock/Release mutex
  * @param pMutex Pointer to the mutex structure
- * @return true if mutex unlocked successfully
- * @return false if mutex could not be unlocked
+ * @retval SUCCESS if mutex unlocked successfully
+ * @retval -ENOTOWNER if current owner doesnot owns the mutex
+ * @retval -EINVAL on Invalid operation or invalid argument passed
  */
-bool mutexUnlock(mutexHandleType *pMutex)
+int mutexUnlock(mutexHandleType *pMutex)
 {
     taskHandleType *currentTask = taskPool.currentTask;
 
     /*Unlocking the mutex is possible only if current task owns it*/
-    if (pMutex != NULL && pMutex->ownerTask == currentTask)
+    if (pMutex != NULL)
     {
-        if (pMutex->locked)
+        if (pMutex->ownerTask == currentTask)
         {
+            if (pMutex->locked)
+            {
 
 #if MUTEX_USE_PRIORITY_INHERITANCE
-            /* Assign owner task its default priority if priority inheritance was perforemd while locking the mutex*/
-            if (pMutex->ownerDefaultPriority != -1)
-            {
-                pMutex->ownerTask->priority = pMutex->ownerDefaultPriority;
+                /* Assign owner task its default priority if priority inheritance was perforemd while locking the mutex*/
+                if (pMutex->ownerDefaultPriority != -1)
+                {
+                    pMutex->ownerTask->priority = pMutex->ownerDefaultPriority;
 
-                /* Reset owner defalult priority of mutex*/
-                pMutex->ownerDefaultPriority = -1;
-            }
+                    /* Reset owner defalult priority of mutex*/
+                    pMutex->ownerDefaultPriority = -1;
+                }
 #endif
-            /* select next owner of the mutex*/
-            taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
+                /* select next owner of the mutex*/
+                taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
 
-            pMutex->ownerTask = nextOwner;
+                pMutex->ownerTask = nextOwner;
 
-            if (nextOwner!=NULL)
-            {
-                taskSetReady(nextOwner, MUTEX_LOCKED);
+                if (nextOwner != NULL)
+                {
+                    taskSetReady(nextOwner, MUTEX_LOCKED);
+                }
+                else
+                {
+                    pMutex->locked = false;
+                }
+
+                return SUCCESS;
             }
-            else
-            {
-                pMutex->locked = false;
-            }
-
-            return true;
+        }
+        else
+        {
+            return -ENOTOWNER;
         }
     }
 
-    return false;
+    return -EINVAL;
 }

@@ -1,7 +1,7 @@
 /**
  * @file queue.h
  * @author Surya Poudel
- * @brief FIFO Queue implementation for inter-task communication
+ * @brief FIFO Message Queue implementation for inter-task communication
  * @version 0.1
  * @date 2024-04-15
  *
@@ -16,6 +16,11 @@
 #include <stdbool.h>
 #include "taskQueue/taskQueue.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define MSG_QUEUE_DEFINE(msgQueueHandle, length, item_size) \
     uint8_t msgQueueHandle##Buffer[length * item_size];     \
     msgQueueHandleType msgQueueHandle = {                   \
@@ -28,44 +33,48 @@
         .readIndex = 0,                                     \
         .writeIndex = 0}
 
-typedef struct
-{
-    taskQueueType producerWaitQueue;
-    taskQueueType consumerWaitQueue;
-    uint8_t *buffer;
-    uint32_t queueLength;
-    uint32_t itemSize;
-    uint32_t itemCount;
-    uint32_t readIndex;
-    uint32_t writeIndex;
-} msgQueueHandleType;
+    typedef struct
+    {
+        taskQueueType producerWaitQueue;
+        taskQueueType consumerWaitQueue;
+        uint8_t *buffer;
+        uint32_t queueLength;
+        uint32_t itemSize;
+        uint32_t itemCount;
+        uint32_t readIndex;
+        uint32_t writeIndex;
+    } msgQueueHandleType;
 
-/**
- * @brief Check if message queue is full
- *
- * @param pQueueHandle
- * @return true
- * @return false
- */
-static inline bool msgQueueFull(msgQueueHandleType *pQueueHandle)
-{
-    return pQueueHandle->itemCount == pQueueHandle->queueLength;
+    /**
+     * @brief Check if message queue is full
+     *
+     * @param pQueueHandle
+     * @return true
+     * @return false
+     */
+    static inline bool msgQueueFull(msgQueueHandleType *pQueueHandle)
+    {
+        return pQueueHandle->itemCount == pQueueHandle->queueLength;
+    }
+
+    /**
+     * @brief Check if message queue is empty
+     *
+     * @param pQueueHandle
+     * @return true
+     * @return false
+     */
+    static inline bool msgQueueEmpty(msgQueueHandleType *pQueueHandle)
+    {
+        return pQueueHandle->itemCount == 0;
+    }
+
+    int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
+
+    int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
+
+#ifdef __cplusplus
 }
-
-/**
- * @brief Check if message queue is empty
- *
- * @param pQueueHandle
- * @return true
- * @return false
- */
-static inline bool msgQueueEmpty(msgQueueHandleType *pQueueHandle)
-{
-    return pQueueHandle->itemCount == 0;
-}
-
-bool msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
-
-bool msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
+#endif
 
 #endif

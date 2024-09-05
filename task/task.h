@@ -15,12 +15,16 @@
 #include "osConfig.h"
 #include "taskQueue/taskQueue.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define TASK_LOWEST_PRIORITY 0xff
 #define TASK_HIGHEST_PRIORITY 0
 
 #define TASK_NO_WAIT 0
 #define TASK_MAX_WAIT 0xffffffffUL
-
 
 #define TASK_DEFINE(taskHandle, stackDepth, taskEntryFunction, taskParams, taskPriority) \
     void taskEntryFunction(void *);                                                      \
@@ -35,81 +39,85 @@
         .blockedReason = BLOCK_REASON_NONE,                                              \
         .wakeupReason = WAKEUP_REASON_NONE}
 
-typedef void (*taskFunctionType)(void *params);
+    typedef void (*taskFunctionType)(void *params);
 
-typedef enum
-{
-    TASK_STATUS_READY,
-    TASK_STATUS_RUNNING,
-    TASK_STATUS_BLOCKED,
-    TASK_STATUS_SUSPENDED
-} taskStatusType;
+    typedef enum
+    {
+        TASK_STATUS_READY,
+        TASK_STATUS_RUNNING,
+        TASK_STATUS_BLOCKED,
+        TASK_STATUS_SUSPENDED
+    } taskStatusType;
 
-typedef enum
-{
-    BLOCK_REASON_NONE,
-    SLEEP,
-    WAIT_FOR_SEMAPHORE,
-    WAIT_FOR_MUTEX,
-    WAIT_FOR_MSG_QUEUE_DATA,
-    WAIT_FOR_MSG_QUEUE_SPACE,
-    WAIT_FOR_COND_VAR,
-    WAIT_FOR_TIMER_TIMEOUT,
+    typedef enum
+    {
+        BLOCK_REASON_NONE,
+        SLEEP,
+        WAIT_FOR_SEMAPHORE,
+        WAIT_FOR_MUTEX,
+        WAIT_FOR_MSG_QUEUE_DATA,
+        WAIT_FOR_MSG_QUEUE_SPACE,
+        WAIT_FOR_COND_VAR,
+        WAIT_FOR_TIMER_TIMEOUT,
 
-} blockedReasonType;
+    } blockedReasonType;
 
-typedef enum
-{
-    WAKEUP_REASON_NONE,
-    WAIT_TIMEOUT,
-    SLEEP_TIME_TIMEOUT,
-    SEMAPHORE_TAKEN,
-    MUTEX_LOCKED,
-    MSG_QUEUE_DATA_AVAILABLE,
-    MSG_QUEUE_SPACE_AVAILABE,
-    COND_VAR_SIGNALLED,
-    TIMER_TIMEOUT,
-    RESUME
+    typedef enum
+    {
+        WAKEUP_REASON_NONE,
+        WAIT_TIMEOUT,
+        SLEEP_TIME_TIMEOUT,
+        SEMAPHORE_TAKEN,
+        MUTEX_LOCKED,
+        MSG_QUEUE_DATA_AVAILABLE,
+        MSG_QUEUE_SPACE_AVAILABE,
+        COND_VAR_SIGNALLED,
+        TIMER_TIMEOUT,
+        RESUME
 
-} wakeupReasonType;
+    } wakeupReasonType;
 
-typedef struct taskHandle
-{
-    uint32_t stackPointer;
-    taskFunctionType taskEntry;
-    void *params;
-    uint32_t remainingSleepTicks;
-    taskStatusType status;
-    blockedReasonType blockedReason;
-    wakeupReasonType wakeupReason;
-    uint8_t priority;
+    typedef struct taskHandle
+    {
+        uint32_t stackPointer;
+        taskFunctionType taskEntry;
+        void *params;
+        uint32_t remainingSleepTicks;
+        taskStatusType status;
+        blockedReasonType blockedReason;
+        wakeupReasonType wakeupReason;
+        uint8_t priority;
 
-} taskHandleType;
+    } taskHandleType;
 
-typedef struct
-{
-    taskQueueType readyQueue;
-    taskQueueType blockedQueue;
-    taskHandleType *currentTask;
+    typedef struct
+    {
+        taskQueueType readyQueue;
+        taskQueueType blockedQueue;
+        taskHandleType *currentTask;
 
-} taskPoolType;
+    } taskPoolType;
 
-extern taskHandleType *currentTask;
-extern taskHandleType *nextTask;
-extern taskPoolType taskPool;
+    extern taskHandleType *currentTask;
+    extern taskHandleType *nextTask;
+    extern taskPoolType taskPool;
 
-bool taskStart(taskHandleType *pTaskHandle);
+    int taskStart(taskHandleType *pTaskHandle);
 
-void taskSleepMS(uint32_t sleepTimeMS);
+    int taskSleepMS(uint32_t sleepTimeMS);
 
-void taskSleepUS(uint32_t sleepTimeUS);
+    int taskSleepUS(uint32_t sleepTimeUS);
 
-void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
+    int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
 
-void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
+    int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
 
-void taskSuspend(taskHandleType *pTask);
+    int taskSuspend(taskHandleType *pTask);
 
-bool taskResume(taskHandleType *pTask);
+    int taskResume(taskHandleType *pTask);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

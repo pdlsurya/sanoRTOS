@@ -15,21 +15,30 @@
 #include "mutex/mutex.h"
 #include "taskQueue/taskQueue.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define CONDVAR_DEFINE(condVarHandle, p_mutex) \
     condVarHandleType condVarHandle = {        \
         .waitQueue = {0},                      \
         .pMutex = p_mutex}
 
-typedef struct
-{
-    taskQueueType waitQueue;
-    mutexHandleType *pMutex;
-} condVarHandleType;
+    typedef struct
+    {
+        taskQueueType waitQueue;
+        mutexHandleType *pMutex;
+    } condVarHandleType;
 
-bool condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks);
+    int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks);
 
-bool condVarSignal(condVarHandleType *pCondVar);
+    int condVarSignal(condVarHandleType *pCondVar);
 
-bool condVarBroadcast(condVarHandleType *pCondVar);
+    int condVarBroadcast(condVarHandleType *pCondVar);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

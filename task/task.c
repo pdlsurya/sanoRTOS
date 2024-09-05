@@ -8,7 +8,7 @@
  * @copyright Copyright (c) 2024
  *
  */
-
+#include "retCodes.h"
 #include "osConfig.h"
 #include "scheduler/scheduler.h"
 #include "taskQueue/taskQueue.h"
@@ -32,21 +32,28 @@ static void taskExitFunction()
 /**
  * @brief Change task's status to ready
  * @param pTask Pointer to the taskHandle struct.
+ * @retval SUCCESS if task enqueued to readyQueue successfully
+ * @retval -EINVAL if invalid argument passed
  */
-void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
+int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
-    if (pTask->status == TASK_STATUS_BLOCKED)
+    if (pTask)
     {
-        /* Remove  task from the queue of blocked tasks*/
-        taskQueueRemove(&taskPool.blockedQueue, pTask);
-    }
-    pTask->status = TASK_STATUS_READY;
-    pTask->blockedReason = BLOCK_REASON_NONE;
-    pTask->wakeupReason = wakeupReason;
-    pTask->remainingSleepTicks = 0;
+        if (pTask->status == TASK_STATUS_BLOCKED)
+        {
+            /* Remove  task from the queue of blocked tasks*/
+            taskQueueRemove(&taskPool.blockedQueue, pTask);
+        }
+        pTask->status = TASK_STATUS_READY;
+        pTask->blockedReason = BLOCK_REASON_NONE;
+        pTask->wakeupReason = wakeupReason;
+        pTask->remainingSleepTicks = 0;
 
-    /* Add task to queue of ready tasks*/
-    taskQueueAdd(&taskPool.readyQueue, pTask);
+        /* Add task to queue of ready tasks*/
+        taskQueueAdd(&taskPool.readyQueue, pTask);
+        return SUCCESS;
+    }
+    return -EINVAL;
 }
 
 /**
@@ -55,103 +62,131 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
  * @param pTask Pointer to taskHandle struct.
  * @param blockReason Block reason
  * @param ticks Number to ticks to block the task for.
+ * @retval SUCCESS if task blocked successfully
+ * @retval -EINVAL if invalid argument passed
  */
-void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
+int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
 {
+    if (pTask)
+    {
 
-    pTask->remainingSleepTicks = ticks;
-    pTask->status = TASK_STATUS_BLOCKED;
-    pTask->blockedReason = blockedReason;
-    pTask->wakeupReason = WAKEUP_REASON_NONE;
+        pTask->remainingSleepTicks = ticks;
+        pTask->status = TASK_STATUS_BLOCKED;
+        pTask->blockedReason = blockedReason;
+        pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
-    taskQueueAddToFront(&taskPool.blockedQueue, pTask);
+        // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
+        taskQueueAddToFront(&taskPool.blockedQueue, pTask);
 
-    // Give CPU to other tasks
-    taskYield();
+        // Give CPU to other tasks
+        taskYield();
+
+        return SUCCESS;
+    }
+    return -EINVAL;
 }
 
 /**
  * @brief Suspend task
  *
  * @param pTask Pointer to taskHandle struct.
+ * @retval SUCCESS if task suspended successfully
+ * @retval -EINVAL if invalid argument passed
  */
-void taskSuspend(taskHandleType *pTask)
+int taskSuspend(taskHandleType *pTask)
 {
-    // If task is in ready queue, remove it from the queue
-    if (pTask->status == TASK_STATUS_READY)
-        taskQueueRemove(&taskPool.readyQueue, pTask);
+    if (pTask)
+    {
+        // If task is in ready queue, remove it from the queue
+        if (pTask->status == TASK_STATUS_READY)
+            taskQueueRemove(&taskPool.readyQueue, pTask);
 
-    pTask->remainingSleepTicks = 0;
-    pTask->status = TASK_STATUS_SUSPENDED;
-    pTask->blockedReason = BLOCK_REASON_NONE;
-    pTask->wakeupReason = WAKEUP_REASON_NONE;
+        pTask->remainingSleepTicks = 0;
+        pTask->status = TASK_STATUS_SUSPENDED;
+        pTask->blockedReason = BLOCK_REASON_NONE;
+        pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    if (pTask == taskPool.currentTask)
-        taskYield();
+        if (pTask == taskPool.currentTask)
+        {
+            taskYield();
+        }
+        return SUCCESS;
+    }
+    return -EINVAL;
 }
 
 /**
  * @brief Resume task from suspended state
  *
  * @param pTask Pointer to taskHandle struct
- * @return true if task resumed succesfully
- * @return false if task resume failed
+ * @return SUCCESS if task resumed succesfully
+ * @return -EINVAL if invalid argument passed or task was not in suspended state
  */
-bool taskResume(taskHandleType *pTask)
+int taskResume(taskHandleType *pTask)
 {
-    if (pTask->status == TASK_STATUS_SUSPENDED)
+    if (pTask)
     {
-        taskSetReady(pTask, RESUME);
-        return true;
+        if (pTask->status == TASK_STATUS_SUSPENDED)
+        {
+            taskSetReady(pTask, RESUME);
+            return SUCCESS;
+        }
     }
-    return false;
+    return -EINVAL;
 }
 
 /**
  * @brief Block task for specified number of OS Ticks
  *
  * @param sleepTicks
+ * @retval SUCCESS if task put to sleep successfullly
+ * @retval -EINVAL if task is not running
  */
-static inline void taskSleep(uint32_t sleepTicks)
+static inline int taskSleep(uint32_t sleepTicks)
 {
     taskHandleType *currentTask = taskPool.currentTask;
     if (currentTask->status == TASK_STATUS_RUNNING)
     {
-        taskBlock(currentTask, SLEEP, sleepTicks);
+        return taskBlock(currentTask, SLEEP, sleepTicks);
     }
+    return -EINVAL;
 }
 
 /**
  * @brief Block task for specified number of milliseconds
  *
  * @param sleepTimeMS
+ * @retval SUCCESS if task put to sleep successfullly
+ * @retval -EINVAL if task is not running
  */
-void taskSleepMS(uint32_t sleepTimeMS)
+int taskSleepMS(uint32_t sleepTimeMS)
 {
 
-    taskSleep(MS_TO_OS_TICKS(sleepTimeMS));
+    return taskSleep(MS_TO_OS_TICKS(sleepTimeMS));
 }
 
 /**
  * @brief Block task for specified number of microseconds
  *
  * @param sleepTimeUS
+ * @retval SUCCESS if task put to sleep successfullly
+ * @retval -EINVAL if task is not running
  */
-void taskSleepUS(uint32_t sleepTimeUS)
+int taskSleepUS(uint32_t sleepTimeUS)
 {
-    taskSleep(US_TO_OS_TICKS(sleepTimeUS));
+    return taskSleep(US_TO_OS_TICKS(sleepTimeUS));
 }
+
 /**
  * @brief Initialize task's default stack contents and store pointer to taskHandle struct to pool of tasks ready to run. Calling this
  * function from main does not start execution of the task if Scheduler is not started.To start executeion of task, osStartScheduler must be
  * called from  main after calling taskStart. If this function is called from other running tasks, execution happens based on priority of the task.
  *
  * @param pTaskHandle Pointer to taskHandle struct
- * @return true if task started successfully
- * @return false  if task start failed
+ * @retval SUCCESS if task enqueued to readyQueue successfully
+ * @retval -EINVAL if invalid argument passed
  */
-bool taskStart(taskHandleType *pTaskHandle)
+int taskStart(taskHandleType *pTaskHandle)
 {
 
     /**********--Task's default stack values--****************************************
@@ -181,15 +216,18 @@ bool taskStart(taskHandleType *pTaskHandle)
        |____|                                    |____|
      <-32bits->                                 <-32bits->
     *************************************************************************************/
+    if (pTaskHandle)
+    {
+        *((uint32_t *)pTaskHandle->stackPointer + 8) = EXC_RETURN_THREAD_PSP;
+        *((uint32_t *)pTaskHandle->stackPointer + 9) = (uint32_t)pTaskHandle->params;
+        *((uint32_t *)pTaskHandle->stackPointer + 14) = (uint32_t)taskExitFunction;
+        *((uint32_t *)pTaskHandle->stackPointer + 15) = (uint32_t)pTaskHandle->taskEntry;
+        *((uint32_t *)pTaskHandle->stackPointer + 16) = 0x01000000; // Default xPSR register value
 
-    *((uint32_t *)pTaskHandle->stackPointer + 8) = EXC_RETURN_THREAD_PSP;
-    *((uint32_t *)pTaskHandle->stackPointer + 9) = (uint32_t)pTaskHandle->params;
-    *((uint32_t *)pTaskHandle->stackPointer + 14) = (uint32_t)taskExitFunction;
-    *((uint32_t *)pTaskHandle->stackPointer + 15) = (uint32_t)pTaskHandle->taskEntry;
-    *((uint32_t *)pTaskHandle->stackPointer + 16) = 0x01000000; // Default xPSR register value
+        /*Store pointer to the taskHandle struct to ready queue*/
+        taskQueueAdd(&taskPool.readyQueue, pTaskHandle);
 
-    /*Store pointer to the taskHandle struct to ready queue*/
-    taskQueueAdd(&taskPool.readyQueue, pTaskHandle);
-
-    return true;
+        return SUCCESS;
+    }
+    return -EINVAL;
 }
