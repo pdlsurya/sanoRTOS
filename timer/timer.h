@@ -1,7 +1,7 @@
 /**
  * @file timer.h
  * @author Surya Poudel
- * @brief RTOS software Timer implementation
+ * @brief RTOS Software Timer implementation
  * @version 0.1
  * @date 2024-04-26
  *
@@ -75,7 +75,7 @@ extern "C"
 
     void processTimers();
 
-    int timerTaskStart();
+    void timerTaskStart();
 
 #ifdef __cplusplus
 }

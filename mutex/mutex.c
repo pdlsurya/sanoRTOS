@@ -9,6 +9,7 @@
  *
  */
 #include <stdlib.h>
+#include <assert.h>
 #include "osConfig.h"
 #include "retCodes.h"
 #include "task/task.h"
@@ -21,113 +22,107 @@
  *
  * @param pMutex Pointer to the mutex structure
  * @param waitTicks Number of ticks to wait if mutex is not available
- * @retval SUCCESS if mutex locked successfully
- * @retval -EBUSY  if mutex not available
- * @retval -ETIMEOUT if timeout occured while waiting for mutex
- * @retval -EINVAL if invalid arguments passed
+ * @retval RET_SUCCESS if mutex locked successfully
+ * @retval RET_BUSY  if mutex not available
+ * @retval RET_TIMEOUT if timeout occured while waiting for mutex
  */
 int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
-    if (pMutex != NULL)
-    {
-        taskHandleType *currentTask = taskPool.currentTask;
+    assert(pMutex != NULL);
+
+    taskHandleType *currentTask = taskPool.currentTask;
 #if MUTEX_USE_PRIORITY_INHERITANCE
-        /* Priority inheritance*/
-        if (pMutex->ownerTask && currentTask->priority < pMutex->ownerTask->priority)
+    /* Priority inheritance*/
+    if (pMutex->ownerTask && currentTask->priority < pMutex->ownerTask->priority)
+    {
+        /* Save owner task's default priority if not saved before */
+        if (pMutex->ownerDefaultPriority == -1)
         {
-            /* Save owner task's default priority if not saved before */
-            if (pMutex->ownerDefaultPriority == -1)
-            {
-                pMutex->ownerDefaultPriority = pMutex->ownerTask->priority;
-            }
-            pMutex->ownerTask->priority = currentTask->priority;
+            pMutex->ownerDefaultPriority = pMutex->ownerTask->priority;
         }
-#endif
-        /* Check if mutex is free and no owner has been assigned. If so, lock mutex immediately.*/
-        if (!pMutex->locked)
-        {
-            pMutex->locked = true;
-            pMutex->ownerTask = currentTask;
-            return SUCCESS;
-        }
-
-        else if (waitTicks == TASK_NO_WAIT && pMutex->locked)
-        {
-            return -EBUSY;
-        }
-
-        else if (waitTicks > 0)
-        {
-            /* Add the tasking waiting on mutex to the wait queue*/
-            taskQueueAdd(&pMutex->waitQueue, currentTask);
-
-            /* Block current task and give CPU to other tasks while waiting for mutex*/
-            taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
-
-            if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
-            {
-                return SUCCESS;
-            }
-            else
-            {
-                return -ETIMEOUT;
-            }
-        }
+        pMutex->ownerTask->priority = currentTask->priority;
     }
-    return -EINVAL;
+#endif
+    /* Check if mutex is free and no owner has been assigned. If so, lock mutex immediately.*/
+    if (!pMutex->locked)
+    {
+        pMutex->locked = true;
+        pMutex->ownerTask = currentTask;
+        return RET_SUCCESS;
+    }
+
+    else if (waitTicks == TASK_NO_WAIT && pMutex->locked)
+    {
+        return RET_BUSY;
+    }
+
+    else
+    {
+        /* Add the tasking waiting on mutex to the wait queue*/
+        taskQueueAdd(&pMutex->waitQueue, currentTask);
+
+        /* Block current task and give CPU to other tasks while waiting for mutex*/
+        taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
+
+        if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
+        {
+            return RET_SUCCESS;
+        }
+
+        return RET_TIMEOUT;
+    }
 }
 
 /**
  * @brief Unlock/Release mutex
  * @param pMutex Pointer to the mutex structure
- * @retval SUCCESS if mutex unlocked successfully
- * @retval -ENOTOWNER if current owner doesnot owns the mutex
- * @retval -EINVAL on Invalid operation or invalid argument passed
+ * @retval RET_SUCCESS if mutex unlocked successfully
+ * @retval RET_NOTOWNER if current owner doesnot owns the mutex
+ * @retval RET_NOTLOCKED if mutex was not previously locked
  */
 int mutexUnlock(mutexHandleType *pMutex)
 {
+
+    assert(pMutex != NULL);
+
     taskHandleType *currentTask = taskPool.currentTask;
 
     /*Unlocking the mutex is possible only if current task owns it*/
-    if (pMutex != NULL)
+
+    if (pMutex->ownerTask == currentTask)
     {
-        if (pMutex->ownerTask == currentTask)
+        if (pMutex->locked)
         {
-            if (pMutex->locked)
-            {
 
 #if MUTEX_USE_PRIORITY_INHERITANCE
-                /* Assign owner task its default priority if priority inheritance was perforemd while locking the mutex*/
-                if (pMutex->ownerDefaultPriority != -1)
-                {
-                    pMutex->ownerTask->priority = pMutex->ownerDefaultPriority;
+            /* Assign owner task its default priority if priority inheritance was perforemd while locking the mutex*/
+            if (pMutex->ownerDefaultPriority != -1)
+            {
+                pMutex->ownerTask->priority = pMutex->ownerDefaultPriority;
 
-                    /* Reset owner defalult priority of mutex*/
-                    pMutex->ownerDefaultPriority = -1;
-                }
-#endif
-                /* select next owner of the mutex*/
-                taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
-
-                pMutex->ownerTask = nextOwner;
-
-                if (nextOwner != NULL)
-                {
-                    taskSetReady(nextOwner, MUTEX_LOCKED);
-                }
-                else
-                {
-                    pMutex->locked = false;
-                }
-
-                return SUCCESS;
+                /* Reset owner defalult priority of mutex*/
+                pMutex->ownerDefaultPriority = -1;
             }
+#endif
+            /* select next owner of the mutex*/
+            taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
+
+            pMutex->ownerTask = nextOwner;
+
+            if (nextOwner != NULL)
+            {
+                taskSetReady(nextOwner, MUTEX_LOCKED);
+            }
+            else
+            {
+                pMutex->locked = false;
+            }
+
+            return RET_SUCCESS;
         }
-        else
-        {
-            return -ENOTOWNER;
-        }
+
+        return RET_NOTLOCKED;
     }
 
-    return -EINVAL;
+    return RET_NOTOWNER;
 }

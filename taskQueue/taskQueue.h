@@ -1,7 +1,7 @@
 /**
  * @file taskQueue.h
  * @author Surya Poudel
- * @brief Task queue implementation
+ * @brief Priority Task Queue implementation
  * @version 0.1
  * @date 2024-05-08
  *
@@ -18,7 +18,7 @@
 extern "C"
 {
 #endif
-
+    /*Forward declaration of taskHandleType*/
     typedef struct taskHandle taskHandleType;
 
     typedef struct taskNode
@@ -34,18 +34,18 @@ extern "C"
 
     taskHandleType *taskQueueGet(taskQueueType *pTaskQueue);
 
-    int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
-    int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
-    int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
     /**
      * @brief Check if taskQueue is empty
      *
      * @param pTaskQueue
-     * @return true
-     * @return false
+     * @retval true if taskQueue is empty
+     * @retval false, otherwise
      */
     static inline bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {

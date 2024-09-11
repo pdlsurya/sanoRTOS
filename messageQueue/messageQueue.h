@@ -49,8 +49,8 @@ extern "C"
      * @brief Check if message queue is full
      *
      * @param pQueueHandle
-     * @return true
-     * @return false
+     * @retval true if msgQueue is full
+     * @retval false otherwise
      */
     static inline bool msgQueueFull(msgQueueHandleType *pQueueHandle)
     {
@@ -61,8 +61,8 @@ extern "C"
      * @brief Check if message queue is empty
      *
      * @param pQueueHandle
-     * @return true
-     * @return false
+     * @retval true if msgQueue is empty
+     * @return false otherwise
      */
     static inline bool msgQueueEmpty(msgQueueHandleType *pQueueHandle)
     {

@@ -10,6 +10,7 @@
  */
 
 #include <stdbool.h>
+#include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include "retCodes.h"
@@ -35,6 +36,9 @@ TASK_DEFINE(timerTask, 256, timerTaskFunction, NULL, TIMER_TASK_PRIORITY);
 static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue, timeoutHandlerType timeoutHandler)
 {
     timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)malloc(sizeof(timeoutHandlerNodeType));
+
+    assert(newNode != NULL);
+
     newNode->timeoutHandler = timeoutHandler;
     newNode->nextNode = NULL;
 
@@ -75,21 +79,13 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
  *
  * @param pTimerList  Pointer to the timer list struct
  * @param pTimerNode  Pointer to the timerNode struct
- * @retval SUCCESS if timerNode added to the list successfully
- * @retval -EINVAL if invalid arguments passed
  */
-static int timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNode)
+static void timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
-    if (pTimerList != NULL && pTimerNode != NULL)
-    {
-        pTimerNode->nextNode = pTimerList->head;
 
-        pTimerList->head = pTimerNode;
+    pTimerNode->nextNode = pTimerList->head;
 
-        return SUCCESS;
-    }
-
-    return -EINVAL;
+    pTimerList->head = pTimerNode;
 }
 
 /**
@@ -111,36 +107,31 @@ static inline void timerListDeleteFirstNode(timerListType *pTimerList)
  *
  * @param pTimerList Pointer to the timerList struct.
  * @param pTimerNode Pointer to the timerNode struct.
- * @retval SUCCESS if timerNode deleted successfully
- * @retval -EEMPTY if timerList is empty
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if timerNode deleted successfully
+ * @retval RET_EMPTY if timerList is empty
  */
 static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
-    if (pTimerList != NULL && pTimerNode != NULL)
+
+    if (pTimerList->head != NULL) // Check if timerList is empty
     {
+        timerNodeType *currentNode = pTimerList->head;
 
-        if (pTimerList->head != NULL)
+        /* If the timer correponds to the head node in the list, remove the timer node and reassign head node.*/
+        if (pTimerNode == pTimerList->head)
+            timerListDeleteFirstNode(pTimerList);
+
+        else
         {
-            timerNodeType *currentNode = pTimerList->head;
+            while (currentNode->nextNode != pTimerNode)
+                currentNode = currentNode->nextNode;
 
-            /* If the timer correponds to the head node in the list, remove the timer node and reassign head node.*/
-            if (pTimerNode == pTimerList->head)
-                timerListDeleteFirstNode(pTimerList);
-
-            else
-            {
-                while (currentNode->nextNode != pTimerNode)
-                    currentNode = currentNode->nextNode;
-
-                currentNode->nextNode = pTimerNode->nextNode;
-                pTimerNode->nextNode = NULL;
-            }
-            return SUCCESS;
+            currentNode->nextNode = pTimerNode->nextNode;
+            pTimerNode->nextNode = NULL;
         }
-        return -EEMPTY;
+        return RET_SUCCESS;
     }
-    return -EINVAL;
+    return RET_EMPTY;
 }
 
 /**
@@ -148,27 +139,26 @@ static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerN
  *
  * @param pTimerNode Pointer timerNode struct
  * @param intervalTicks Timer intervalTicks
- * @retval SUCCESS if timer started successfully
- * @retval -EALREADYACTIVE if timer is already running
- * @retval -EINVAL if invalid arguments passed
+ * @retval RET_SUCCESS if timer started successfully
+ * @retval RET_ALREADYACTIVE if timer is already running
  */
 int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
 {
-    if (pTimerNode != NULL)
-    {
-        /* check if the timer is already in running state. If so, abort re-starting the timer.*/
-        if (pTimerNode->isRunning)
-            return -EALREADYACTIVE;
+    assert(pTimerNode != NULL);
 
-        /* Set isRunning flag for the started timer pTimerNode.*/
-        pTimerNode->isRunning = true;
+    /* check if the timer is already in running state. If so, abort re-starting the timer.*/
+    if (pTimerNode->isRunning)
+        return RET_ALREADYACTIVE;
 
-        pTimerNode->ticksToExpire = pTimerNode->intervalTicks = intervalTicks;
+    /* Set isRunning flag for the started timer pTimerNode.*/
+    pTimerNode->isRunning = true;
 
-        /* Add the timer in the queue of running timers*/
-        return timerListNodeAdd(&timerList, pTimerNode);
-    }
-    return -EINVAL;
+    pTimerNode->ticksToExpire = pTimerNode->intervalTicks = intervalTicks;
+
+    /* Add the timer in the queue of running timers*/
+    timerListNodeAdd(&timerList, pTimerNode);
+
+    return RET_SUCCESS;
 }
 
 /**
@@ -176,22 +166,20 @@ int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
  *  and delete timer from the list of running timers
  *
  * @param pTimerNode Pointer to timerNode struct
- * @retval SUCCESS if timer stopped successfully
- * @retval -ENOTACTIVE if timer is not running
- * @retval -EINVAL if invalid argument passed
+ * @retval RET_SUCCESS if timer stopped successfully
+ * @retval RET_EMPTY if timerList is empty
+ * @retval RET_NOTACTIVE if timer is not running
  */
 int timerStop(timerNodeType *pTimerNode)
 {
-    if (pTimerNode)
+    assert(pTimerNode != NULL);
+
+    if (pTimerNode->isRunning)
     {
-        if (pTimerNode->isRunning)
-        {
-            pTimerNode->isRunning = false;
-            return timerListNodeDelete(&timerList, pTimerNode);
-        }
-        return -ENOTACTIVE;
+        pTimerNode->isRunning = false;
+        return timerListNodeDelete(&timerList, pTimerNode);
     }
-    return -EINVAL;
+    return RET_NOTACTIVE;
 }
 
 /**
@@ -200,7 +188,7 @@ int timerStop(timerNodeType *pTimerNode)
  */
 void processTimers()
 {
-    if (timerList.head != NULL)
+    if (timerList.head != NULL) // Check if timer list is empty
     {
         timerNodeType *currentNode = timerList.head;
         while (currentNode != NULL)
@@ -236,13 +224,12 @@ void processTimers()
 
 /**
  * @brief Function to Start timerTask. This function will be called when starting the scheduler.
- * @retval SUCCESS if timerTask started successfully
- * @retval -EINVAL if invalid argument passed
+ *
  */
-int timerTaskStart()
+void timerTaskStart()
 {
 
-    return taskStart(&timerTask);
+    taskStart(&timerTask);
 }
 
 /**
