@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "mutex/mutex.h"
 #include "taskQueue/taskQueue.h"
 
 #ifdef __cplusplus
@@ -21,22 +22,32 @@ extern "C"
 {
 #endif
 
-#define MSG_QUEUE_DEFINE(msgQueueHandle, length, item_size) \
-    uint8_t msgQueueHandle##Buffer[length * item_size];     \
-    msgQueueHandleType msgQueueHandle = {                   \
-        .producerWaitQueue = {0},                           \
-        .consumerWaitQueue = {0},                           \
-        .buffer = msgQueueHandle##Buffer,                   \
-        .queueLength = length,                              \
-        .itemSize = item_size,                              \
-        .itemCount = 0,                                     \
-        .readIndex = 0,                                     \
+/**
+ * @brief Statically define and initialize a message queue. The message queue internally uses a ring buffer,
+ * which is (length * item_size) bytes long, to store message items.The message queue operates
+ * in First In First Out(FIFO) manner.
+ * @param name Name of the message queue.
+ * @param length Maximum number of message items the message queue can hold.
+ * @param item_size Size of a message item in bytes.
+ */
+#define MSG_QUEUE_DEFINE(name, length, item_size) \
+    uint8_t name##Buffer[length * item_size];     \
+    msgQueueHandleType name = {                   \
+        .producerWaitQueue = {0},                 \
+        .consumerWaitQueue = {0},                 \
+        .mutex = {.ownerDefaultPriority = -1},    \
+        .buffer = name##Buffer,                   \
+        .queueLength = length,                    \
+        .itemSize = item_size,                    \
+        .itemCount = 0,                           \
+        .readIndex = 0,                           \
         .writeIndex = 0}
 
     typedef struct
     {
         taskQueueType producerWaitQueue;
         taskQueueType consumerWaitQueue;
+        mutexHandleType mutex;
         uint8_t *buffer;
         uint32_t queueLength;
         uint32_t itemSize;
