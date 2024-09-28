@@ -23,8 +23,14 @@ extern "C"
 {
 #endif
 
-#define SEMAPHORE_DEFINE(semHandle, initialCount, maxCnt) \
-    semaphoreHandleType semHandle = {                     \
+/**
+ * @brief Statically define and initialize a semaphore.
+ * @param name Name of the semaphore.
+ * @param initialCount Initial semaphore count.
+ * @param maxCnt Maximum semaphore count.
+ */
+#define SEMAPHORE_DEFINE(name, initialCount, maxCnt) \
+    semaphoreHandleType name = {                     \
         .waitQueue = {0},                                 \
         .count = initialCount,                            \
         .maxCount = maxCnt}

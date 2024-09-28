@@ -17,7 +17,7 @@
 
 #define IDLE_TASK_PRIORITY TASK_LOWEST_PRIORITY // Idle task has lowest possible priority[higher the value lower the priority]
 
-TASK_DEFINE(idleTask, 48, idleTaskHandler, NULL, IDLE_TASK_PRIORITY);
+TASK_DEFINE(idleTask, 192, idleTaskHandler, NULL, IDLE_TASK_PRIORITY);
 
 void idleTaskHandler(void *params)
 {
@@ -131,7 +131,7 @@ void taskYield()
 /**
  * @brief Function to start the RTOS task scheduler.
  */
-void osStartScheduler()
+void schedulerStart()
 {
     /*Start timerTask*/
     timerTaskStart();

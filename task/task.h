@@ -26,17 +26,25 @@ extern "C"
 #define TASK_NO_WAIT 0
 #define TASK_MAX_WAIT 0xffffffffUL
 
-#define TASK_DEFINE(taskHandle, stackDepth, taskEntryFunction, taskParams, taskPriority) \
-    void taskEntryFunction(void *);                                                      \
-    uint32_t taskHandle##Stack[stackDepth] = {0};                                        \
-    taskHandleType taskHandle = {                                                        \
-        .stackPointer = (uint32_t)(taskHandle##Stack + stackDepth - 17),                 \
-        .priority = taskPriority,                                                        \
-        .taskEntry = taskEntryFunction,                                                  \
-        .params = taskParams,                                                            \
-        .remainingSleepTicks = 0,                                                        \
-        .status = TASK_STATUS_READY,                                                     \
-        .blockedReason = BLOCK_REASON_NONE,                                              \
+/**
+ * @brief Statically define and initialize a task.
+ * @param name Name of the task.
+ * @param stackSize Size of task stack in bytes.
+ * @param taskEntryFunction Task  entry  function.
+ * @param taskParams Entry point parameter.
+ * @param taskPriority Task priority.
+ */
+#define TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority)    \
+    void taskEntryFunction(void *);                                                  \
+    uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {0};                        \
+    taskHandleType name = {                                                          \
+        .stackPointer = (uint32_t)(name##Stack + stackSize / sizeof(uint32_t) - 17), \
+        .priority = taskPriority,                                                    \
+        .taskEntry = taskEntryFunction,                                              \
+        .params = taskParams,                                                        \
+        .remainingSleepTicks = 0,                                                    \
+        .status = TASK_STATUS_READY,                                                 \
+        .blockedReason = BLOCK_REASON_NONE,                                          \
         .wakeupReason = WAKEUP_REASON_NONE}
 
     typedef void (*taskFunctionType)(void *params);

@@ -23,8 +23,12 @@ extern "C"
 {
 #endif
 
-#define MUTEX_DEFINE(mutexHandle)   \
-    mutexHandleType mutexHandle = { \
+/**
+ * @brief Statically define and initialize a mutex.
+ * @param name Name of the mutex.
+ */
+#define MUTEX_DEFINE(name)          \
+    mutexHandleType name = {        \
         .waitQueue = {0},           \
         .ownerTask = NULL,          \
         .ownerDefaultPriority = -1, \
@@ -33,7 +37,7 @@ extern "C"
     typedef struct
     {
         taskQueueType waitQueue;
-        volatile taskHandleType *ownerTask;
+        taskHandleType *ownerTask;
         int16_t ownerDefaultPriority;
         bool locked;
 
