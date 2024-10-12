@@ -54,6 +54,6 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - **timerStop**: Stop a running timer.
 
 # License
-This project is licensed under the MIT License.
+This project is licensed under the MIT License-see the [LICENSE](LICENSE) file for details.
 
 
