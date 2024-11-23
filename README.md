@@ -4,9 +4,10 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 # Features
 
 - Priority based preemptive scheduling
-- Optional Priority Inheritance to avoid Priority inversion problem
+- Optional priority inheritance to avoid priority inversion problem while using mutexes
+- Configurable tick rate
 - Task synchronization
-- Task communication
+- Inter-task communication
 - Lightweight and minimalistic design
 
 # API Functions
@@ -14,7 +15,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 
 ## Task Management
 
-- **TASK_DEFINE**: Statically define and initialize a task.
+- **TASK_DEFINE**: Macro to statically define and initialize a task.
 - **taskStart** : Start the task.
 - **taskYield**: Yield the processor to allow other tasks to run.
 - **taskSleepMS**: Delay a task for a specified number of milliseconds.
@@ -24,32 +25,32 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 
 ## Mutex
 
-- **MUTEX_DEFINE**: Statically define and initialize a mutex.
+- **MUTEX_DEFINE**: Macro to statically define and initialize a mutex.
 - **mutexLock**: Acquire a mutex, blocking if necessary.
 - **mutexUnlock**: Release a mutex.
 
 ## Semaphore
 
-- **SEMAPHORE_DEFINE**: Statically define and initialize a semaphore.
+- **SEMAPHORE_DEFINE**: Macro to statically define and initialize a semaphore.
 - **semaphoreTake**: Take the semaphore.
 - **semaphoreGive**: Release a semaphore.
 
 ## Message Queue
 
-- **MSG_QUEUE_DEFINE**: Statically define and initialize a message queue.
+- **MSG_QUEUE_DEFINE**: Macro to statically define and initialize a message queue.
 - **msgQueueSend**: Send a message to a queue.
 - **msgQueueReceive**: Receive a message from a queue.
 
 ## Condition Variable
 
-- **CONDVAR_DEFINE**: Statically define and initialize a conditon variable.
+- **CONDVAR_DEFINE**: Macro to statically define and initialize a conditon variable.
 - **condVarWait**: Wait on a condition variable.
 - **condVarSignal**: Signal a condition variable, waking one waiting task.
 - **condVarBroadcast**: Broadcast a condition variable, waking all waiting tasks.
 
 ## Software Timer
 
-- **TIMER_DEFINE**: Statically define and initialize a timer
+- **TIMER_DEFINE**: Macro to statically define and initialize a timer
 - **timerStart**: Start a timer with a specified timeout.
 - **timerStop**: Stop a running timer.
 
@@ -90,8 +91,8 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
    #include "scheduler/scheduler.h"
    #include "task/task.h"
 
-   TASK_DEFINE(task1, 128, firstTask, NULL, 1);
-   TASK_DEFINE(task2, 128, secondTask, NULL, 1);
+   TASK_DEFINE(task1, 512, firstTask, NULL, 1);
+   TASK_DEFINE(task2, 512, secondTask, NULL, 1);
 
     void firstTask(void *args){
 
