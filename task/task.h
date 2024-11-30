@@ -1,11 +1,11 @@
 /**
  * @file task.h
  * @author Surya Poudel
- * @brief
+ * @brief RTOS task management APIs
  * @version 0.1
  * @date 2024-04-09
  *
- * @copyright Copyright (c) 2024
+ * @copyright Copyright (c) 2024 Surya Poudel
  *
  */
 

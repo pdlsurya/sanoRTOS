@@ -1,11 +1,11 @@
 /**
  * @file conditionVariable.h
  * @author Surya Poudel
- * @brief
+ * @brief Condition variable APIs
  * @version 0.1
  * @date 2024-05-10
  *
- * @copyright Copyright (c) 2024
+ * @copyright Copyright (c) 2024 Surya Poudel
  *
  */
 #ifndef __SANO_RTOS_CONDITION_VARIABLE
