@@ -1,7 +1,7 @@
 /**
  * @file task.c
  * @author Surya Poudel
- * @brief
+ * @brief RTOS task management APIs implementation
  * @version 0.1
  * @date 2024-04-09
  *
