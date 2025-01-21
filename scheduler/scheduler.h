@@ -32,6 +32,9 @@ extern "C"
 {
 #endif
 
+#define ENTER_CRITICAL_SECTION __disable_irq
+#define EXIT_CRITICAL_SECTION __enable_irq
+
 #ifdef PLATFORM_STM32
 #define SYSTICK_HANDLER osSysTick_Handler
 /*For STM32 SoCs, SysTick timer is initialized during ClockConfig stage;

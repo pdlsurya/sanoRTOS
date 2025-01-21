@@ -34,8 +34,8 @@
 #include "conditionVariable.h"
 
 /**
- * @brief Wait on condition variable
- *
+ * @brief Wait on condition variable. Since waiting on a condition variable internally uses
+ * a mutex, this function cannot be called from an ISR.
  * @param pCondVar Pointer to condVarHandle struct
  * @param waitTicks Number of ticks to wait until timeout
  * @retval RET_SUCCESS(0) if wait succeeded
@@ -68,8 +68,8 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 }
 
 /**
- * @brief Signal a task waiting on conditional variable.
- *
+ * @brief Signal a task waiting on conditional variable. This function cannot be
+ * called from an ISR.
  * @param pCondVar Pointer to condVarHandle struct
  * @retval RET_SUCCESS if signal succeeded,
  * @retval RET_NOTASK if no tasks available to signal
@@ -78,10 +78,19 @@ int condVarSignal(condVarHandleType *pCondVar)
 {
     assert(pCondVar != NULL);
 
+    /*Get next highest priority waiting task to unblock*/
     taskHandleType *nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
+
     if (nextSignalTask != NULL)
     {
         taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
+
+        /*Perform context switch if unblocked task has equal or
+         *higher priority[lower priority value] than that of current task */
+        if (nextSignalTask->priority <= taskPool.currentTask->priority)
+        {
+            taskYield();
+        }
         return RET_SUCCESS;
     }
 
@@ -89,8 +98,8 @@ int condVarSignal(condVarHandleType *pCondVar)
 }
 
 /**
- * @brief Signal all the waiting tasks waiting on conditional variable
- *
+ * @brief Signal all the waiting tasks waiting on conditional variable. This function
+ * cannot be called from an ISR.
  * @param pCondVar Pointer to condVarHandle struct
  * @retval RET_SUCCESS if broadcast succeeded,
  * @retval RET_NOTASK if not tasks available to broadcast

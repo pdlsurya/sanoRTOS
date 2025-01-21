@@ -32,8 +32,8 @@
 #include "mutex.h"
 
 /**
- * @brief Lock/acquire the mutex
- *
+ * @brief Lock/acquire the mutex. Because mutexes incorporate ownership control and
+ * priority inheritance, calling this function from an ISR is not allowed.
  * @param pMutex Pointer to the mutex structure
  * @param waitTicks Number of ticks to wait if mutex is not available
  * @retval RET_SUCCESS if mutex locked successfully
@@ -43,6 +43,10 @@
 int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
     assert(pMutex != NULL);
+
+    int retCode;
+
+    ENTER_CRITICAL_SECTION();
 
     taskHandleType *currentTask = taskPool.currentTask;
 #if MUTEX_USE_PRIORITY_INHERITANCE
@@ -62,12 +66,13 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
     {
         pMutex->locked = true;
         pMutex->ownerTask = currentTask;
-        return RET_SUCCESS;
+
+        retCode = RET_SUCCESS;
     }
 
     else if (waitTicks == TASK_NO_WAIT && pMutex->locked)
     {
-        return RET_BUSY;
+        retCode = RET_BUSY;
     }
 
     else
@@ -75,20 +80,32 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
         /* Add the tasking waiting on mutex to the wait queue*/
         taskQueueAdd(&pMutex->waitQueue, currentTask);
 
+        /*Exit from critical section before blocking the task*/
+        EXIT_CRITICAL_SECTION();
+
         /* Block current task and give CPU to other tasks while waiting for mutex*/
         taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
 
+        /*Re-enter critical section after being unblocked*/
+        ENTER_CRITICAL_SECTION();
+
         if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
         {
-            return RET_SUCCESS;
+            retCode = RET_SUCCESS;
         }
-
-        return RET_TIMEOUT;
+        else
+        {
+            retCode = RET_TIMEOUT;
+        }
     }
+    EXIT_CRITICAL_SECTION();
+
+    return retCode;
 }
 
 /**
- * @brief Unlock/Release mutex
+ * @brief Unlock/Release mutex.Because mutexes incorporate ownership control and
+ * priority inheritance, calling this function from an ISR is not allowed.
  * @param pMutex Pointer to the mutex structure
  * @retval RET_SUCCESS if mutex unlocked successfully
  * @retval RET_NOTOWNER if current owner doesnot owns the mutex
@@ -98,6 +115,12 @@ int mutexUnlock(mutexHandleType *pMutex)
 {
 
     assert(pMutex != NULL);
+
+    int retCode;
+
+    bool contextSwitchRequired = false;
+
+    ENTER_CRITICAL_SECTION();
 
     taskHandleType *currentTask = taskPool.currentTask;
 
@@ -118,7 +141,7 @@ int mutexUnlock(mutexHandleType *pMutex)
                 pMutex->ownerDefaultPriority = -1;
             }
 #endif
-            /* select next owner of the mutex*/
+            /* Get next owner of the mutex*/
             taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
 
             pMutex->ownerTask = nextOwner;
@@ -126,17 +149,37 @@ int mutexUnlock(mutexHandleType *pMutex)
             if (nextOwner != NULL)
             {
                 taskSetReady(nextOwner, MUTEX_LOCKED);
+
+                /*Perform context switch if next owner task has equal or
+                 *higher priority[lower priority value] than that of current task */
+                if (nextOwner->priority <= taskPool.currentTask->priority)
+                {
+                    contextSwitchRequired = true;
+                }
             }
             else
             {
                 pMutex->locked = false;
             }
 
-            return RET_SUCCESS;
+            retCode = RET_SUCCESS;
         }
-
-        return RET_NOTLOCKED;
+        else
+        {
+            retCode = RET_NOTLOCKED;
+        }
+    }
+    else
+    {
+        retCode = RET_NOTOWNER;
     }
 
-    return RET_NOTOWNER;
+    EXIT_CRITICAL_SECTION();
+
+    if (contextSwitchRequired)
+    {
+        taskYield();
+    }
+
+    return retCode;
 }
