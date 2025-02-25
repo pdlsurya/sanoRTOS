@@ -31,17 +31,20 @@
 extern "C"
 {
 #endif
-
+    /**
+     * @brief Codes used by System call to perform a specified action.
+     *
+     */
     typedef enum
     {
         DISABLE_INTERRUPTS = 1,
         ENABLE_INTERUPPTS,
         CONTEXT_SWITCH,
 
-    } SysCodeType;
+    } sysCodesType;
 
-/*Macro to trigger SVC interrupt with specified SVC number*/
-#define SYSCALL(svcNum) __asm volatile("svc %0" : : "I"(svcNum) : "memory");
+/*Macro to invoke System call. This triggers SVC exception with specified sysCode*/
+#define SYSCALL(sysCode) __asm volatile("svc %0" : : "I"(sysCode) : "memory");
 
 #if (TASK_RUN_PRIVILEGED)
 #define ENTER_CRITICAL_SECTION() __disable_irq()
@@ -53,8 +56,8 @@ extern "C"
 
 #ifdef PLATFORM_STM32
 #define SYSTICK_HANDLER osSysTick_Handler
-/*For STM32 SoCs, SysTick timer is initialized during ClockConfig stage;
- Hence, we dont need it re-initialize SysTick timer for STM32 platform.*/
+/*For STM32 SoCs, SysTick timer is initialized during ClockConfig stage.
+ Hence, we dont need to re-initialize SysTick timer for STM32 platform.*/
 #define SYSTICK_CONFIG() ((void)0)
     void osSysTick_Handler();
 #else

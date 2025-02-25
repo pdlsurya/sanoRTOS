@@ -25,7 +25,7 @@
 #ifndef __OS_CONFIG_H
 #define __OS_CONFIG_H
 
-// #define PLATFORM_STM32
+ #define PLATFORM_STM32
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -46,7 +46,7 @@ extern "C"
 
 #define SYSTICK_PRIORITY 0xff // Priority of SysTick Timer.
 
-#define TASK_RUN_PRIVILEGED 0 // macro to set whether tasks should run in privileged mode.
+#define TASK_RUN_PRIVILEGED 1 // macro to set whether tasks should run in privileged mode.
 
 #define MUTEX_USE_PRIORITY_INHERITANCE 1
 
