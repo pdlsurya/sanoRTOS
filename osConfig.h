@@ -25,7 +25,7 @@
 #ifndef __OS_CONFIG_H
 #define __OS_CONFIG_H
 
- #define PLATFORM_STM32
+// #define PLATFORM_STM32
 
 #include <stdbool.h>
 #include <stdint.h>

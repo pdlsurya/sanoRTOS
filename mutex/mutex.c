@@ -49,6 +49,8 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
     ENTER_CRITICAL_SECTION();
 
     taskHandleType *currentTask = taskPool.currentTask;
+
+retry:
 #if MUTEX_USE_PRIORITY_INHERITANCE
     /* Priority inheritance*/
     if (pMutex->ownerTask && currentTask->priority < pMutex->ownerTask->priority)
@@ -93,9 +95,18 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
         {
             retCode = RET_SUCCESS;
         }
-        else
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
+            /*Wait timed out, remove task from  the waitQueue.*/
+            taskQueueRemove(&pMutex->waitQueue, currentTask);
+
             retCode = RET_TIMEOUT;
+        }
+        /*Task might have been suspended while waiting for mutex and later resumed.
+          In this case, retry locking the mutex again */
+        else if (currentTask->wakeupReason == RESUME)
+        {
+            goto retry;
         }
     }
     EXIT_CRITICAL_SECTION();
@@ -120,6 +131,8 @@ int mutexUnlock(mutexHandleType *pMutex)
 
     bool contextSwitchRequired = false;
 
+    taskHandleType *nextOwner = NULL;
+
     ENTER_CRITICAL_SECTION();
 
     taskHandleType *currentTask = taskPool.currentTask;
@@ -142,12 +155,17 @@ int mutexUnlock(mutexHandleType *pMutex)
             }
 #endif
             /* Get next owner of the mutex*/
-            taskHandleType *nextOwner = taskQueueGet(&pMutex->waitQueue);
-
-            pMutex->ownerTask = nextOwner;
+        getNextOwner:
+            nextOwner = taskQueueGet(&pMutex->waitQueue);
 
             if (nextOwner != NULL)
             {
+                /*If task was suspended while waiting for mutex,skip the task and get another waiting task from the waitQueue*/
+                if (nextOwner->status == TASK_STATUS_SUSPENDED)
+                {
+                    goto getNextOwner;
+                }
+
                 taskSetReady(nextOwner, MUTEX_LOCKED);
 
                 /*Perform context switch if next owner task has equal or
@@ -161,6 +179,8 @@ int mutexUnlock(mutexHandleType *pMutex)
             {
                 pMutex->locked = false;
             }
+
+            pMutex->ownerTask = nextOwner;
 
             retCode = RET_SUCCESS;
         }

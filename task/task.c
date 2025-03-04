@@ -77,6 +77,8 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
 {
     assert(pTask != NULL);
 
+    ENTER_CRITICAL_SECTION();
+
     pTask->remainingSleepTicks = ticks;
     pTask->status = TASK_STATUS_BLOCKED;
     pTask->blockedReason = blockedReason;
@@ -84,6 +86,8 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
 
     // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
     taskQueueAddToFront(&taskPool.blockedQueue, pTask);
+
+    EXIT_CRITICAL_SECTION();
 
     // Give CPU to other tasks
     taskYield();
@@ -98,15 +102,27 @@ void taskSuspend(taskHandleType *pTask)
 {
     assert(pTask != NULL);
 
-    // If task is in ready queue, remove it from the queue
+    ENTER_CRITICAL_SECTION();
+
+    /* If task status is ready, remove it from the readyQueue*/
     if (pTask->status == TASK_STATUS_READY)
+    {
         taskQueueRemove(&taskPool.readyQueue, pTask);
+    }
+    /*If task status is blocked, remove it from the blockedQueue*/
+    else if (pTask->status == TASK_STATUS_BLOCKED)
+    {
+        taskQueueRemove(&taskPool.blockedQueue, pTask);
+    }
 
     pTask->remainingSleepTicks = 0;
     pTask->status = TASK_STATUS_SUSPENDED;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
+    EXIT_CRITICAL_SECTION();
+
+    /*If self suspended, give CPU to other tasks*/
     if (pTask == taskPool.currentTask)
     {
         taskYield();
