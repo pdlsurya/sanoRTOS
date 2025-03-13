@@ -25,6 +25,7 @@
 #ifndef __SANO_RTOS_TASK_H
 #define __SANO_RTOS_TASK_H
 
+#include <assert.h>
 #include "osConfig.h"
 #include "taskQueue/taskQueue.h"
 
@@ -39,8 +40,37 @@ extern "C"
 #define TASK_NO_WAIT 0
 #define TASK_MAX_WAIT 0xffffffffUL
 
+    extern void taskExitFunction();
+
+    /**********--Task's default stack contents--****************************************
+          ____ <-- tackBase = stack + stackSize / sizeof(uint32_t)
+         |____|xPSR  --> stackBase - 1
+         |____|Return address(PC) <-Task Entry --> stackBase - 2
+         |____|LR --> stackBase - 3
+         |____|R12
+         |____|R3
+         |____|R2
+         |____|R1
+         |____|R0 <-Task params --> stackBase - 8
+         |____|EXC_RETURN --> stackBase - 9
+
+        <--Cortex-M3/M4/M7-->               <--Cortex-MO/M0+--->
+         |____|R11                                 |____|R7
+         |____|R10                                 |____|R6
+         |____|R9                                  |____|R5
+         |____|R8                                  |____|R4
+         |____|R7                                  |____|R11
+         |____|R6                                  |____|R10
+         |____|R5                                  |____|R9
+         |____|R4 <--stackPointer=(stackBase - 17) |____|R8 <--stackPointer=(stackBase - 17)
+            |                                         |
+            |                                         |
+         |____|                                    |____|
+         |____|                                    |____|
+       <-32bits->                                 <-32bits->
+      *************************************************************************************/
 /**
- * @brief Statically define and initialize a task.
+ * @brief Statically define and initialize a task and its default stack contents.
  * @param name Name of the task.
  * @param stackSize Size of task stack in bytes.
  * @param taskEntryFunction Task  entry  function.
@@ -49,7 +79,12 @@ extern "C"
  */
 #define TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority)    \
     void taskEntryFunction(void *);                                                  \
-    uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {0};                        \
+    uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                           \
+        [stackSize / sizeof(uint32_t) - 1] = 0x01000000,                             \
+        [stackSize / sizeof(uint32_t) - 2] = (uint32_t)taskEntryFunction,            \
+        [stackSize / sizeof(uint32_t) - 3] = (uint32_t)taskExitFunction,             \
+        [stackSize / sizeof(uint32_t) - 8] = (uint32_t)taskParams,                   \
+        [stackSize / sizeof(uint32_t) - 9] = EXC_RETURN_THREAD_PSP};                 \
     taskHandleType name = {                                                          \
         .stackPointer = (uint32_t)(name##Stack + stackSize / sizeof(uint32_t) - 17), \
         .priority = taskPriority,                                                    \
@@ -124,11 +159,51 @@ extern "C"
     extern taskHandleType *nextTask;
     extern taskPoolType taskPool;
 
-    void taskStart(taskHandleType *pTask);
+    /**
+     * @brief Store pointer to the taskHandle struct to the queue of ready tasks. Calling this
+     * function from main does not start execution of the task if Scheduler is not started.To start executeion of task, osStartScheduler must be
+     * called from  main after calling taskStart. If this function is called from other running tasks, execution happens based on priority of the task.
+     *
+     * @param pTask Pointer to taskHandle struct
+     */
+    static inline void taskStart(taskHandleType *pTask)
+    {
+        assert(pTask != NULL);
 
-    int taskSleepMS(uint32_t sleepTimeMS);
+        taskQueueAdd(&taskPool.readyQueue, pTask);
+    }
 
-    int taskSleepUS(uint32_t sleepTimeUS);
+    extern void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
+
+    /**
+     * @brief Block task for specified number of RTOS Ticks
+     *
+     * @param sleepTicks
+     */
+    static inline void taskSleep(uint32_t sleepTicks)
+    {
+        taskBlock(taskPool.currentTask, SLEEP, sleepTicks);
+    }
+
+    /**
+     * @brief Block task for specified number of milliseconds
+     *
+     * @param sleepTimeMS
+     */
+    static inline void taskSleepMS(uint32_t sleepTimeMS)
+    {
+        taskSleep(MS_TO_OS_TICKS(sleepTimeMS));
+    }
+
+    /**
+     * @brief Block task for specified number of microseconds
+     *
+     * @param sleepTimeUS
+     */
+    static inline void taskSleepUS(uint32_t sleepTimeUS)
+    {
+        taskSleep(US_TO_OS_TICKS(sleepTimeUS));
+    }
 
     void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
 
