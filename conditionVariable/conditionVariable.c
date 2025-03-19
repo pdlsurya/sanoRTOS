@@ -73,7 +73,7 @@ wait:
     }
     /*Task might have been suspended while waiting on condition variable and later resumed.
       In this case, retry waiting on condition variable again */
-    else if (currentTask->wakeupReason == RESUME)
+    else
     {
         goto wait;
     }

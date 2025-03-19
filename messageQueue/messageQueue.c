@@ -178,7 +178,7 @@ retry:
         }
         /*Task might have been suspended while waiting for space to be available and later resumed.
           In this case, retry sending to the msgQueue again */
-        else if (currentTask->wakeupReason == RESUME)
+        else
         {
             goto retry;
         }
@@ -238,7 +238,7 @@ retry:
         }
         /*Task might have been suspended while waiting for data to be available and later resumed.
         In this case, retry receiving from the msgQueue again */
-        else if (currentTask->wakeupReason == RESUME)
+        else
         {
             goto retry;
         }

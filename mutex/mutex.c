@@ -104,11 +104,12 @@ retry:
         }
         /*Task might have been suspended while waiting for mutex and later resumed.
           In this case, retry locking the mutex again */
-        else if (currentTask->wakeupReason == RESUME)
+        else
         {
             goto retry;
         }
     }
+
     EXIT_CRITICAL_SECTION();
 
     return retCode;
