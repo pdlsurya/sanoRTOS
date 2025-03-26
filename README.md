@@ -1,5 +1,5 @@
 # sanoRTOS
-sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-M microcontrollers. This implementation provides a simple yet effective API for task management, synchronization, and communication, enabling efficient and predictable multitasking in embedded systems.
+sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-M and RISC-V microcontrollers. This implementation provides a simple yet effective API for task management, synchronization, and communication, enabling efficient and predictable multitasking in embedded systems.
 
 # Features
 
