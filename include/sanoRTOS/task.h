@@ -51,17 +51,18 @@ extern "C"
  * @param taskParams Entry point parameter.
  * @param taskPriority Task priority.
  */
-#define TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority)                      \
-    void taskEntryFunction(void *);                                                                    \
-    TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction,taskParams);                           \
-    taskHandleType name = {                                                                            \
+#define TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                 \
+    void taskEntryFunction(void *);                                                                         \
+    TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams);                    \
+    taskHandleType name = {                                                                                 \
         .stackPointer = (uint32_t)(name##Stack + stackSize / sizeof(uint32_t) - INITIAL_TASK_STACK_OFFSET), \
-        .priority = taskPriority,                                                                      \
-        .taskEntry = taskEntryFunction,                                                                \
-        .params = taskParams,                                                                          \
-        .remainingSleepTicks = 0,                                                                      \
-        .status = TASK_STATUS_READY,                                                                   \
-        .blockedReason = BLOCK_REASON_NONE,                                                            \
+        .priority = taskPriority,                                                                           \
+        .coreAffinity = affinity,                                                                           \
+        .taskEntry = taskEntryFunction,                                                                     \
+        .params = taskParams,                                                                               \
+        .remainingSleepTicks = 0,                                                                           \
+        .status = TASK_STATUS_READY,                                                                        \
+        .blockedReason = BLOCK_REASON_NONE,                                                                 \
         .wakeupReason = WAKEUP_REASON_NONE}
 
     typedef void (*taskFunctionType)(void *params);
@@ -113,6 +114,7 @@ extern "C"
         blockedReasonType blockedReason;
         wakeupReasonType wakeupReason;
         uint8_t priority;
+        int8_t coreAffinity;
 
     } taskHandleType;
 
@@ -120,12 +122,12 @@ extern "C"
     {
         taskQueueType readyQueue;
         taskQueueType blockedQueue;
-        taskHandleType *currentTask;
+        taskHandleType *currentTask[CONFIG_NUM_CORES];
 
     } taskPoolType;
 
-    extern taskHandleType *currentTask;
-    extern taskHandleType *nextTask;
+    extern taskHandleType *currentTask[CONFIG_NUM_CORES];
+    extern taskHandleType *nextTask[CONFIG_NUM_CORES];
     extern taskPoolType taskPool;
 
     void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
@@ -136,19 +138,7 @@ extern "C"
 
     int taskResume(taskHandleType *pTask);
 
-    /**
-     * @brief Store pointer to the taskHandle struct to the queue of ready tasks. Calling this
-     * function from main does not start execution of the task if Scheduler is not started.To start executeion of task, osStartScheduler must be
-     * called from  main after calling taskStart. If this function is called from other running tasks, execution happens based on priority of the task.
-     *
-     * @param pTask Pointer to taskHandle struct
-     */
-    static inline void taskStart(taskHandleType *pTask)
-    {
-        assert(pTask != NULL);
-
-        taskQueueAdd(&taskPool.readyQueue, pTask);
-    }
+    void taskStart(taskHandleType *pTask);
 
     /**
      * @brief Block task for specified number of RTOS Ticks
@@ -157,7 +147,7 @@ extern "C"
      */
     static inline void taskSleep(uint32_t sleepTicks)
     {
-        taskBlock(taskPool.currentTask, SLEEP, sleepTicks);
+        taskBlock(taskPool.currentTask[CORE_ID()], SLEEP, sleepTicks);
     }
 
     /**

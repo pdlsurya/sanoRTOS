@@ -25,66 +25,90 @@
 #include <stdlib.h>
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/config.h"
+#include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/port.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/timer.h"
 #include "sanoRTOS/taskQueue.h"
 
-#define IDLE_TASK_PRIORITY TASK_LOWEST_PRIORITY // Idle task has lowest possible priority[higher the value lower the priority]
+TASK_DEFINE(idleTask0, 512, idleTaskHandler, NULL, TASK_LOWEST_PRIORITY, 0);
 
-TASK_DEFINE(idleTask, 512, idleTaskHandler, NULL, IDLE_TASK_PRIORITY);
+static atomic_t schedulerLock;
 
 void idleTaskHandler(void *params)
 {
     (void)params;
     while (1)
     {
-        /*Do not spend time on idle task*/
-        taskYield();
+        /*enter energy saving mode*/
+        // __WFE();
+        //__WFI();
     }
 }
 
 /**
- * @brief Select next highest priority ready task for execution and trigger context switch.
+ * @brief Save current task's stack pointer and load next task's stack pointer
+ * @retval next task's stack pointer
  */
-void scheduleNextTask()
+uint32_t switchContext(uint32_t stackPointer)
+{
+    spinLock(&schedulerLock);
+
+    currentTask[CORE_ID()]->stackPointer = stackPointer;
+
+    uint32_t nextTaskStackPointer = nextTask[CORE_ID()]->stackPointer;
+
+    spinUnlock(&schedulerLock);
+
+    return nextTaskStackPointer;
+}
+
+/**
+ * @brief Select next highest priority ready task for execution
+ *
+ * @retval TRUE if context switch  required
+ * @retval FALSE  if context switch not required
+ */
+static bool selectNextTask()
 {
     if (!taskQueueEmpty(&taskPool.readyQueue))
     {
-
-        if (taskPool.currentTask->status == TASK_STATUS_RUNNING)
+        if (taskPool.currentTask[CORE_ID()]->status == TASK_STATUS_RUNNING)
         {
             /*Perform context switch only if next highest priority ready task has equal or higher priority[lower priority value]
             than the current running task*/
 
             taskHandleType *nextReadyTask = taskQueuePeek(&taskPool.readyQueue);
 
-            if (nextReadyTask->priority <= taskPool.currentTask->priority)
+            if (nextReadyTask->priority <= taskPool.currentTask[CORE_ID()]->priority)
             {
                 /*Change current task's status to ready and add it to the readyQueue*/
-                taskPool.currentTask->status = TASK_STATUS_READY;
-                taskQueueAdd(&taskPool.readyQueue, taskPool.currentTask);
+                taskPool.currentTask[CORE_ID()]->status = TASK_STATUS_READY;
+                taskQueueAdd(&taskPool.readyQueue, taskPool.currentTask[CORE_ID()]);
             }
             else
             {
                 /*Current running task has higher priority than the next highest priority ready task;Hence, no need to perform context
-                  switch. Return from here */
-                return;
+                  switch.*/
+                return false;
             }
         }
 
-        currentTask = taskPool.currentTask;
+        currentTask[CORE_ID()] = taskPool.currentTask[CORE_ID()];
 
         // Get the next highest priority  ready task
-        nextTask = taskQueueGet(&taskPool.readyQueue);
+        nextTask[CORE_ID()] = taskQueueGet(&taskPool.readyQueue);
 
-        taskPool.currentTask = nextTask;
+        taskPool.currentTask[CORE_ID()] = nextTask[CORE_ID()];
 
-        nextTask->status = TASK_STATUS_RUNNING;
+        nextTask[CORE_ID()]->status = TASK_STATUS_RUNNING;
 
-        /*Trigger platform specific context switch mechanism*/
-        portTriggerContextSwitch();
+        // Context switch required
+        return true;
     }
+
+    // No tasks in ready state, Context swtich not required
+    return false;
 }
 
 /**
@@ -93,7 +117,6 @@ void scheduleNextTask()
  */
 static void checkTimeout()
 {
-
     taskNodeType *currentTaskNode = taskPool.blockedQueue.head;
 
     while (currentTaskNode != NULL)
@@ -122,39 +145,58 @@ static void checkTimeout()
  */
 void taskYield()
 {
+    bool contextSwitchRequired = false;
+
+    spinLock(&schedulerLock);
+
+    contextSwitchRequired = selectNextTask();
+
+    spinUnlock(&schedulerLock);
+
+    if (contextSwitchRequired)
+    {
 #if (CONFIG_TASK_USER_MODE)
-    /*We need to be in privileged mode to perform context switch.*/
-    SYSCALL(SWITCH_CONTEXT);
-
+        /*We need to be in privileged mode to perform context switch.*/
+        SYSCALL(SWITCH_CONTEXT);
 #else
-    ENTER_CRITICAL_SECTION();
-
-    scheduleNextTask();
-
-    EXIT_CRITICAL_SECTION();
+        /*Trigger platform specific context switch mechanism*/
+        portTriggerContextSwitch();
 
 #endif
+    }
 }
 
 /**
  * @brief RTOS Tick interrupt handler. It selects next task to run and
  * triggers platform specific context switch mechanism.
  */
- void rtosTickHandler()
+void tickHandler()
 {
+    bool contextSwitchRequired = false;
 
-    /*Check for timer timeout*/
-    processTimers();
+    spinLock(&schedulerLock);
 
-    /*Check for wait timeout of blocked tasks*/
-    if (!taskQueueEmpty(&taskPool.blockedQueue))
+    if (CORE_ID() == 0)
     {
-        checkTimeout();
+        /*Check for timer timeout*/
+        processTimers();
+
+        /*Check for wait timeout of blocked tasks*/
+        if (!taskQueueEmpty(&taskPool.blockedQueue))
+        {
+            checkTimeout();
+        }
     }
 
-    if(!taskQueueEmpty(&taskPool.readyQueue)){
     /*Perform context switch if required*/
-    scheduleNextTask();
+    contextSwitchRequired = selectNextTask();
+
+    spinUnlock(&schedulerLock);
+
+    if (contextSwitchRequired)
+    {
+        /*Trigger platform specific context switch mechanism*/
+        portTriggerContextSwitch();
     }
 }
 
@@ -163,7 +205,7 @@ void taskYield()
  *
  * @param sysCode
  */
-void rtosSyscallHandler(uint8_t sysCode)
+void syscallHandler(uint8_t sysCode)
 {
     switch (sysCode)
     {
@@ -174,8 +216,7 @@ void rtosSyscallHandler(uint8_t sysCode)
         PORT_ENABLE_IRQ();
         break;
     case SWITCH_CONTEXT:
-        /*Perform context switch if required*/
-        scheduleNextTask();
+        portTriggerContextSwitch();
         break;
     default:
         break;
@@ -190,14 +231,8 @@ void schedulerStart()
     /*Start timerTask*/
     timerTaskStart();
 
-    /* Start the idle task*/
-    taskStart(&idleTask);
+    /* Start the idle task0*/
+    taskStart(&idleTask0);
 
-    /*Get the highest priority ready task from ready Queue*/
-    currentTask = taskPool.currentTask = taskQueueGet(&taskPool.readyQueue);
-
-    /*Change status to RUNNING*/
-    currentTask->status = TASK_STATUS_RUNNING;
-
-    portSchedulerStart(currentTask);
+    portSchedulerStart();
 }

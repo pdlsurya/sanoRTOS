@@ -25,13 +25,16 @@
 #include <assert.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
+#include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/task.h"
 
 taskPoolType taskPool = {0};
-taskHandleType *currentTask;
-taskHandleType *nextTask;
+taskHandleType *currentTask[CONFIG_NUM_CORES];
+taskHandleType *nextTask[CONFIG_NUM_CORES];
+
+static atomic_t lock;
 
 /**
  * @brief Function to execute when task returns
@@ -52,6 +55,8 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
     assert(pTask != NULL);
 
+    spinLock(&lock);
+
     if (pTask->status == TASK_STATUS_BLOCKED)
     {
         /* Remove  task from the queue of blocked tasks*/
@@ -64,6 +69,8 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 
     /* Add task to queue of ready tasks*/
     taskQueueAdd(&taskPool.readyQueue, pTask);
+
+    spinUnlock(&lock);
 }
 
 /**
@@ -77,17 +84,17 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
 {
     assert(pTask != NULL);
 
-    ENTER_CRITICAL_SECTION();
-
     pTask->remainingSleepTicks = ticks;
     pTask->status = TASK_STATUS_BLOCKED;
     pTask->blockedReason = blockedReason;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
+    spinLock(&lock);
+
     // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
     taskQueueAddToFront(&taskPool.blockedQueue, pTask);
 
-    EXIT_CRITICAL_SECTION();
+    spinUnlock(&lock);
 
     // Give CPU to other tasks
     taskYield();
@@ -102,7 +109,7 @@ void taskSuspend(taskHandleType *pTask)
 {
     assert(pTask != NULL);
 
-    ENTER_CRITICAL_SECTION();
+    spinLock(&lock);
 
     /* If task status is ready, remove it from the readyQueue*/
     if (pTask->status == TASK_STATUS_READY)
@@ -115,15 +122,15 @@ void taskSuspend(taskHandleType *pTask)
         taskQueueRemove(&taskPool.blockedQueue, pTask);
     }
 
+    spinUnlock(&lock);
+
     pTask->remainingSleepTicks = 0;
     pTask->status = TASK_STATUS_SUSPENDED;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    EXIT_CRITICAL_SECTION();
-
     /*If self suspended, give CPU to other tasks*/
-    if (pTask == taskPool.currentTask)
+    if (pTask == taskPool.currentTask[CORE_ID()])
     {
         taskYield();
     }
@@ -147,4 +154,22 @@ int taskResume(taskHandleType *pTask)
     }
 
     return RET_NOTSUSPENDED;
+}
+
+/**
+ * @brief Store pointer to the taskHandle struct to the queue of ready tasks. Calling this
+ * function from main does not start execution of the task if Scheduler is not started.To start executeion of task, osStartScheduler must be
+ * called from  main after calling taskStart. If this function is called from other running tasks, execution happens based on priority of the task.
+ *
+ * @param pTask Pointer to taskHandle struct
+ */
+void taskStart(taskHandleType *pTask)
+{
+    assert(pTask != NULL);
+
+    spinLock(&lock);
+
+    taskQueueAdd(&taskPool.readyQueue, pTask);
+
+    spinUnlock(&lock);
 }

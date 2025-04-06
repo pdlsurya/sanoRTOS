@@ -129,6 +129,8 @@ extern "C"
 
 #define portTriggerContextSwitch() msi_trigger()
 
+#define PORT_NOP() asm volatile("nop")
+
     /**
      * @brief Configure platform specific core components and
      * start the RTOS scheduler by jumping to the first task.
@@ -136,6 +138,19 @@ extern "C"
      * @param pTask  Pointer to the first task to be executed
      */
     void portSchedulerStart(taskHandleType *pTask);
+
+    /**
+     * @brief Compare-And-Set function for ARM Cortex-M
+     *
+     * @param ptr Pointer to the target memory location
+     * @param compare_val The expected old value
+     * @param set_val The new value to be stored if `*ptr` is equal to `expected`
+     * @return bool Returns true if the set was successful, false otherwise
+     */
+    static inline bool portAtomicCAS(volatile uint32_t *ptr, uint32_t compare_val, uint32_t set_val)
+    {
+        return rv_utils_compare_and_set(ptr, compare_val, set_val);
+    }
 
 #ifdef __cplusplus
 }

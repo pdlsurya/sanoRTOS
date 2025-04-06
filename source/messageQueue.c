@@ -64,7 +64,7 @@ getNextConsumer:
 
         /*Perform context switch if  unblocked consumer task has equal or
          *higher priority[lower priority value] than that of current task */
-        if (consumer->priority <= taskPool.currentTask->priority)
+        if (consumer->priority <= taskPool.currentTask[CORE_ID()]->priority)
         {
             contextSwitchRequired = true;
         }
@@ -110,7 +110,7 @@ getNextProducer:
 
         /*Perform context switch if unblocked producer task has equal or
          *higher priority[lower priority value] than that of current task */
-        if (producer->priority <= taskPool.currentTask->priority)
+        if (producer->priority <= taskPool.currentTask[CORE_ID()]->priority)
         {
             contextSwitchRequired = true;
         }
@@ -155,7 +155,7 @@ retry:
     }
     else
     {
-        taskHandleType *currentTask = taskPool.currentTask;
+        taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
 
         taskQueueAdd(&pQueueHandle->producerWaitQueue, currentTask);
 
@@ -215,7 +215,7 @@ retry:
     }
     else
     {
-        taskHandleType *currentTask = taskPool.currentTask;
+        taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
 
         taskQueueAdd(&pQueueHandle->consumerWaitQueue, currentTask);
 

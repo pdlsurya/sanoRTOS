@@ -22,31 +22,59 @@
  * SOFTWARE.
  */
 
-#ifndef __SANO_RTOS_CONFIG_H
-#define __SANO_RTOS_CONFIG_H
+#ifndef __SANO_RTOS_SPIN_LOCK_H
+#define __SANO_RTOS_SPIN_LOCK_H
 
-#include "sanoRTOS/retCodes.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <assert.h>
+#include "sanoRTOS/config.h"
+#include "sanoRTOS/task.h"
+#include "sanoRTOS/taskQueue.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-#define CONFIG_SMP 1 // Configure Symmetric Multi Processing
+    typedef uint32_t atomic_t;
+
+    /**
+     * @brief Lock the specified spinlock.
+     *
+     * @param pLok  Pointer to the lock variable
+     */
+    static inline void spinLock(atomic_t *pLock)
+    {
+        assert(pLock != NULL);
+
+        // Disable interrupts to avoid context switch
+        PORT_IRQ_LOCK();
 
 #if (CONFIG_SMP)
-#define CONFIG_NUM_CORES 2 // Configure number of cores
-#else
-#define CONFIG_NUM_CORES 1
+        while (!portAtomicCAS(pLock, 0, 1))
+        {
+            PORT_NOP();
+        }
+#endif
+    }
+
+    /**
+     * @brief Unlock the specified spinlock.
+     *
+     * @param pLock  Pointer to the lock variable.
+     */
+    static inline void spinUnlock(atomic_t *pLock)
+    {
+        assert(pLock != NULL);
+
+#if (CONFIG_SMP)
+        *pLock = 0;
 #endif
 
-#define CONFIG_MUTEX_USE_PRIORITY_INHERITANCE 1 // Configure mutex priority inheritance
-
-#define CONFIG_TASK_USER_MODE 0 // Configure whether tasks should run in privileged mode.
-
-#define CONFIG_OS_TICK_INTERVAL_US 1000 // Configure SysTick to generate interrupt every 1ms.
-
-#include "sanoRTOS/port.h"
+        // Enable interrupts
+        PORT_IRQ_UNLOCK();
+    }
 
 #ifdef __cplusplus
 }

@@ -38,7 +38,7 @@ static timerListType timerList = {0}; // List of running timers
 static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout handlers to be executed
 
 /*Define timer task with highest possible priority*/
-TASK_DEFINE(timerTask, 1024, timerTaskFunction, NULL, TIMER_TASK_PRIORITY);
+TASK_DEFINE(timerTask, 2048, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, 0);
 
 /**
  * @brief Insert timeoutHandler node at the end of the Queue

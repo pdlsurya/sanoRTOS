@@ -26,6 +26,7 @@
 #include <assert.h>
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/retCodes.h"
+#include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
@@ -46,9 +47,9 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 
     int retCode;
 
-    ENTER_CRITICAL_SECTION();
+    spinLock(&pMutex->lock);
 
-    taskHandleType *currentTask = taskPool.currentTask;
+    taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
 
 retry:
 #if MUTEX_USE_PRIORITY_INHERITANCE
@@ -79,17 +80,17 @@ retry:
 
     else
     {
-        /* Add the tasking waiting on mutex to the wait queue*/
+        /* Add the task waiting on mutex to the wait queue*/
         taskQueueAdd(&pMutex->waitQueue, currentTask);
 
-        /*Exit from critical section before blocking the task*/
-        EXIT_CRITICAL_SECTION();
+        /*Release spinlock before blocking the task*/
+        spinUnlock(&pMutex->lock);
 
         /* Block current task and give CPU to other tasks while waiting for mutex*/
         taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
 
-        /*Re-enter critical section after being unblocked*/
-        ENTER_CRITICAL_SECTION();
+        /*Re-acquire spinlock section after being unblocked*/
+        spinLock(&pMutex->lock);
 
         if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
         {
@@ -110,7 +111,7 @@ retry:
         }
     }
 
-    EXIT_CRITICAL_SECTION();
+    spinUnlock(&pMutex->lock);
 
     return retCode;
 }
@@ -134,9 +135,7 @@ int mutexUnlock(mutexHandleType *pMutex)
 
     taskHandleType *nextOwner = NULL;
 
-    ENTER_CRITICAL_SECTION();
-
-    taskHandleType *currentTask = taskPool.currentTask;
+    taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
 
     /*Unlocking the mutex is possible only if current task owns it*/
 
@@ -157,7 +156,11 @@ int mutexUnlock(mutexHandleType *pMutex)
 #endif
             /* Get next owner of the mutex*/
         getNextOwner:
+            spinLock(&pMutex->lock);
+
             nextOwner = taskQueueGet(&pMutex->waitQueue);
+
+            spinUnlock(&pMutex->lock);
 
             if (nextOwner != NULL)
             {
@@ -171,7 +174,7 @@ int mutexUnlock(mutexHandleType *pMutex)
 
                 /*Perform context switch if next owner task has equal or
                  *higher priority[lower priority value] than that of current task */
-                if (nextOwner->priority <= taskPool.currentTask->priority)
+                if (nextOwner->priority <= taskPool.currentTask[CORE_ID()]->priority)
                 {
                     contextSwitchRequired = true;
                 }
@@ -194,8 +197,6 @@ int mutexUnlock(mutexHandleType *pMutex)
     {
         retCode = RET_NOTOWNER;
     }
-
-    EXIT_CRITICAL_SECTION();
 
     if (contextSwitchRequired)
     {

@@ -53,6 +53,8 @@ extern "C"
 
     void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
+    taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue);
+
     /**
      * @brief Check if taskQueue is empty
      *
@@ -63,17 +65,6 @@ extern "C"
     static inline bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {
         return pTaskQueue->head == NULL;
-    }
-
-    /**
-     * @brief Get task corresponding to front node from the task queue without removing the node
-     *
-     * @param pTaskQueue Pointer to the taskQueue struct
-     * @return Pointer to taskHandle struct corresponding to front node
-     */
-    static inline taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
-    {
-        return pTaskQueue->head->pTask;
     }
 
 #ifdef __cplusplus

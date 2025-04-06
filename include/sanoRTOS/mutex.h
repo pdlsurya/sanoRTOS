@@ -30,6 +30,7 @@
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/config.h"
+#include "sanoRTOS/spinLock.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -42,6 +43,7 @@ extern "C"
  */
 #define MUTEX_DEFINE(name)          \
     mutexHandleType name = {        \
+        .lock = 0,                  \
         .waitQueue = {0},           \
         .ownerTask = NULL,          \
         .ownerDefaultPriority = -1, \
@@ -49,6 +51,7 @@ extern "C"
 
     typedef struct
     {
+        atomic_t lock;
         taskQueueType waitQueue;
         taskHandleType *ownerTask;
         int16_t ownerDefaultPriority;

@@ -51,7 +51,7 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
     /* Unlock previously acquired mutex;*/
     mutexUnlock(pCondVar->pMutex);
 
-    taskHandleType *currentTask = taskPool.currentTask;
+    taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
 
 wait:
     taskQueueAdd(&pCondVar->waitQueue, currentTask);
@@ -112,7 +112,7 @@ getNextSignalTask:
 
         /*Perform context switch if unblocked task has equal or
          *higher priority[lower priority value] than that of current task */
-        if (nextSignalTask->priority <= taskPool.currentTask->priority)
+        if (nextSignalTask->priority <= taskPool.currentTask[CORE_ID()]->priority)
         {
             taskYield();
         }
