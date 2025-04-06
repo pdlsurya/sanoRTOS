@@ -30,7 +30,7 @@
 #include "hal/apm_ll.h"
 
 /*RTOS tick handler function*/
-extern void rtosTickHandler(void);
+extern void schedulerTickHandler(void);
 
 /**
  * @brief Configure platform specific interrupts and tick timer.

@@ -30,6 +30,9 @@
 #elif defined(__ARM_ARCH_7EM__)
     .syntax unified
     .arch armv7e-m
+#elif defined(__ARM_ARCH_8M_MAIN__)
+     .syntax unified
+     .arch armv8-m.main
 #endif
 
 .thumb
@@ -74,17 +77,8 @@ PendSV_Handler:
 
 #endif
 
-    /*save current task's stack pointer*/
-    ldr r1, =currentTask
-    ldr r2,[r1] 
-    str r0,[r2] //first member of the taskHandleType struct is stack pointer
-
-    /*load next task's stack pointer*/
-    ldr r1, =nextTask
-    ldr r2,[r1]
-    ldr r0,[r2] //first member of the taskHandleType struct is stack pointer
-
-
+     bl switchContext
+ 
 #ifdef __ARM_ARCH_6M__
 /*The LDMIA instruction can only use low registers (R0-R7);
  Hence, we need  to first load contents of R8-R11 to R4-R7 registers 

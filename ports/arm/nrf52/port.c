@@ -28,41 +28,41 @@
 #include "sanoRTOS/task.h"
 
 /*RTOS system call handler function*/
-extern void rtosSyscallHandler(uint8_t sysCode);
+extern void syscallHandler(uint8_t sysCode);
 
 /*RTOS tick handler function*/
-extern void rtosTickHandler(void);
+extern void tickHandler(void);
 
 /**
  * @brief Configure platform specific interrupts and tick timer.
  */
 static inline void portConfig()
 {
-    /* Assign lowest priority to PendSV*/
-    NVIC_SetPriority(PendSV_IRQn, 0xff);
-
-    /* Assign lowest priority to SysTick*/
-    NVIC_SetPriority(SysTick_IRQn, SYSTICK_PRIORITY);
 
     /* Configure SysTick to generate interrupt every OS_INTERVAL_CPU_TICKS */
     SYSTICK_CONFIG();
+
+    NVIC_SetPriority(SysTick_IRQn, SYSTICK_PRIORITY);
+
+    /* Assign lowest priority to PendSV*/
+    NVIC_SetPriority(PendSV_IRQn, PENDSV_PRIORITY);
 }
 
 /**
  * @brief Setup the scheduler to start the first task.
- * 
- * @param pTask 
+ *
+ * @param pTask
  */
 void portSchedulerStart(taskHandleType *pTask)
 {
 
-	portConfig();
+    portConfig();
 
     __set_PSP(pTask->stackPointer); /* Set PSP to the top of task's stack */
 
     uint32_t control = __get_CONTROL(); // Read CONTROL register
 
-    __set_CONTROL(CONFIG_TASK_USER_MODE ? (control | 0x3) : control | 0x2); // Set bit 0 to 1 to switch to unprivileged mode
+    __set_CONTROL(CONFIG_TASK_USER_MODE ? (control | 0x3) : (control | 0x2)); // Set bit 0 to 1 to switch to unprivileged mode
 
     __ISB(); // Instruction Synchronization Barrier
 
@@ -78,11 +78,7 @@ void portSchedulerStart(taskHandleType *pTask)
  */
 void SYSTICK_HANDLER()
 {
-    ENTER_CRITICAL_SECTION();
-
-    rtosTickHandler();
-
-    EXIT_CRITICAL_SECTION();
+    tickHandler();
 }
 
 /**

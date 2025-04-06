@@ -30,6 +30,7 @@
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/taskQueue.h"
+#include "sanoRTOS/spinLock.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -44,12 +45,14 @@ extern "C"
  */
 #define SEMAPHORE_DEFINE(name, initialCount, maxCnt) \
     semaphoreHandleType name = {                     \
+        .lock = 0,                                   \
         .waitQueue = {0},                            \
         .count = initialCount,                       \
         .maxCount = maxCnt}
 
     typedef struct
     {
+        atomic_t lock;
         taskQueueType waitQueue;
         uint8_t count;
         uint8_t maxCount;
