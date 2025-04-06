@@ -71,7 +71,7 @@ extern "C"
          |____|R0 <-Task params --> stackBase - 8
          |____|EXC_RETURN --> stackBase - 9
 
-        <--Cortex-M3/M4/M7-->               <--Cortex-MO/M0+--->
+        <--Cortex-M3/M4/M7/M33-->               <--Cortex-MO/M0+--->
          |____|R11                                 |____|R7
          |____|R10                                 |____|R6
          |____|R9                                  |____|R5
