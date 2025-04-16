@@ -30,6 +30,7 @@
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
+#include "sanoRTOS/spinLock.h"
 
 /**
  * @brief Insert an item to the queue buffer
@@ -37,44 +38,52 @@
  * @param pQueueHandle
  * @param pItem
  */
-static void msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
+static bool msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 {
+    bool irqFlag = spinLock(&pQueueHandle->lock);
 
     bool contextSwitchRequired = false;
 
-    taskHandleType *consumer = NULL;
-
-    ENTER_CRITICAL_SECTION();
-
-    memcpy(&pQueueHandle->buffer[pQueueHandle->writeIndex], pItem, pQueueHandle->itemSize);
-    pQueueHandle->writeIndex = (pQueueHandle->writeIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
-    pQueueHandle->itemCount++;
-
-    // Get next waiting consumer task to unblock
-getNextConsumer:
-    consumer = taskQueueGet(&pQueueHandle->consumerWaitQueue);
-    if (consumer != NULL)
+    taskHandleType *pConsumerTask = NULL;
+    if (!msgQueueFull(pQueueHandle))
     {
-        /*If task was suspended while waiting for Queue data, skipt the task and get another waiting task from the waitQueue*/
-        if (consumer->status == TASK_STATUS_SUSPENDED)
-        {
-            goto getNextConsumer;
-        }
-        taskSetReady(consumer, MSG_QUEUE_DATA_AVAILABLE);
 
-        /*Perform context switch if  unblocked consumer task has equal or
-         *higher priority[lower priority value] than that of current task */
-        if (consumer->priority <= taskPool.currentTask[CORE_ID()]->priority)
+        memcpy(&pQueueHandle->buffer[pQueueHandle->writeIndex], pItem, pQueueHandle->itemSize);
+        pQueueHandle->writeIndex = (pQueueHandle->writeIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
+        pQueueHandle->itemCount++;
+
+        // Get next waiting pConsumerTask task to unblock
+    getNextConsumer:
+        pConsumerTask = taskQueueGet(&pQueueHandle->consumerWaitQueue);
+        if (pConsumerTask != NULL)
         {
-            contextSwitchRequired = true;
+            /*If task was suspended while waiting for Queue data, skipt the task and get another waiting task from the waitQueue*/
+            if (pConsumerTask->status == TASK_STATUS_SUSPENDED)
+            {
+                goto getNextConsumer;
+            }
+            taskSetReady(pConsumerTask, MSG_QUEUE_DATA_AVAILABLE);
+
+            /*Perform context switch if  unblocked pConsumerTask task has equal or
+             *higher priority[lower priority value] than that of current task */
+            if (pConsumerTask->priority <= taskPool.currentTask[PORT_CORE_ID()]->priority)
+            {
+                contextSwitchRequired = true;
+            }
         }
+
+        spinUnlock(&pQueueHandle->lock, irqFlag);
+
+        if (contextSwitchRequired)
+        {
+            taskYield();
+        }
+        return true;
     }
-
-    EXIT_CRITICAL_SECTION();
-
-    if (contextSwitchRequired)
+    else
     {
-        taskYield();
+        spinUnlock(&pQueueHandle->lock, irqFlag);
+        return false;
     }
 }
 
@@ -84,43 +93,56 @@ getNextConsumer:
  * @param pQueueHandle
  * @param pItem
  */
-static void msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
+static bool msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 {
+
+    bool irqFlag = spinLock(&pQueueHandle->lock);
+
     bool contextSwitchRequired = false;
 
-    taskHandleType *producer = NULL;
+    taskHandleType *pProducerTask = NULL;
 
-    ENTER_CRITICAL_SECTION();
-
-    memcpy(pItem, &pQueueHandle->buffer[pQueueHandle->readIndex], pQueueHandle->itemSize);
-    pQueueHandle->readIndex = (pQueueHandle->readIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
-    pQueueHandle->itemCount--;
-
-    // Get next waiting producer task to unblock
-getNextProducer:
-    producer = taskQueueGet(&pQueueHandle->producerWaitQueue);
-    if (producer != NULL)
+    if (!msgQueueEmpty(pQueueHandle))
     {
-        /*If task was suspended while waiting for Queue space, skip the task and get another waiting task from the wait Queue*/
-        if (producer->status == TASK_STATUS_SUSPENDED)
-        {
-            goto getNextProducer;
-        }
-        taskSetReady(producer, MSG_QUEUE_SPACE_AVAILABE);
 
-        /*Perform context switch if unblocked producer task has equal or
-         *higher priority[lower priority value] than that of current task */
-        if (producer->priority <= taskPool.currentTask[CORE_ID()]->priority)
+        memcpy(pItem, &pQueueHandle->buffer[pQueueHandle->readIndex], pQueueHandle->itemSize);
+        pQueueHandle->readIndex = (pQueueHandle->readIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
+        pQueueHandle->itemCount--;
+
+        // Get next waiting pProducerTask task to unblock
+    getNextProducer:
+        pProducerTask = taskQueueGet(&pQueueHandle->producerWaitQueue);
+        if (pProducerTask != NULL)
         {
-            contextSwitchRequired = true;
+            /*If task was suspended while waiting for Queue space, skip the task and get another waiting task from the wait Queue*/
+            if (pProducerTask->status == TASK_STATUS_SUSPENDED)
+            {
+                goto getNextProducer;
+            }
+            taskSetReady(pProducerTask, MSG_QUEUE_SPACE_AVAILABE);
+
+            /*Perform context switch if unblocked pProducerTask task has equal or
+             *higher priority[lower priority value] than that of current task */
+            if (pProducerTask->priority <= taskPool.currentTask[PORT_CORE_ID()]->priority)
+            {
+                contextSwitchRequired = true;
+            }
         }
+
+        spinUnlock(&pQueueHandle->lock, irqFlag);
+
+        if (contextSwitchRequired)
+        {
+            taskYield();
+        }
+
+        return true;
     }
-
-    EXIT_CRITICAL_SECTION();
-
-    if (contextSwitchRequired)
+    else
     {
-        taskYield();
+        spinUnlock(&pQueueHandle->lock, irqFlag);
+
+        return false;
     }
 }
 
@@ -143,10 +165,8 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
 
     /*Write to msgQueue buffer if messageQueue is not full*/
 retry:
-    if (!msgQueueFull(pQueueHandle))
+    if (msgQueueBufferWrite(pQueueHandle, pItem))
     {
-        msgQueueBufferWrite(pQueueHandle, pItem);
-
         retCode = RET_SUCCESS;
     }
     else if (waitTicks == TASK_NO_WAIT)
@@ -155,24 +175,30 @@ retry:
     }
     else
     {
-        taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
+        taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
+
+        bool irqFlag = spinLock(&pQueueHandle->lock);
 
         taskQueueAdd(&pQueueHandle->producerWaitQueue, currentTask);
+
+        spinUnlock(&pQueueHandle->lock, irqFlag);
 
         // Block current task and  give CPU to other tasks while waiting for space to be available
         taskBlock(currentTask, WAIT_FOR_MSG_QUEUE_SPACE, waitTicks);
 
-        if (currentTask->wakeupReason == MSG_QUEUE_SPACE_AVAILABE && !msgQueueFull(pQueueHandle))
+        if (currentTask->wakeupReason == MSG_QUEUE_SPACE_AVAILABE && msgQueueBufferWrite(pQueueHandle, pItem))
         {
-            msgQueueBufferWrite(pQueueHandle, pItem);
 
             retCode = RET_SUCCESS;
         }
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
+            irqFlag = spinLock(&pQueueHandle->lock);
 
             /*Wait timed out,remove task from wait Queue.*/
             taskQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
+
+            spinUnlock(&pQueueHandle->lock, irqFlag);
 
             retCode = RET_TIMEOUT;
         }
@@ -204,9 +230,8 @@ int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t wait
     int retCode;
 
 retry:
-    if (!msgQueueEmpty(pQueueHandle))
+    if (msgQueueBufferRead(pQueueHandle, pItem))
     {
-        msgQueueBufferRead(pQueueHandle, pItem);
         retCode = RET_SUCCESS;
     }
     else if (waitTicks == TASK_NO_WAIT)
@@ -215,24 +240,31 @@ retry:
     }
     else
     {
-        taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
+        taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
+
+        bool irqFlag = spinLock(&pQueueHandle->lock);
 
         taskQueueAdd(&pQueueHandle->consumerWaitQueue, currentTask);
+
+        spinUnlock(&pQueueHandle->lock, irqFlag);
 
         // Block current task and give CPU to other tasks while waiting for data to be available
         taskBlock(currentTask, WAIT_FOR_MSG_QUEUE_DATA, waitTicks);
 
-        if (currentTask->wakeupReason == MSG_QUEUE_DATA_AVAILABLE && !msgQueueEmpty(pQueueHandle))
+        if (currentTask->wakeupReason == MSG_QUEUE_DATA_AVAILABLE && msgQueueBufferRead(pQueueHandle, pItem))
         {
-            msgQueueBufferRead(pQueueHandle, pItem);
-
             retCode = RET_SUCCESS;
         }
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
+            irqFlag = spinLock(&pQueueHandle->lock);
+
+            spinLock(&pQueueHandle->lock);
 
             /*Wait timed out,remove task from wait Queue.*/
             taskQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
+
+            spinUnlock(&pQueueHandle->lock, irqFlag);
 
             retCode = RET_TIMEOUT;
         }

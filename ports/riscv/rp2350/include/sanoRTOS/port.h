@@ -30,10 +30,10 @@
 #include <stdint.h>
 #include <string.h>
 #include "sanoRTOS/config.h"
-#include "riscv/rv_utils.h"
-#include "interrupts.h"
-#include "mtimer.h"
-#include "usb_serial.h"
+#include "pico/stdlib.h"
+#include "pico/multicore.h"
+#include "hardware/clocks.h"
+#include "hardware/irq.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -66,6 +66,27 @@ extern "C"
     } privilegeModesType;
 
     typedef void (*tickHandlerType)(void);
+
+#define MTIMER_TICK_FREQUENCY 1000000
+
+#define SET_MTIMECMP(val)                                    \
+    do                                                       \
+    {                                                        \
+        sio_hw->mtimecmp = (uint32_t)(0xffffffff);           \
+        sio_hw->mtimecmph = (uint32_t)((uint64_t)val >> 32); \
+        sio_hw->mtimecmp = (uint32_t)(val);                  \
+    } while (0)
+
+#define GET_MTIME() ({                          \
+    uint32_t timeh;                             \
+    uint32_t time;                              \
+    do                                          \
+    {                                           \
+        timeh = sio_hw->mtimeh;                 \
+        time = sio_hw->mtime;                   \
+    } while (timeh != sio_hw->mtimeh);          \
+    ((uint64_t)timeh << 32) + ((uint64_t)time); \
+})
 
     /**********--Task's default stack contents--****************************************
 
@@ -120,9 +141,9 @@ extern "C"
 #define PORT_SYSCALL(sysCode) asm volatile("mv a0,%0\n" \
                                            "ecall" : : "r"(sysCode));
 
-#define PORT_DISABLE_INTERRUPTS() rv_utils_intr_global_disable();
+#define PORT_DISABLE_INTERRUPTS() riscv_clear_csr(mstatus, RVCSR_MSTATUS_MIE_BITS);
 
-#define PORT_ENABLE_INTERRUPTS() rv_utils_intr_global_enable();
+#define PORT_ENABLE_INTERRUPTS() riscv_set_csr(mstatus, RVCSR_MSTATUS_MIE_BITS);
 
 #define PORT_ENTER_PRIVILEGED_MODE() PORT_SYSCALL(ENTER_PRIVILEGED_MODE)
 
@@ -130,21 +151,21 @@ extern "C"
 
 #define PORT_IS_PRIVILEGED() isMachineMode()
 
-#define PORT_TIMER_TICK_FREQ 160000000
+#define PORT_TIMER_TICK_FREQ MTIMER_TICK_FREQUENCY
 
-#define PORT_CORE_COUNT 1
+#define PORT_CORE_COUNT 2
 
-#define PORT_CORE_ID()  portCoreId()
+#define PORT_CORE_ID() get_core_num()
 
-#define PORT_MEM_FENCE() asm volatile("fence rw, rw\n")
+#define PORT_MEM_FENCE() asm volatile("fence rw,rw\n")
 
-#define PORT_TRIGGER_CONTEXT_SWITCH() msi_trigger()
+#define PORT_TRIGGER_CONTEXT_SWITCH() (sio_hw->riscv_softirq = (get_core_num() == 0) ? SIO_RISCV_SOFTIRQ_CORE0_SET_BITS : SIO_RISCV_SOFTIRQ_CORE1_SET_BITS)
 
 #define PORT_NOP() asm volatile("nop")
 
 #define PORT_ENTER_SLEEP_MODE() asm volatile("wfi");
 
-#define PORT_PRINTF serial_printf
+#define PORT_PRINTF printf
 
     volatile extern privilegeModesType privilegeMode;
 
@@ -175,7 +196,7 @@ extern "C"
         {
             PORT_ENTER_PRIVILEGED_MODE();
 
-            uint32_t coreId = RV_READ_CSR(mhartid);
+            uint32_t coreId = riscv_read_csr(mhartid);
 
             PORT_EXIT_PRIVILEGED_MODE();
 
@@ -183,11 +204,11 @@ extern "C"
         }
         else
         {
-            return RV_READ_CSR(mhartid);
+            return riscv_read_csr(mhartid);
         }
 
 #else
-    return RV_READ_CSR(mhartid);
+    return riscv_read_csr(mhartid);
 
 #endif
     }
@@ -204,18 +225,18 @@ extern "C"
         if (!PORT_IS_PRIVILEGED())
         {
             PORT_ENTER_PRIVILEGED_MODE();
-            bool irqFlag = (RV_READ_CSR(mstatus) & MSTATUS_MIE);
+            bool irqFlag = (riscv_read_csr(mstatus) & RVCSR_MSTATUS_MIE_BITS);
             PORT_EXIT_PRIVILEGED_MODE();
             return irqFlag;
         }
         else
         {
-            return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
+            return (riscv_read_csr(mstatus) & RVCSR_MSTATUS_MIE_BITS);
         }
 
 #else
 
-    return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
+    return ((riscv_read_csr(mstatus) & RVCSR_MSTATUS_MIE_BITS) != 0);
 #endif
     }
 
@@ -297,7 +318,22 @@ extern "C"
      */
     static inline bool portAtomicCAS(volatile uint32_t *ptr, uint32_t compare_val, uint32_t set_val)
     {
-        return rv_utils_compare_and_set(ptr, compare_val, set_val);
+        uint32_t old_val = 0;
+        int error = 0;
+
+        /* Based on sample code for CAS from RISCV specs v2.2, atomic instructions */
+        __asm__ __volatile__(
+            "1: lr.w %0, 0(%2)     \n"   // load 4 bytes from addr (%2) into old_value (%0)
+            "     bne  %0, %3, 2f  \n"   // fail if old_value if not equal to compare_value (%3)
+            "     sc.w %1, %4, 0(%2) \n" // store new_value (%4) into addr,
+            "     bnez %1, 1b      \n"   // if we failed to store the new value then retry the operation
+            "2:                   \n"
+            : "=&r"(old_val), "=&r"(error)                        // output parameters
+            : "r"(ptr), "r"(compare_val), "r"(set_val) : "memory" // input parameters
+        );
+        PORT_MEM_FENCE();
+
+        return (old_val == compare_val);
     }
 
 #ifdef __cplusplus

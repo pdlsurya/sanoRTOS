@@ -25,11 +25,11 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/timer.h"
+#include "sanoRTOS/mem.h"
 
 #define TIMER_TASK_PRIORITY TASK_HIGHEST_PRIORITY // timer task has the highest possible priority [lower the value, higher the priority]
 
@@ -38,7 +38,7 @@ static timerListType timerList = {0}; // List of running timers
 static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout handlers to be executed
 
 /*Define timer task with highest possible priority*/
-TASK_DEFINE(timerTask, 2048, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, 0);
+TASK_DEFINE(timerTask, 4096, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, AFFINITY_CORE_0);
 
 /**
  * @brief Insert timeoutHandler node at the end of the Queue
@@ -48,7 +48,7 @@ TASK_DEFINE(timerTask, 2048, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, 0);
  */
 static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue, timeoutHandlerType timeoutHandler)
 {
-    timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)malloc(sizeof(timeoutHandlerNodeType));
+    timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)memAlloc(sizeof(timeoutHandlerNodeType));
 
     assert(newNode != NULL);
 
@@ -80,7 +80,7 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
 
     timeoutHandlerType timeoutHandler = pTimeoutHandlerQueue->head->timeoutHandler;
 
-    free(pTimeoutHandlerQueue->head);
+    memFree(pTimeoutHandlerQueue->head);
 
     pTimeoutHandlerQueue->head = temp;
 

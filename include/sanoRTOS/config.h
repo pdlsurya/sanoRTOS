@@ -34,19 +34,11 @@ extern "C"
 
 #define CONFIG_SMP 1 // Configure Symmetric Multi Processing
 
-#if (CONFIG_SMP)
-#define CONFIG_NUM_CORES 2 // Configure number of cores
-#else
-#define CONFIG_NUM_CORES 1
-#endif
-
 #define CONFIG_MUTEX_USE_PRIORITY_INHERITANCE 1 // Configure mutex priority inheritance
 
 #define CONFIG_TASK_USER_MODE 0 // Configure whether tasks should run in privileged mode.
 
-#define CONFIG_OS_TICK_INTERVAL_US 1000 // Configure SysTick to generate interrupt every 1ms.
-
-#include "sanoRTOS/port.h"
+#define CONFIG_TICK_INTERVAL_US 100 // Configure SysTick to generate interrupt every 1ms.
 
 #ifdef __cplusplus
 }

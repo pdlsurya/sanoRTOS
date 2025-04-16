@@ -29,52 +29,74 @@
 #include <stdbool.h>
 #include <assert.h>
 #include "sanoRTOS/config.h"
-#include "sanoRTOS/task.h"
-#include "sanoRTOS/taskQueue.h"
+#include "sanoRTOS/port.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-    typedef uint32_t atomic_t;
+        typedef uint32_t atomic_t;
 
-    /**
-     * @brief Lock the specified spinlock.
-     *
-     * @param pLok  Pointer to the lock variable
-     */
-    static inline void spinLock(atomic_t *pLock)
-    {
-        assert(pLock != NULL);
-
-        // Disable interrupts to avoid context switch
-        PORT_IRQ_LOCK();
-
-#if (CONFIG_SMP)
-        while (!portAtomicCAS(pLock, 0, 1))
+        /**
+         * @brief Lock the specified spinlock.
+         *
+         * @param pLok  Pointer to the lock variable
+         * @return Interrupt status flag
+         * @retval true if interrupts were previously enabled
+         * @retval false if interrupts are  previously disabled
+         */
+        static inline bool spinLock(atomic_t *pLock)
         {
-            PORT_NOP();
-        }
-#endif
-    }
+                assert(pLock != NULL);
+#if (CONFIG_SMP)
+#if CONFIG_TASK_USER_MODE
 
-    /**
-     * @brief Unlock the specified spinlock.
-     *
-     * @param pLock  Pointer to the lock variable.
-     */
-    static inline void spinUnlock(atomic_t *pLock)
-    {
-        assert(pLock != NULL);
+                bool privileged = PORT_IS_PRIVILEGED(); // Check if CPU core was previously in privileged mode
+
+                if (!privileged)
+                {
+                        PORT_ENTER_PRIVILEGED_MODE();
+                }
+#endif
+                bool irqFlag = portIrqLock();
+
+                while (!portAtomicCAS(pLock, 0, 1))
+                {
+                        PORT_NOP();
+                }
+                PORT_MEM_FENCE();
+#if CONFIG_TASK_USER_MODE
+
+                if (!privileged) // Exit privileged mode if CPU core was previously in unprivileged mode
+                {
+                        PORT_EXIT_PRIVILEGED_MODE();
+                }
+#endif
+
+#else
+        bool irqFlag = portIrqLock();
+
+#endif
+
+                return irqFlag;
+        }
+
+        /**
+         * @brief Unlock the specified spinlock.
+         *
+         * @param pLock  Pointer to the lock variable.
+         */
+        static inline void spinUnlock(atomic_t *pLock, bool irqFlag)
+        {
+                assert(pLock != NULL);
 
 #if (CONFIG_SMP)
-        *pLock = 0;
+                *pLock = 0;
 #endif
-
-        // Enable interrupts
-        PORT_IRQ_UNLOCK();
-    }
+                portIrqUnlock(irqFlag);
+                PORT_MEM_FENCE();
+        }
 
 #ifdef __cplusplus
 }

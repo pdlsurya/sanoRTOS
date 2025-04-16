@@ -47,9 +47,9 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 
     int retCode;
 
-    spinLock(&pMutex->lock);
+    bool irqFlag = spinLock(&pMutex->lock);
 
-    taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
+    taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
 
 retry:
 #if MUTEX_USE_PRIORITY_INHERITANCE
@@ -84,13 +84,13 @@ retry:
         taskQueueAdd(&pMutex->waitQueue, currentTask);
 
         /*Release spinlock before blocking the task*/
-        spinUnlock(&pMutex->lock);
+        spinUnlock(&pMutex->lock, irqFlag);
 
         /* Block current task and give CPU to other tasks while waiting for mutex*/
         taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
 
         /*Re-acquire spinlock section after being unblocked*/
-        spinLock(&pMutex->lock);
+        irqFlag = spinLock(&pMutex->lock);
 
         if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
         {
@@ -111,7 +111,7 @@ retry:
         }
     }
 
-    spinUnlock(&pMutex->lock);
+    spinUnlock(&pMutex->lock, irqFlag);
 
     return retCode;
 }
@@ -131,11 +131,13 @@ int mutexUnlock(mutexHandleType *pMutex)
 
     int retCode;
 
+    bool irqFlag;
+
     bool contextSwitchRequired = false;
 
     taskHandleType *nextOwner = NULL;
 
-    taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
+    taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
 
     /*Unlocking the mutex is possible only if current task owns it*/
 
@@ -156,11 +158,11 @@ int mutexUnlock(mutexHandleType *pMutex)
 #endif
             /* Get next owner of the mutex*/
         getNextOwner:
-            spinLock(&pMutex->lock);
+            irqFlag = spinLock(&pMutex->lock);
 
             nextOwner = taskQueueGet(&pMutex->waitQueue);
 
-            spinUnlock(&pMutex->lock);
+            spinUnlock(&pMutex->lock, irqFlag);
 
             if (nextOwner != NULL)
             {
@@ -174,7 +176,7 @@ int mutexUnlock(mutexHandleType *pMutex)
 
                 /*Perform context switch if next owner task has equal or
                  *higher priority[lower priority value] than that of current task */
-                if (nextOwner->priority <= taskPool.currentTask[CORE_ID()]->priority)
+                if (nextOwner->priority <= taskPool.currentTask[PORT_CORE_ID()]->priority)
                 {
                     contextSwitchRequired = true;
                 }

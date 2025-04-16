@@ -46,7 +46,7 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 
     int retCode;
 
-    spinLock(&pSem->lock);
+    bool irqFlag = spinLock(&pSem->lock);
 
 retry:
     if (pSem->count != 0)
@@ -63,19 +63,19 @@ retry:
     }
     else
     {
-        taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
+        taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
 
         /*Put current task in semaphore's wait queue*/
 
         taskQueueAdd(&pSem->waitQueue, currentTask);
 
-        spinUnlock(&pSem->lock);
+        spinUnlock(&pSem->lock, irqFlag);
 
         /* Block current task and give CPU to other tasks while waiting for semaphore*/
         taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
 
         /*Re-acquire spinlock after being unblocked*/
-        spinLock(&pSem->lock);
+        irqFlag = spinLock(&pSem->lock);
 
         if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
         {
@@ -96,7 +96,7 @@ retry:
             goto retry;
         }
     }
-    spinUnlock(&pSem->lock);
+    spinUnlock(&pSem->lock, irqFlag);
 
     return retCode;
 }
@@ -117,7 +117,7 @@ int semaphoreGive(semaphoreHandleType *pSem)
 
     taskHandleType *nextTask = NULL;
 
-    spinLock(&pSem->lock);
+    bool irqFlag = spinLock(&pSem->lock);
 
     if (pSem->count != pSem->maxCount)
     {
@@ -136,7 +136,7 @@ int semaphoreGive(semaphoreHandleType *pSem)
 
             /*Perform context switch if unblocked task has equal or
              *higher priority[lower priority value] than that of current task */
-            if (nextTask->priority <= taskPool.currentTask[CORE_ID()]->priority)
+            if (nextTask->priority <= taskPool.currentTask[PORT_CORE_ID()]->priority)
             {
                 contextSwitchRequired = true;
             }
@@ -153,7 +153,7 @@ int semaphoreGive(semaphoreHandleType *pSem)
         retCode = RET_NOSEM;
     }
 
-    spinUnlock(&pSem->lock);
+    spinUnlock(&pSem->lock, irqFlag);
 
     if (contextSwitchRequired)
     {

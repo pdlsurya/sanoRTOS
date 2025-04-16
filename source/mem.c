@@ -22,31 +22,59 @@
  * SOFTWARE.
  */
 
-#ifndef __SANO_RTOS_SCHEDULER_H
-#define __SANO_RTOS_SCHEDULER_H
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "sanoRTOS/mem.h"
+#include "sanoRTOS/spinLock.h"
 
-#include "sanoRTOS/config.h"
-#include "sanoRTOS/port.h"
+static atomic_t lock;
 
-#ifdef __cplusplus
-extern "C"
+/**
+ * @brief Allocate a  memory block of specified size in bytes
+ *
+ * @param size Size of memory to be allocated in bytes
+ * @retval Address of the allocated memory block
+ */
+void *memAlloc(size_t size)
 {
-#endif
+    void *ptr;
+    bool irqFlag = spinLock(&lock);
 
-#define US_TO_TIMER_TICKS(us) ((uint32_t)((uint64_t)us * PORT_TIMER_TICK_FREQ / 1000000))
+    ptr = malloc(size);
 
-/*Number to timer ticks between two RTOS Ticks*/
-#define TIMER_TICKS_PER_RTOS_TICK US_TO_TIMER_TICKS(CONFIG_TICK_INTERVAL_US)
-
-#define US_TO_RTOS_TICKS(us) ((us) / CONFIG_TICK_INTERVAL_US)
-#define MS_TO_RTOS_TICKS(ms) ((ms * 1000) / CONFIG_TICK_INTERVAL_US)
-
-    void schedulerStart();
-
-    void taskYield();
-
-#ifdef __cplusplus
+    spinUnlock(&lock, irqFlag);
+    return ptr;
 }
-#endif
 
-#endif
+/**
+ * @brief Deallocate the memory block
+ *
+ * @param ptr Pointer to the  memory block
+ */
+void memFree(void *ptr)
+{
+    bool irqFlag = spinLock(&lock);
+
+    free(ptr);
+
+    spinUnlock(&lock, irqFlag);
+}
+
+/**
+ * @brief Re-allocate the  memory block with given size
+ *
+ * @param ptr Pointer to the memory block to be reallocated
+ * @param size New size of the memory block
+ * @retval Address of new memeory block
+ */
+void *memRealloc(void *ptr, size_t size)
+{
+    void *new_ptr;
+    bool irqFlag = spinLock(&lock);
+
+    new_ptr = realloc(ptr, size);
+
+    spinUnlock(&lock, irqFlag);
+    return new_ptr;
+}

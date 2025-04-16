@@ -48,16 +48,22 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 
     int retCode;
 
+    bool irqFlag = spinLock(&pCondVar->lock);
+
     /* Unlock previously acquired mutex;*/
     mutexUnlock(pCondVar->pMutex);
 
-    taskHandleType *currentTask = taskPool.currentTask[CORE_ID()];
+    taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
 
 wait:
     taskQueueAdd(&pCondVar->waitQueue, currentTask);
 
+    spinUnlock(&pCondVar->lock, irqFlag);
+
     /* Block current task and give CPU to other tasks while waiting on condition variable*/
     taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
+
+    irqFlag = spinLock(&pCondVar->lock);
 
     /*Task has been woken up either due to wait timeout or by another task by signalling the condtion variable.*/
     if (currentTask->wakeupReason == COND_VAR_SIGNALLED)
@@ -77,6 +83,7 @@ wait:
     {
         goto wait;
     }
+    spinUnlock(&pCondVar->lock, irqFlag);
 
     /*Re-acquire previously released mutex*/
     mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
@@ -97,8 +104,11 @@ int condVarSignal(condVarHandleType *pCondVar)
 
     taskHandleType *nextSignalTask = NULL;
 
+    bool irqFlag = spinLock(&pCondVar->lock);
+
     /*Get next highest priority waiting task to unblock*/
 getNextSignalTask:
+
     nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
 
     if (nextSignalTask != NULL)
@@ -108,16 +118,19 @@ getNextSignalTask:
         {
             goto getNextSignalTask;
         }
+        spinUnlock(&pCondVar->lock, irqFlag);
+
         taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
 
         /*Perform context switch if unblocked task has equal or
          *higher priority[lower priority value] than that of current task */
-        if (nextSignalTask->priority <= taskPool.currentTask[CORE_ID()]->priority)
+        if (nextSignalTask->priority <= taskPool.currentTask[PORT_CORE_ID()]->priority)
         {
             taskYield();
         }
         return RET_SUCCESS;
     }
+    spinUnlock(&pCondVar->lock, irqFlag);
 
     return RET_NOTASK;
 }
@@ -133,6 +146,10 @@ int condVarBroadcast(condVarHandleType *pCondVar)
 {
     assert(pCondVar != NULL);
 
+    int retCode;
+
+    bool irqFlag = spinLock(&pCondVar->lock);
+
     if (!taskQueueEmpty(&pCondVar->waitQueue))
     {
         taskHandleType *pTask = NULL;
@@ -141,11 +158,18 @@ int condVarBroadcast(condVarHandleType *pCondVar)
         {
             if (pTask->status != TASK_STATUS_SUSPENDED)
             {
+
                 taskSetReady(pTask, COND_VAR_SIGNALLED);
             }
         }
 
-        return RET_SUCCESS;
+        retCode = RET_SUCCESS;
     }
-    return RET_NOTASK;
+    else
+    {
+        retCode = RET_NOTASK;
+    }
+    spinUnlock(&pCondVar->lock, irqFlag);
+
+    return retCode;
 }

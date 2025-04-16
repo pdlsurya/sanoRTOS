@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #include "sanoRTOS/mutex.h"
 #include "sanoRTOS/taskQueue.h"
+#include "sanoRTOS/spinLock.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -53,7 +54,8 @@ extern "C"
         .itemSize = item_size,                    \
         .itemCount = 0,                           \
         .readIndex = 0,                           \
-        .writeIndex = 0}
+        .writeIndex = 0,                          \
+        .lock = 0}
 
     typedef struct
     {
@@ -65,6 +67,7 @@ extern "C"
         uint32_t itemCount;
         uint32_t readIndex;
         uint32_t writeIndex;
+        atomic_t lock;
     } msgQueueHandleType;
 
     /**
@@ -88,7 +91,7 @@ extern "C"
      */
     static inline bool msgQueueEmpty(msgQueueHandleType *pQueueHandle)
     {
-        return pQueueHandle->itemCount == 0;
+        return (pQueueHandle->itemCount == 0);
     }
 
     int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
