@@ -28,6 +28,7 @@
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/spinLock.h"
+#include "sanoRTOS/log.h"
 
 #if (CONFIG_SMP)
 
@@ -123,48 +124,9 @@ static inline void portConfig()
 }
 
 /**
- * @brief Configure Physical Memory Protection (PMP) to allow user mode access to peripherals and memory regions.
+ * @brief Run the first task.
  *
  */
-/*
-void pmpConfigure()
-{
-    //NAPOT pmpaddr value= (start_address >> 2) | (size - 1) >> 3
-    // FLASH (4MB @0x42000000, Read/Execute, NAPOT)
-    uint32_t pmpaddr0 = (SOC_IROM_LOW >> 2) | ((4 * 1024 * 1024 - 1) >> 3);
-    uint8_t pmp0cfg = (PMP_R | PMP_X | PMP_NAPOT | PMP_L);
-
-    // RAM (520KB@0x20000000, Read/Write/Execute, NAPOT)
-    uint32_t pmpaddr1 = (SOC_DRAM_LOW >> 2) | ((520 * 1024 - 1) >> 3);
-    uint8_t pmp1cfg = (PMP_R | PMP_W | PMP_X | PMP_NAPOT | PMP_L);
-
-    // PERIPHERALS (832KB @ 0x40000000, Read/Write, TOR)
-    uint32_t pmpaddr2 = (SOC_PERIPHERAL_LOW >> 2);  // Start address(Inclusive)
-    uint32_t pmpaddr3 = (SOC_PERIPHERAL_HIGH >> 2); // End address(Exclusive)
-
-    // preceding pmpcfg[pmp2cfg in this case] entry is neglected for TOR.
-    uint8_t pmp3cfg = (PMP_R | PMP_W | PMP_TOR | PMP_L);
-
-    // CPU Subsystem (0x20000000, Read/Write, NAPOT)
-    uint32_t pmpaddr4 = (SOC_CPU_SUBSYSTEM_LOW >> 2) | ((64 * 1024 - 1) >> 3);
-    uint8_t pmp4cfg = (PMP_R | PMP_W | PMP_NAPOT | PMP_L);
-
-    // Write PMPADDR registers
-    riscv_write_csr(pmpaddr0, pmpaddr0);
-    riscv_write_csr(pmpaddr1, pmpaddr1);
-    riscv_write_csr(pmpaddr2, pmpaddr2);
-    riscv_write_csr(pmpaddr3, pmpaddr3);
-    riscv_write_csr(pmpaddr4, pmpaddr4);
-
-    // Pack and write to PMPCFG0 register
-    uint32_t pmpcfg0 = ((pmp3cfg << 24) | (pmp1cfg << 8) | pmp0cfg);
-
-    riscv_write_csr(pmpcfg0, pmpcfg0);
-
-    riscv_write_csr(pmpcfg1, pmp4cfg);
-}
-*/
-
 void portRunFirstTask()
 {
     bool irqFlag = spinLock(&lock);
@@ -243,7 +205,6 @@ __attribute__((interrupt)) __attribute__((section(".time_critical"))) void isr_r
     /*Load sp with isr/handler mode stack pointer stored in mscratch and store current thread mode sp to mscratch*/
     __asm__ volatile("csrrw sp,mscratch,sp");
 #endif
-
     SET_MTIMECMP((GET_MTIME() + mtimer_period_ticks));
 
     /*Store mcause, mepc and mstatus in local variables before enabling interrupt nesting*/
@@ -253,6 +214,7 @@ __attribute__((interrupt)) __attribute__((section(".time_critical"))) void isr_r
 
     // Invoke RTOS tickHandler function
     tickHandler();
+   // LOG_DEBUG("timer", "Timer on core=%d\n", PORT_CORE_ID());
 
     /* Restore mstatus, mepc and mcause*/
     riscv_write_csr(mstatus, mstatus_val);

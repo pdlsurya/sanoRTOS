@@ -25,6 +25,8 @@
 #ifndef __SANORTOS_LOG_H
 #define __SANORTOS_LOG_H
 
+#include <stdio.h>
+#include <stdarg.h>
 #include "sanoRTOS/port.h"
 #include "sanoRTOS/spinLock.h"
 
@@ -57,35 +59,28 @@
 // Bold (optional)
 #define ANSI_BOLD ANSI_ESC "1m"
 
-#define LOG_INTERNAL(fmt, ...)           \
-    do                                   \
-    {                                    \
-        static atomic_t lock;            \
-        bool irqFlag = spinLock(&lock);  \
-        PORT_PRINTF(fmt, ##__VA_ARGS__); \
-        spinUnlock(&lock, irqFlag);      \
-    } while (0);
+#define LOG_PRINT(tag, fmt, ...) log_internal_printf(fmt, ##__VA_ARGS__)
 
-#define LOG_PRINT(tag, fmt, ...) LOG_INTERNAL(fmt, ##__VA_ARGS__)
+#define LOG_INFO(tag, fmt, ...) log_internal_printf(ANSI_GREEN "[INF] "                 \
+                                                               "[%s]: " fmt ANSI_RESET, \
+                                                    tag,                                \
+                                                    ##__VA_ARGS__)
 
-#define LOG_INFO(tag, fmt, ...) LOG_INTERNAL(ANSI_GREEN "[INFO] "                     \
-                                                        "[%s]: " fmt ANSI_RESET "\n", \
-                                             tag,                                     \
-                                             ##__VA_ARGS__)
+#define LOG_WARNING(tag, fmt, ...) log_internal_printf(ANSI_BRIGHT_YELLOW "[WRN] "                 \
+                                                                          "[%s]: " fmt ANSI_RESET, \
+                                                       tag,                                        \
+                                                       ##__VA_ARGS__)
 
-#define LOG_WARNING(tag, fmt, ...) LOG_INTERNAL(ANSI_YELLOW "[WARNING] "                  \
-                                                            "[%s]: " fmt ANSI_RESET "\n", \
-                                                tag,                                      \
-                                                ##__VA_ARGS__)
+#define LOG_ERROR(tag, fmt, ...) log_internal_printf(ANSI_RED "[ERR] "                 \
+                                                              "[%s]: " fmt ANSI_RESET, \
+                                                     tag,                              \
+                                                     ##__VA_ARGS__)
 
-#define LOG_ERROR(tag, fmt, ...) LOG_INTERNAL(ANSI_RED "[ERROR] "                    \
-                                                       "[%s]: " fmt ANSI_RESET "\n", \
-                                              tag,                                   \
-                                              ##__VA_ARGS__)
+#define LOG_DEBUG(tag, fmt, ...) log_internal_printf(ANSI_CYAN "[DBG] "                 \
+                                                               "[%s]: " fmt ANSI_RESET, \
+                                                     tag,                               \
+                                                     ##__VA_ARGS__)
 
-#define LOG_DEBUG(tag, fmt, ...) LOG_INTERNAL(ANSI_CYAN "[DEBUG] "                    \
-                                                        "[%s]: " fmt ANSI_RESET "\n", \
-                                              tag,                                    \
-                                              ##__VA_ARGS__)
+int log_internal_printf(const char *format, ...);
 
 #endif // __SANORTOS_LOG_H

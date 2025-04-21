@@ -22,26 +22,27 @@
  * SOFTWARE.
  */
 
-#ifndef __SANO_RTOS_CONFIG_H
-#define __SANO_RTOS_CONFIG_H
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include "sanoRTOS/spinLock.h"
+#include "sanoRTOS/log.h"
+#include "sanoRTOS/port.h"
 
-#include "sanoRTOS/retCodes.h"
+static atomic_t lock;
 
-#ifdef __cplusplus
-extern "C"
+
+int log_internal_printf(const char *format, ...)
 {
-#endif
+    bool irqFlag = spinLock(&lock);
+    char buffer[192];
+    va_list args;
+    va_start(args, format);
+    int size = vsprintf(buffer, format, args);
+    va_end(args);
+    PORT_PRINT(buffer);
+    spinUnlock(&lock, irqFlag);
 
-#define CONFIG_SMP 1 // Configure Symmetric Multi Processing
-
-#define CONFIG_MUTEX_USE_PRIORITY_INHERITANCE 1 // Configure mutex priority inheritance
-
-#define CONFIG_TASK_USER_MODE 0 // Configure whether tasks should run in privileged mode.
-
-#define CONFIG_TICK_INTERVAL_US 2000 // Configure SysTick to generate interrupt every 2ms.
-
-#ifdef __cplusplus
+    return size;
 }
-#endif
-
-#endif

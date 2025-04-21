@@ -134,7 +134,7 @@ extern "C"
 
 #define PORT_TIMER_TICK_FREQ SystemCoreClock
 
-#define PORT_PRINTF printf
+#define PORT_PRINT printf
 
 #define PORT_ENTER_SLEEP_MODE() __WFI()
     /**
