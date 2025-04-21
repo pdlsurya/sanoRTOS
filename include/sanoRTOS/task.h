@@ -27,6 +27,7 @@
 
 #include <assert.h>
 #include "sanoRTOS/config.h"
+#include "sanoRTOS/port.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/scheduler.h"
 
@@ -43,6 +44,15 @@ extern "C"
 
     void taskExitFunction();
 
+    typedef enum
+    {
+        AFFINITY_CORE_ANY = -1,
+        AFFINITY_CORE_0,
+        AFFINITY_CORE_1,
+        AFFINITY_CORE_2,
+        AFFINITY_CORE_3
+    } coreAffinityType;
+
 /**
  * @brief Statically define and initialize a task and its default stack contents.
  * @param name Name of the task.
@@ -53,7 +63,7 @@ extern "C"
  */
 #define TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                 \
     void taskEntryFunction(void *);                                                                         \
-    TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams);                    \
+    PORT_TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams);               \
     taskHandleType name = {                                                                                 \
         .stackPointer = (uint32_t)(name##Stack + stackSize / sizeof(uint32_t) - INITIAL_TASK_STACK_OFFSET), \
         .priority = taskPriority,                                                                           \
@@ -114,7 +124,7 @@ extern "C"
         blockedReasonType blockedReason;
         wakeupReasonType wakeupReason;
         uint8_t priority;
-        int8_t coreAffinity;
+        coreAffinityType coreAffinity;
 
     } taskHandleType;
 
@@ -122,12 +132,12 @@ extern "C"
     {
         taskQueueType readyQueue;
         taskQueueType blockedQueue;
-        taskHandleType *currentTask[CONFIG_NUM_CORES];
+        taskHandleType *currentTask[PORT_CORE_COUNT];
 
     } taskPoolType;
 
-    extern taskHandleType *currentTask[CONFIG_NUM_CORES];
-    extern taskHandleType *nextTask[CONFIG_NUM_CORES];
+    extern taskHandleType *currentTask[PORT_CORE_COUNT];
+    extern taskHandleType *nextTask[PORT_CORE_COUNT];
     extern taskPoolType taskPool;
 
     void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
@@ -147,7 +157,7 @@ extern "C"
      */
     static inline void taskSleep(uint32_t sleepTicks)
     {
-        taskBlock(taskPool.currentTask[CORE_ID()], SLEEP, sleepTicks);
+        taskBlock(taskPool.currentTask[PORT_CORE_ID()], SLEEP, sleepTicks);
     }
 
     /**
@@ -157,7 +167,7 @@ extern "C"
      */
     static inline void taskSleepMS(uint32_t sleepTimeMS)
     {
-        taskSleep(MS_TO_OS_TICKS(sleepTimeMS));
+        taskSleep(MS_TO_RTOS_TICKS(sleepTimeMS));
     }
 
     /**
@@ -167,7 +177,7 @@ extern "C"
      */
     static inline void taskSleepUS(uint32_t sleepTimeUS)
     {
-        taskSleep(US_TO_OS_TICKS(sleepTimeUS));
+        taskSleep(US_TO_RTOS_TICKS(sleepTimeUS));
     }
 
 #ifdef __cplusplus

@@ -28,6 +28,8 @@
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/mutex.h"
 #include "sanoRTOS/taskQueue.h"
+#include "sanoRTOS/spinLock.h"
+#include "sanoRTOS/port.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -43,12 +45,14 @@ extern "C"
 #define CONDVAR_DEFINE(name, p_mutex) \
     condVarHandleType name = {        \
         .waitQueue = {0},             \
-        .pMutex = p_mutex}
+        .pMutex = p_mutex,            \
+        .lock = 0}
 
     typedef struct
     {
         taskQueueType waitQueue;
         mutexHandleType *pMutex;
+        atomic_t lock;
     } condVarHandleType;
 
     int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks);

@@ -22,10 +22,12 @@
  * SOFTWARE.
  */
 
-#ifndef __SANO_RTOS_SCHEDULER_H
-#define __SANO_RTOS_SCHEDULER_H
+#ifndef __SANO_RTOS_MEM_H
+#define __SANO_RTOS_MEM_H
 
-#include "sanoRTOS/config.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include "sanoRTOS/port.h"
 
 #ifdef __cplusplus
@@ -33,20 +35,14 @@ extern "C"
 {
 #endif
 
-#define US_TO_TIMER_TICKS(us) ((uint32_t)((uint64_t)us * PORT_TIMER_TICK_FREQ / 1000000))
+    void *memAlloc(size_t size);
 
-/*Number to timer ticks between two RTOS Ticks*/
-#define TIMER_TICKS_PER_RTOS_TICK US_TO_TIMER_TICKS(CONFIG_TICK_INTERVAL_US)
+    void memFree(void *ptr);
 
-#define US_TO_RTOS_TICKS(us) ((us) / CONFIG_TICK_INTERVAL_US)
-#define MS_TO_RTOS_TICKS(ms) ((ms * 1000) / CONFIG_TICK_INTERVAL_US)
-
-    void schedulerStart();
-
-    void taskYield();
+    void *memRealloc(void *ptr, size_t size);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif // __SANO_RTOS_MEM_H

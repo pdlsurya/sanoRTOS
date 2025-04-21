@@ -39,12 +39,6 @@ extern "C"
 {
 #endif
 
-#define CPU_FREQ SystemCoreClock
-
-#define SYSTICK_HANDLER SysTick_Handler
-
-#define SYSTICK_CONFIG() SysTick_Config(OS_INTERVAL_CPU_TICKS)
-
     /*Forward declaration of taskHandleType*/
     typedef struct taskHandle taskHandleType;
 
@@ -54,10 +48,20 @@ extern "C"
      */
     typedef enum
     {
-        DISABLE_INTERRUPTS = 1,
-        ENABLE_INTERUPPTS,
-        SWITCH_CONTEXT
+        SWITCH_CONTEXT = 1,
+        DISABLE_INTERRUPTS,
+        ENABLE_INTERRUPTS,
+        ENTER_PRIVILEGED_MODE,
+
     } sysCodesType;
+
+#define SYSTICK_PRIORITY 0xf // Priority of SysTick Timer.
+
+#define PENDSV_PRIORITY 0xf // Priority of PendSV
+
+#define BASEPRI(priority) ((priority) << (8 - __NVIC_PRIO_BITS))
+
+#define TRIGGER_PENDSV() (SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk)
 
     /**********--Task's default stack contents--****************************************
           ____ <-- stackBase = stack + stackSize / sizeof(uint32_t)
@@ -91,59 +95,136 @@ extern "C"
 
 #define INITIAL_EXC_RETURN (EXC_RETURN_PREFIX | EXC_RETURN_SPSEL | EXC_RETURN_MODE | EXC_RETURN_S | EXC_RETURN_ES | EXC_RETURN_DCRS | EXC_RETURN_FTYPE)
 
-#define TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams) \
-    uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                                  \
-        [stackSize / sizeof(uint32_t) - 1] = 0x01000000,                                    \
-        [stackSize / sizeof(uint32_t) - 2] = (uint32_t)taskEntryFunction,                   \
-        [stackSize / sizeof(uint32_t) - 3] = (uint32_t)taskExitFunction,                    \
-        [stackSize / sizeof(uint32_t) - 8] = (uint32_t)taskParams,                          \
+#define PORT_TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams) \
+    __aligned(4) uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                          \
+        [stackSize / sizeof(uint32_t) - 1] = 0x01000000,                                         \
+        [stackSize / sizeof(uint32_t) - 2] = (uint32_t)taskEntryFunction,                        \
+        [stackSize / sizeof(uint32_t) - 3] = (uint32_t)taskExitFunction,                         \
+        [stackSize / sizeof(uint32_t) - 8] = (uint32_t)taskParams,                               \
         [stackSize / sizeof(uint32_t) - 9] = INITIAL_EXC_RETURN}
 
-#define SYSTICK_PRIORITY 0xff // Priority of SysTick Timer.
-#define PENDSV_PRIORITY 0xff  // Priority of PendSV
-
 /*Macro to invoke System call. This triggers SVC exception with specified sysCode*/
-#define SYSCALL(sysCode) __asm volatile("svc %0" : : "I"(sysCode) : "memory");
+#define PORT_SYSCALL(sysCode) __asm volatile("svc %0" : : "I"(sysCode) : "memory")
 
-#define SYSTICK_INT_DISABLE() (SysTick->CTRL &= ~(SysTick_CTRL_TICKINT_Msk))
-#define SYSTICK_INT_ENABLE() (SysTick->CTRL |= (SysTick_CTRL_TICKINT_Msk))
+#define PORT_ENTER_PRIVILEGED_MODE() PORT_SYSCALL(ENTER_PRIVILEGED_MODE)
 
-#define PORT_DISABLE_IRQ()     \
-    do                         \
-    {                          \
-        __set_BASEPRI(1);      \
-        SYSTICK_INT_DISABLE(); \
+#define PORT_EXIT_PRIVILEGED_MODE()           \
+    do                                        \
+    {                                         \
+        __set_CONTROL(__get_CONTROL() | 0x1); \
+        __ISB();                              \
     } while (0)
 
-#define PORT_ENABLE_IRQ()     \
-    do                        \
-    {                         \
-        __set_BASEPRI(0);     \
-        SYSTICK_INT_ENABLE(); \
-    } while (0)
-#if (CONFIG_TASK_USER_MODE)
-#define ENTER_CRITICAL_SECTION() SYSCALL(DISABLE_INTERRUPTS)
-#define EXIT_CRITICAL_SECTION() SYSCALL(ENABLE_INTERUPPTS)
-
-#else
-#define ENTER_CRITICAL_SECTION() PORT_DISABLE_IRQ() /*Disable all the interrupts with priority values 1 or higher*/
-#define EXIT_CRITICAL_SECTION() PORT_ENABLE_IRQ()
-#endif
-
-#if (CONFIG_TASK_USER_MODE)
-#define PORT_IRQ_LOCK() SYSCALL(DISABLE_INTERRUPTS)
-#define PORT_IRQ_UNLOCK() SYSCALL(ENABLE_INTERUPPTS)
-
-#else
-#define PORT_IRQ_LOCK() PORT_DISABLE_IRQ() /*Disable all the interrupts with priority values 1 or higher*/
-#define PORT_IRQ_UNLOCK() PORT_ENABLE_IRQ()
-#endif
+#define PORT_TRIGGER_CONTEXT_SWITCH() TRIGGER_PENDSV()
 
 #define PORT_NOP() __NOP()
 
-#define CORE_ID() get_core_num()
+#define PORT_MEM_FENCE() __DMB()
 
-#define portTriggerContextSwitch() (SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk)
+#if CONFIG_SMP
+#define PORT_CORE_COUNT 2
+#else
+#define PORT_CORE_COUNT 1
+#endif
+
+#define PORT_TIMER_TICK_FREQ SystemCoreClock
+
+#define PORT_ENTER_SLEEP_MODE() __WFI()
+
+#define PORT_CORE_ID() get_core_num()
+
+#define PORT_PRINTF printf
+
+#if CONFIG_TASK_USER_MODE
+
+#define PORT_DISABLE_INTERRUPTS() __set_BASEPRI(BASEPRI(1));
+
+#define PORT_ENABLE_INTERRUPTS() __set_BASEPRI(0);
+
+#else
+
+#define PORT_DISABLE_INTERRUPTS() __disable_irq()
+
+#define PORT_ENABLE_INTERRUPTS() __enable_irq()
+
+#endif
+
+/**
+ * @brief Check if CPU is executing in Privileged or Unprivileged mode
+ *
+ * @retval True, if cpu is in privileged mode
+ * @retval False, if cpu is in unprivileged mode
+ */
+#define PORT_IS_PRIVILEGED() ((__get_IPSR() > 0) ? true : (((__get_CONTROL() & 0x1) == 0) ? true : false))
+
+    /**
+     * @brief Disable interrupts and return previous irq status
+     *
+     * @retval true, if interrupts were enabled previously
+     * @retval false, if interrupts were disabled previously
+     */
+    static inline bool portIrqLock()
+    {
+        bool irqFlag;
+#if CONFIG_TASK_USER_MODE
+
+        irqFlag = (__get_BASEPRI() == 0);
+
+        if (irqFlag)
+        {
+
+            if (PORT_IS_PRIVILEGED())
+            {
+
+                PORT_DISABLE_INTERRUPTS();
+            }
+            else
+            {
+                PORT_SYSCALL(DISABLE_INTERRUPTS);
+            }
+        }
+
+#else
+    irqFlag = (__get_PRIMASK() == 0);
+    if (irqFlag)
+    {
+
+        PORT_DISABLE_INTERRUPTS();
+    }
+
+#endif
+
+        return irqFlag;
+    }
+
+    /**
+     * @brief Change interrupt status base on irqFlag
+     *
+     * @param irqFlag Flag representing previous irq status
+     */
+    static inline void portIrqUnlock(bool irqFlag)
+    {
+#if CONFIG_TASK_USER_MODE
+
+        if (irqFlag)
+        {
+            if (PORT_IS_PRIVILEGED())
+            {
+                PORT_ENABLE_INTERRUPTS();
+            }
+            else
+            {
+                PORT_SYSCALL(ENABLE_INTERRUPTS);
+            }
+        }
+
+#else
+    if (irqFlag)
+    {
+        PORT_ENABLE_INTERRUPTS();
+    }
+#endif
+    }
 
     /**
      * @brief Compare-And-Set function for ARM Cortex-M
@@ -153,20 +234,25 @@ extern "C"
      * @param set_val The new value to be stored if `*ptr` is equal to `expected`
      * @return bool Returns true if the set was successful, false otherwise
      */
-    static __always_inline bool portAtomicCAS(volatile uint32_t *ptr, uint32_t compare_val, uint32_t set_val)
+    static inline bool portAtomicCAS(volatile uint32_t *ptr, uint32_t compare_val, uint32_t set_val)
     {
-        do
-        {
-            uint32_t old_val = __LDREXW(ptr); // Load-exclusive
-            if (old_val != compare_val)
-            {
-                __CLREX();    // Clear-exclusive
-                return false; // Indicate failure
-            }
+        uint32_t status;
+        uint32_t old_val;
 
-        } while (__STREXW(set_val, ptr)); // Store-exclusive (returns 0 on success)
+        __asm__ volatile(
+            "1:                     \n"
+            "ldrex %0, [%2]         \n" // Load *ptr into old_val
+            "cmp %0, %3             \n" // Compare with expected
+            "bne 2f                 \n" // If not equal, branch to fail
+            "strex %1, %4, [%2]     \n" // Try to store set_val
+            "cmp   %1, #0           \n" // check if STREX succeeded
+            "bne   1b               \n" // if not, retry loop
+            "2:                     \n"
+            : "=&r"(old_val), "=&r"(status)
+            : "r"(ptr), "r"(compare_val), "r"(set_val)
+            : "cc", "memory");
 
-        return true; // Success
+        return (old_val == compare_val);
     }
 
     /**

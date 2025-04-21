@@ -23,16 +23,18 @@
  */
 
 #include <assert.h>
+#include <stdio.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/task.h"
+#include "sanoRTOS/timer.h"
 
 taskPoolType taskPool = {0};
-taskHandleType *currentTask[CONFIG_NUM_CORES];
-taskHandleType *nextTask[CONFIG_NUM_CORES];
+taskHandleType *currentTask[PORT_CORE_COUNT];
+taskHandleType *nextTask[PORT_CORE_COUNT];
 
 static atomic_t lock;
 
@@ -55,7 +57,7 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
     assert(pTask != NULL);
 
-    spinLock(&lock);
+    bool irqFlag = spinLock(&lock);
 
     if (pTask->status == TASK_STATUS_BLOCKED)
     {
@@ -70,7 +72,7 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
     /* Add task to queue of ready tasks*/
     taskQueueAdd(&taskPool.readyQueue, pTask);
 
-    spinUnlock(&lock);
+    spinUnlock(&lock, irqFlag);
 }
 
 /**
@@ -84,17 +86,17 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
 {
     assert(pTask != NULL);
 
+    bool irqFlag = spinLock(&lock);
+
     pTask->remainingSleepTicks = ticks;
     pTask->status = TASK_STATUS_BLOCKED;
     pTask->blockedReason = blockedReason;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    spinLock(&lock);
-
     // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
     taskQueueAddToFront(&taskPool.blockedQueue, pTask);
 
-    spinUnlock(&lock);
+    spinUnlock(&lock, irqFlag);
 
     // Give CPU to other tasks
     taskYield();
@@ -109,7 +111,7 @@ void taskSuspend(taskHandleType *pTask)
 {
     assert(pTask != NULL);
 
-    spinLock(&lock);
+    bool irqFlag = spinLock(&lock);
 
     /* If task status is ready, remove it from the readyQueue*/
     if (pTask->status == TASK_STATUS_READY)
@@ -122,15 +124,15 @@ void taskSuspend(taskHandleType *pTask)
         taskQueueRemove(&taskPool.blockedQueue, pTask);
     }
 
-    spinUnlock(&lock);
-
     pTask->remainingSleepTicks = 0;
     pTask->status = TASK_STATUS_SUSPENDED;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
+    spinUnlock(&lock, irqFlag);
+
     /*If self suspended, give CPU to other tasks*/
-    if (pTask == taskPool.currentTask[CORE_ID()])
+    if (pTask == taskPool.currentTask[PORT_CORE_ID()])
     {
         taskYield();
     }
@@ -167,9 +169,9 @@ void taskStart(taskHandleType *pTask)
 {
     assert(pTask != NULL);
 
-    spinLock(&lock);
+    bool irqFlag = spinLock(&lock);
 
     taskQueueAdd(&taskPool.readyQueue, pTask);
 
-    spinUnlock(&lock);
+    spinUnlock(&lock, irqFlag);
 }

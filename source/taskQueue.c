@@ -23,12 +23,12 @@
  */
 
 #include <stdint.h>
-#include <stdlib.h>
 #include <assert.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
 #include "sanoRTOS//task.h"
 #include "sanoRTOS/taskQueue.h"
+#include "sanoRTOS/mem.h"
 /**
  * @brief Dynamically allocate memory for new task Node.
  *
@@ -37,7 +37,7 @@
  */
 static inline taskNodeType *newNode(taskHandleType *pTask)
 {
-    taskNodeType *newTaskNode = (taskNodeType *)malloc(sizeof(taskNodeType));
+    taskNodeType *newTaskNode = (taskNodeType *)memAlloc(sizeof(taskNodeType));
 
     assert(newTaskNode != NULL);
 
@@ -56,7 +56,7 @@ static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
     taskNodeType *temp = pTaskQueue->head->nextTaskNode;
 
-    free(pTaskQueue->head);
+    memFree(pTaskQueue->head);
 
     pTaskQueue->head = temp;
 }
@@ -82,11 +82,13 @@ void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
         taskNodeType *currentTaskNode = pTaskQueue->head;
 
         while (currentTaskNode->nextTaskNode->pTask != pTask)
+        {
             currentTaskNode = currentTaskNode->nextTaskNode;
+        }
 
         taskNodeType *temp = currentTaskNode->nextTaskNode->nextTaskNode;
 
-        free(currentTaskNode->nextTaskNode);
+        memFree(currentTaskNode->nextTaskNode);
 
         currentTaskNode->nextTaskNode = temp;
     }
@@ -155,22 +157,22 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
  * @retval Next highest priority task if exists
  * @retval NULL if Queue is empty
  */
-taskHandleType *taskQueueGet(taskQueueType *ptaskQueue)
+taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
 {
-    assert(ptaskQueue != NULL);
+    assert(pTaskQueue != NULL);
     taskHandleType *pTask;
 
-    if (!taskQueueEmpty(ptaskQueue))
+    if (!taskQueueEmpty(pTaskQueue))
     {
-        taskNodeType *currentTaskNode = ptaskQueue->head;
+        taskNodeType *currentTaskNode = pTaskQueue->head;
 
         while (currentTaskNode != NULL)
         {
-            if (currentTaskNode->pTask->coreAffinity == CORE_ID() || currentTaskNode->pTask->coreAffinity == -1)
+            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() || currentTaskNode->pTask->coreAffinity == -1)
             {
                 pTask = currentTaskNode->pTask;
 
-                taskQueueRemove(ptaskQueue, pTask);
+                taskQueueRemove(pTaskQueue, pTask);
 
                 return pTask;
             }
@@ -194,7 +196,7 @@ taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
         taskNodeType *currentTaskNode = pTaskQueue->head;
         while (currentTaskNode != NULL)
         {
-            if (currentTaskNode->pTask->coreAffinity == CORE_ID() || currentTaskNode->pTask->coreAffinity == -1)
+            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() || currentTaskNode->pTask->coreAffinity == -1)
             {
                 return currentTaskNode->pTask;
             }

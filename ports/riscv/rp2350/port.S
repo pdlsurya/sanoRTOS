@@ -22,15 +22,43 @@
 * SOFTWARE.
 */
 
-#include "soc/soc.h"
-#include "soc/interrupt_reg.h"
-#include "riscv/rvruntime-frames.h"
-#include "soc/soc_caps.h"
-
+#include "hardware/regs/sio.h"
+#include "hardware/regs/addressmap.h"
 
 .equ SAVE_REGS, 32
 .equ CONTEXT_SIZE, (SAVE_REGS * 4)
-.equ MSIP_REG, 0x20001800
+
+.equ RV_STK_MEPC,  0
+.equ RV_STK_RA,    4
+.equ RV_STK_TP,    8
+.equ RV_STK_T0,    12
+.equ RV_STK_T1,    16
+.equ RV_STK_T2,    20
+.equ RV_STK_S0,    24
+.equ RV_STK_S1,    28
+.equ RV_STK_A0,    32
+.equ RV_STK_A1,    36
+.equ RV_STK_A2,    40
+.equ RV_STK_A3,    44
+.equ RV_STK_A4,    48
+.equ RV_STK_A5,    52
+.equ RV_STK_A6,    56
+.equ RV_STK_A7,    60
+.equ RV_STK_S2,    64
+.equ RV_STK_S3,    68
+.equ RV_STK_S4,    72
+.equ RV_STK_S5,    76
+.equ RV_STK_S6,    80
+.equ RV_STK_S7,    84
+.equ RV_STK_S8,    88
+.equ RV_STK_S9,    92
+.equ RV_STK_S10,   96
+.equ RV_STK_S11,   100
+.equ RV_STK_T3,    104
+.equ RV_STK_T4,    108
+.equ RV_STK_T5,    112
+.equ RV_STK_T6,    116
+
 
 /* Macro which first allocates space on the stack to save general
  * purpose registers, and then save them. GP register is excluded.
@@ -116,17 +144,25 @@
 .endm
 
 .macro clear_msip
- li t0, MSIP_REG
- mv t1, zero
- sw t1, 0(t0)
+
+    csrr t0, mhartid             // Get current core number into a0
+    li   t1, 1
+    addi t0, t0, 8               // Shift by 8 for core 0, 9 for core 1
+    sll  t1, t1, t0              // t1 = 1 << (mhartid + 8)
+
+    li t2, (SIO_BASE+SIO_RISCV_SOFTIRQ_OFFSET)
+
+    sw   t1, 0(t2)                // Write to soft IRQ register
 .endm
 
-.section .iram1
-.global m_software_interrupt_handler
-.type m_software_interrupt_handler, @function
+.section .time_critical
+.global isr_riscv_machine_soft_irq
+.type isr_riscv_machine_soft_irq, @function
 
-m_software_interrupt_handler:
+isr_riscv_machine_soft_irq:
 
+    fence 
+    fence.i
 
 /* Start by saving the general purpose registers and the PC value before
  * the interrupt happened. */
@@ -136,20 +172,29 @@ m_software_interrupt_handler:
     /*Clear msip */
     clear_msip
 
-    /*Save current task's stack pointer*/
-    la t0, currentTask
-    lw t1 , 0(t0)
-    sw sp , 0(t1) //first member of the taskHandleType struct is stack pointer
+    /* Read hart ID (CPU ID) into t2 */
+    csrr t2, mhartid       // t2 = hart ID (0 or 1)
 
-    /*Load next task's stack pointer*/
-    la t0, nextTask
-    lw t1 , 0(t0)
-    lw sp , 0(t1) //first member of the taskHandleType struct is stack pointer
+    /* Save current task's stack pointer */
+    la t0, currentTask     // t0 = &currentTask
+    slli t3, t2, 2         // t3 = t2 * 4 (assuming 32-bit pointers)
+    add t0, t0, t3         // t0 = &currentTask[hartid]
+    lw t1, 0(t0)           // t1 = currentTask[hartid]
+    sw sp, 0(t1)           // Save SP to currentTask[hartid]->sp
+    fence 
+
+    /* Load next task's stack pointer */
+    la t0, nextTask        // t0 = &nextTask
+    add t0, t0, t3         // t0 = &nextTask[hartid]
+    lw t1, 0(t0)           // t1 = nextTask[hartid]
+    lw sp, 0(t1)           // Load SP from nextTask[hartid]->sp
 
     restore_mepc
     restore_general_regs
 
+    fence
+    fence.i
+
     mret
 
-.size m_software_interrupt_handler, .-m_software_interrupt_handler
-
+.size isr_riscv_machine_soft_irq, .-isr_riscv_machine_soft_irq

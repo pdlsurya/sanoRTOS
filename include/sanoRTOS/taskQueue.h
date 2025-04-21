@@ -26,6 +26,7 @@
 #define __SANO_RTOS_TASK_QUEUE_H
 
 #include "sanoRTOS/config.h"
+#include "sanoRTOS/port.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -64,7 +65,7 @@ extern "C"
      */
     static inline bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {
-        return pTaskQueue->head == NULL;
+        return (pTaskQueue->head == NULL);
     }
 
 #ifdef __cplusplus
