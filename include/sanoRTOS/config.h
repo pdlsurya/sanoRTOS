@@ -37,7 +37,7 @@ extern "C"
 #define CONFIG_LOG_COLOR 1
 #endif
 
-#define CONFIG_SMP 0 // Configure Symmetric Multi Processing
+#define CONFIG_SMP 0 // Configure Symmetric Multiprocessing
 
 #define CONFIG_MUTEX_USE_PRIORITY_INHERITANCE 1 // Configure mutex priority inheritance
 
