@@ -109,7 +109,7 @@ extern "C"
            <-32bits->
           *************************************************************************************/
 #define PORT_TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams) \
-    uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                                       \
+  static  uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                                       \
         [stackSize / sizeof(uint32_t) - 32] = (uint32_t)taskEntryFunction,                       \
         [stackSize / sizeof(uint32_t) - 31] = (uint32_t)taskExitFunction,                        \
         [stackSize / sizeof(uint32_t) - 24] = (uint32_t)taskParams}

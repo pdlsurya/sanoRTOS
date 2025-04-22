@@ -77,7 +77,7 @@ extern "C"
      * @retval true if msgQueue is full
      * @retval false otherwise
      */
-    static inline bool msgQueueFull(msgQueueHandleType *pQueueHandle)
+    static inline __attribute__((always_inline)) bool msgQueueFull(msgQueueHandleType *pQueueHandle)
     {
         return pQueueHandle->itemCount == pQueueHandle->queueLength;
     }
@@ -89,7 +89,7 @@ extern "C"
      * @retval true if msgQueue is empty
      * @return false otherwise
      */
-    static inline bool msgQueueEmpty(msgQueueHandleType *pQueueHandle)
+    static inline __attribute__((always_inline)) bool msgQueueEmpty(msgQueueHandleType *pQueueHandle)
     {
         return (pQueueHandle->itemCount == 0);
     }

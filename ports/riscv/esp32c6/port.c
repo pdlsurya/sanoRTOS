@@ -83,7 +83,7 @@ static inline void portConfig()
 
     /*initialize mtimer to generate interrupt every 1 ms*/
     mtimer_cb_init_t mtimer_cb_init = {0};
-    mtimer_cb_init.period_ticks =TIMER_TICKS_PER_RTOS_TICK;
+    mtimer_cb_init.period_ticks = TIMER_TICKS_PER_RTOS_TICK;
     mtimer_cb_init.cb_function = tickHandler;
     mtimer_callback_init(&mtimer_cb_init);
 }
@@ -149,8 +149,12 @@ void pmpConfigure()
 void portSchedulerStart()
 {
 
+    taskQueueType *pReadyQueue = getReadyQueue();
+
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = taskPool.currentTask[PORT_CORE_ID()] = taskQueueGet(&taskPool.readyQueue);
+    currentTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
+
+    taskSetCurrent(currentTask[PORT_CORE_ID()]);
 
     /*Change status to RUNNING*/
     currentTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;

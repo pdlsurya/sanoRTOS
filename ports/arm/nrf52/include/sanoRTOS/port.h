@@ -31,6 +31,7 @@
 #include "nrf_soc.h"
 #include "cmsis_gcc.h"
 #include "sanoRTOS/config.h"
+#include "debug_log.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -136,7 +137,7 @@ extern "C"
 
 #define PORT_ENTER_SLEEP_MODE() __WFI()
 
-#define PORT_PRINT printf
+#define PORT_PRINT debug_log_print
 
 /**
  * @brief Check if CPU is executing in Privileged or Unprivileged mode

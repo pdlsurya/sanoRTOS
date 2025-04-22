@@ -63,7 +63,7 @@ extern "C"
      * @retval true if taskQueue is empty
      * @retval false, otherwise
      */
-    static inline bool taskQueueEmpty(taskQueueType *pTaskQueue)
+    static inline __attribute__((always_inline)) bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {
         return (pTaskQueue->head == NULL);
     }

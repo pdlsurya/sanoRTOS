@@ -49,7 +49,7 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 
     bool irqFlag = spinLock(&pMutex->lock);
 
-    taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
+    taskHandleType *currentTask = taskGetCurrent();
 
 retry:
 #if MUTEX_USE_PRIORITY_INHERITANCE
@@ -137,7 +137,7 @@ int mutexUnlock(mutexHandleType *pMutex)
 
     taskHandleType *nextOwner = NULL;
 
-    taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
+    taskHandleType *currentTask = taskGetCurrent();
 
     /*Unlocking the mutex is possible only if current task owns it*/
 
@@ -174,9 +174,9 @@ int mutexUnlock(mutexHandleType *pMutex)
 
                 taskSetReady(nextOwner, MUTEX_LOCKED);
 
-                /*Perform context switch if next owner task has equal or
+                               /*Perform context switch if next owner task has equal or
                  *higher priority[lower priority value] than that of current task */
-                if (nextOwner->priority <= taskPool.currentTask[PORT_CORE_ID()]->priority)
+                if (nextOwner->priority <= currentTask->priority)
                 {
                     contextSwitchRequired = true;
                 }

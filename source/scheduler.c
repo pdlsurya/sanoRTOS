@@ -52,20 +52,25 @@ void idleTaskHandler0(void *params)
  */
 static bool selectNextTask()
 {
-    if (!taskQueueEmpty(&taskPool.readyQueue))
+    taskQueueType *pReadyQueue = getReadyQueue();
+
+    if (!taskQueueEmpty(pReadyQueue))
     {
-        if (taskPool.currentTask[PORT_CORE_ID()]->status == TASK_STATUS_RUNNING)
+        // Current Running task
+        taskHandleType *pTask = taskGetCurrent();
+
+        if (pTask->status == TASK_STATUS_RUNNING)
         {
             /*Perform context switch only if next highest priority ready task has equal or higher priority[lower priority value]
             than the current running task*/
 
-            taskHandleType *nextReadyTask = taskQueuePeek(&taskPool.readyQueue);
+            taskHandleType *nextReadyTask = taskQueuePeek(pReadyQueue);
 
-            if (nextReadyTask->priority <= taskPool.currentTask[PORT_CORE_ID()]->priority)
+            if (nextReadyTask->priority <= pTask->priority)
             {
                 /*Change current task's status to ready and add it to the readyQueue*/
-                taskPool.currentTask[PORT_CORE_ID()]->status = TASK_STATUS_READY;
-                taskQueueAdd(&taskPool.readyQueue, taskPool.currentTask[PORT_CORE_ID()]);
+                pTask->status = TASK_STATUS_READY;
+                taskQueueAdd(pReadyQueue, pTask);
             }
             else
             {
@@ -75,14 +80,16 @@ static bool selectNextTask()
             }
         }
 
-        currentTask[PORT_CORE_ID()] = taskPool.currentTask[PORT_CORE_ID()];
+        currentTask[PORT_CORE_ID()] = pTask;
+
+        taskCheckStackOverflow();
 
         // Get the next highest priority  ready task
-        nextTask[PORT_CORE_ID()] = taskQueueGet(&taskPool.readyQueue);
-
-        taskPool.currentTask[PORT_CORE_ID()] = nextTask[PORT_CORE_ID()];
+        nextTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
 
         nextTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
+
+        taskSetCurrent(nextTask[PORT_CORE_ID()]);
 
         // Context switch required
         return true;
@@ -98,7 +105,9 @@ static bool selectNextTask()
  */
 static void checkTimeout()
 {
-    taskNodeType *currentTaskNode = taskPool.blockedQueue.head;
+    taskQueueType *pBlockedQueue = getBlockedQueue();
+
+    taskNodeType *currentTaskNode = pBlockedQueue->head;
 
     while (currentTaskNode != NULL)
     {
@@ -112,9 +121,13 @@ static void checkTimeout()
             if (currentTaskNode->pTask->remainingSleepTicks == 0)
             {
                 if (currentTaskNode->pTask->blockedReason == SLEEP)
+                {
                     taskSetReady(currentTaskNode->pTask, SLEEP_TIME_TIMEOUT);
+                }
                 else
+                {
                     taskSetReady(currentTaskNode->pTask, WAIT_TIMEOUT);
+                }
             }
         }
         currentTaskNode = nextTaskNode;
@@ -165,8 +178,10 @@ void tickHandler()
         /*Check for timer timeout*/
         processTimers();
 
+        taskQueueType *pBlockedQueue = getBlockedQueue();
+
         /*Check for wait timeout of blocked tasks*/
-        if (!taskQueueEmpty(&taskPool.blockedQueue))
+        if (!taskQueueEmpty(pBlockedQueue))
         {
             checkTimeout();
         }

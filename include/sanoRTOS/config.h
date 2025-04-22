@@ -31,14 +31,19 @@
 extern "C"
 {
 #endif
+#define CONFIG_LOG 1 // Configure logging
 
-#define CONFIG_SMP 1 // Configure Symmetric Multi Processing
+#if CONFIG_LOG
+#define CONFIG_LOG_COLOR 1
+#endif
+
+#define CONFIG_SMP 0 // Configure Symmetric Multi Processing
 
 #define CONFIG_MUTEX_USE_PRIORITY_INHERITANCE 1 // Configure mutex priority inheritance
 
 #define CONFIG_TASK_USER_MODE 0 // Configure whether tasks should run in privileged mode.
 
-#define CONFIG_TICK_INTERVAL_US 2000 // Configure SysTick to generate interrupt every 2ms.
+#define CONFIG_TICK_INTERVAL_US 1000 // Configure SysTick to generate interrupt every TICK_INTERVAL_US
 
 #ifdef __cplusplus
 }

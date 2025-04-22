@@ -42,6 +42,8 @@ extern "C"
 #define TASK_NO_WAIT 0
 #define TASK_MAX_WAIT 0xffffffffUL
 
+#define STACK_GUARD_WORDS 8
+
     void taskExitFunction();
 
     typedef enum
@@ -64,8 +66,10 @@ extern "C"
 #define TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                 \
     void taskEntryFunction(void *);                                                                         \
     PORT_TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams);               \
-    taskHandleType name = {                                                                                 \
+    static taskHandleType name = {                                                                          \
+        .taskName = #name,                                                                                  \
         .stackPointer = (uint32_t)(name##Stack + stackSize / sizeof(uint32_t) - INITIAL_TASK_STACK_OFFSET), \
+        .stack = name##Stack,                                                                               \
         .priority = taskPriority,                                                                           \
         .coreAffinity = affinity,                                                                           \
         .taskEntry = taskEntryFunction,                                                                     \
@@ -117,8 +121,10 @@ extern "C"
     typedef struct taskHandle
     {
         uint32_t stackPointer;
+        uint32_t *stack;
         taskFunctionType taskEntry;
         void *params;
+        const char *taskName;
         uint32_t remainingSleepTicks;
         taskStatusType status;
         blockedReasonType blockedReason;
@@ -130,8 +136,13 @@ extern "C"
 
     typedef struct
     {
+        /*Queue of tasks in ready state*/
         taskQueueType readyQueue;
+
+        /*Queue of tasks in blocked state*/
         taskQueueType blockedQueue;
+
+        /*Currently running task*/
         taskHandleType *currentTask[PORT_CORE_COUNT];
 
     } taskPoolType;
@@ -150,34 +161,136 @@ extern "C"
 
     void taskStart(taskHandleType *pTask);
 
+    void taskCheckStackOverflow();
+
     /**
-     * @brief Block task for specified number of RTOS Ticks
+     * @brief Block the current task for a specified number of RTOS ticks.
      *
-     * @param sleepTicks
+     * @param sleepTicks Number of RTOS ticks to sleep
      */
-    static inline void taskSleep(uint32_t sleepTicks)
+    static inline __attribute__((always_inline)) void taskSleep(uint32_t sleepTicks)
     {
         taskBlock(taskPool.currentTask[PORT_CORE_ID()], SLEEP, sleepTicks);
     }
 
     /**
-     * @brief Block task for specified number of milliseconds
+     * @brief Block the current task for a specified number of milliseconds.
      *
-     * @param sleepTimeMS
+     * @param sleepTimeMS Sleep duration in milliseconds
      */
-    static inline void taskSleepMS(uint32_t sleepTimeMS)
+    static inline __attribute__((always_inline)) void taskSleepMS(uint32_t sleepTimeMS)
     {
         taskSleep(MS_TO_RTOS_TICKS(sleepTimeMS));
     }
 
     /**
-     * @brief Block task for specified number of microseconds
+     * @brief Block the current task for a specified number of microseconds.
      *
-     * @param sleepTimeUS
+     * @param sleepTimeUS Sleep duration in microseconds
      */
-    static inline void taskSleepUS(uint32_t sleepTimeUS)
+    static inline __attribute__((always_inline)) void taskSleepUS(uint32_t sleepTimeUS)
     {
         taskSleep(US_TO_RTOS_TICKS(sleepTimeUS));
+    }
+
+    /**
+     * @brief Get the name of the currently running task.
+     *
+     * @return Pointer to the task name string
+     */
+    static inline __attribute__((always_inline)) const char *taskGetName()
+    {
+        return taskPool.currentTask[PORT_CORE_ID()]->taskName;
+    }
+
+    /**
+     * @brief Get the handle of the currently running task.
+     *
+     * @return Pointer to the current task's handle (taskHandleType)
+     */
+    static inline __attribute__((always_inline)) taskHandleType *taskGetCurrent()
+    {
+        return taskPool.currentTask[PORT_CORE_ID()];
+    }
+
+    /**
+     * @brief Set the current task for the core.
+     *
+     * @param pTask Pointer to the task handle to set as current
+     */
+    static inline __attribute__((always_inline)) void taskSetCurrent(taskHandleType *pTask)
+    {
+        taskPool.currentTask[PORT_CORE_ID()] = pTask;
+    }
+
+    /**
+     * @brief Assign a core affinity to the specified task.
+     *
+     * @param pTask Pointer to the task
+     * @param affinity Core affinity to assign
+     */
+    static inline __attribute__((always_inline)) void taskSetCoreAffinity(taskHandleType *pTask, coreAffinityType affinity)
+    {
+        pTask->coreAffinity = affinity;
+    }
+
+    /**
+     * @brief Retrieve the core affinity of the specified task.
+     *
+     * @param pTask Pointer to the task
+     * @return Core affinity of the task
+     */
+    static inline __attribute__((always_inline)) coreAffinityType taskGetCoreAffinity(taskHandleType *pTask)
+    {
+        return pTask->coreAffinity;
+    }
+
+    /**
+     * @brief Set the priority of the specified task.
+     *
+     * @param pTask Pointer to the task
+     * @param priority Priority value to set
+     */
+    static inline __attribute__((always_inline)) void taskSetPriority(taskHandleType *pTask, uint8_t priority)
+    {
+        pTask->priority = priority;
+    }
+
+    /**
+     * @brief Get the priority of the specified task.
+     *
+     * @param pTask Pointer to the task
+     * @return Task priority
+     */
+    static inline __attribute__((always_inline)) uint8_t taskGetPriority(taskHandleType *pTask)
+    {
+        return pTask->priority;
+    }
+
+    /**
+     * @brief Get a pointer to the ready queue.
+     *
+     * This function returns a pointer to the ready queue in the task pool,
+     * which contains tasks that are ready to run.
+     *
+     * @return Pointer to the ready queue (taskQueueType *)
+     */
+    static inline __attribute__((always_inline)) taskQueueType *getReadyQueue()
+    {
+        return &taskPool.readyQueue;
+    }
+
+    /**
+     * @brief Get a pointer to the blocked queue.
+     *
+     * This function returns a pointer to the blocked queue in the task pool,
+     * which contains tasks that are currently waiting (e.g., sleeping or blocked on a resource).
+     *
+     * @return Pointer to the blocked queue (taskQueueType *)
+     */
+    static inline __attribute__((always_inline)) taskQueueType *getBlockedQueue()
+    {
+        return &taskPool.blockedQueue;
     }
 
 #ifdef __cplusplus

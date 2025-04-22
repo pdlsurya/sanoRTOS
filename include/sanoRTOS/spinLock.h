@@ -46,7 +46,7 @@ extern "C"
          * @retval true if interrupts were previously enabled
          * @retval false if interrupts are  previously disabled
          */
-        static inline bool spinLock(atomic_t *pLock)
+        static inline __attribute__((always_inline)) bool spinLock(atomic_t *pLock)
         {
                 assert(pLock != NULL);
 #if (CONFIG_SMP)
@@ -87,7 +87,7 @@ extern "C"
          *
          * @param pLock  Pointer to the lock variable.
          */
-        static inline void spinUnlock(atomic_t *pLock, bool irqFlag)
+        static inline __attribute__((always_inline)) void spinUnlock(atomic_t *pLock, bool irqFlag)
         {
                 assert(pLock != NULL);
 
