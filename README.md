@@ -1,14 +1,32 @@
 # sanoRTOS
 sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-M and RISC-V microcontrollers. This implementation provides a simple yet effective API for task management, synchronization, and communication, enabling efficient and predictable multitasking in embedded systems.
 
-# Features
+## 🚀 Features
 
-- Priority based preemptive scheduling
-- Optional priority inheritance to avoid priority inversion problem while using mutexes
-- Configurable tick rate
-- Task synchronization
-- Inter-task communication
-- Lightweight and minimalistic design
+- **Priority-Based Preemptive Scheduling**  
+  Efficient task management with support for preemptive scheduling based on task priority levels.
+
+- **Optional Priority Inheritance**  
+  Prevents priority inversion during mutex acquisition by temporarily elevating the priority of lower-priority tasks.
+
+- **Symmetric Multiprocessing (SMP) Support**  
+  Fully supports multi-core systems with per-task **core affinity** configuration for optimal load balancing.
+
+- **Dynamic Stack Overflow Detection**  
+  Runtime monitoring of task stacks to catch and handle stack overflows proactively.
+
+- **Configurable Tick Rate**  
+  Easily adjustable tick frequency to match application-specific timing and power requirements.
+
+- **Task Synchronization Primitives**  
+  Includes mutexes, semaphores, and condition variables for safe and efficient coordination between tasks.
+
+- **Inter-Task Communication**  
+  Enables message passing between tasks using message queue.
+
+- **Minimalistic and Lightweight Design**  
+  Designed for embedded systems with limited resources — small footprint, fast context switches, and no unnecessary bloat.
+
 
 # API Functions
 
@@ -91,8 +109,8 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
    #include "scheduler/scheduler.h"
    #include "task/task.h"
 
-   TASK_DEFINE(task1, 512, firstTask, NULL, 1);
-   TASK_DEFINE(task2, 512, secondTask, NULL, 1);
+   TASK_DEFINE(task1, 512, firstTask, NULL, 1,AFFINITY_CORE_ANY);
+   TASK_DEFINE(task2, 512, secondTask, NULL, 1,AFFINITY_CORE_ANY);
 
     void firstTask(void *args){
 
