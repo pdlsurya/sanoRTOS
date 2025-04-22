@@ -133,7 +133,7 @@ extern "C"
 
 #define PORT_CORE_ID() get_core_num()
 
-#define PORT_PRINTF printf
+#define PORT_PRINT printf
 
 #if CONFIG_TASK_USER_MODE
 

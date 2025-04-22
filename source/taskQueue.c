@@ -168,7 +168,7 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
 
         while (currentTaskNode != NULL)
         {
-            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() || currentTaskNode->pTask->coreAffinity == -1)
+            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() || currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
             {
                 pTask = currentTaskNode->pTask;
 
@@ -196,7 +196,7 @@ taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
         taskNodeType *currentTaskNode = pTaskQueue->head;
         while (currentTaskNode != NULL)
         {
-            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() || currentTaskNode->pTask->coreAffinity == -1)
+            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() || currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
             {
                 return currentTaskNode->pTask;
             }

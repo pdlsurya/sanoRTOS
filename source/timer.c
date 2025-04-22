@@ -132,12 +132,16 @@ static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerN
 
         /* If the timer correponds to the head node in the list, remove the timer node and reassign head node.*/
         if (pTimerNode == pTimerList->head)
+        {
             timerListDeleteFirstNode(pTimerList);
+        }
 
         else
         {
             while (currentNode->nextNode != pTimerNode)
+            {
                 currentNode = currentNode->nextNode;
+            }
 
             currentNode->nextNode = pTimerNode->nextNode;
             pTimerNode->nextNode = NULL;
@@ -161,7 +165,9 @@ int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
 
     /* check if the timer is already in running state. If so, abort re-starting the timer.*/
     if (pTimerNode->isRunning)
+    {
         return RET_ALREADYACTIVE;
+    }
 
     /* Set isRunning flag for the started timer pTimerNode.*/
     pTimerNode->isRunning = true;
@@ -211,24 +217,30 @@ void processTimers()
 
             /*Decrement ticks to expire*/
             if (currentNode->ticksToExpire > 0)
+            {
                 currentNode->ticksToExpire--;
 
-            /* Check if timer has expired.If set, call the timeoutHandler() and update the ticksToExpire for next event.*/
-            if (currentNode->ticksToExpire == 0)
-            {
+                /* Check if timer has expired.If set, call the timeoutHandler() and update the ticksToExpire for next event.*/
+                if (currentNode->ticksToExpire == 0)
+                {
 
-                /*Add timeout handler to the timeoutHandlerQueue*/
-                timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler);
+                    /*Add timeout handler to the timeoutHandlerQueue*/
+                    timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler);
 
-                /* Check if timer task is suspended. If so, change status to ready to allow execution.*/
-                if (timerTask.status == TASK_STATUS_BLOCKED)
-                    taskSetReady(&timerTask, TIMER_TIMEOUT);
+                    /* Check if timer task is BLOCKED. If so, change status to ready to allow execution.*/
+                    if (timerTask.status == TASK_STATUS_BLOCKED)
+                    {
+                        taskSetReady(&timerTask, TIMER_TIMEOUT);
+                    }
 
-                currentNode->ticksToExpire = currentNode->intervalTicks;
+                    currentNode->ticksToExpire = currentNode->intervalTicks;
 
-                /* Check if the timer mode is SINGLE_SHOT. If true, stop the correponding timer*/
-                if (currentNode->mode == TIMER_MODE_SINGLE_SHOT)
-                    timerStop(currentNode);
+                    /* Check if the timer mode is SINGLE_SHOT. If true, stop the correponding timer*/
+                    if (currentNode->mode == TIMER_MODE_SINGLE_SHOT)
+                    {
+                        timerStop(currentNode);
+                    }
+                }
             }
             currentNode = nextNode;
         }

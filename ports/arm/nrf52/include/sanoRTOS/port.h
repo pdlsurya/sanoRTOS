@@ -136,7 +136,7 @@ extern "C"
 
 #define PORT_ENTER_SLEEP_MODE() __WFI()
 
-#define PORT_PRINTF printf
+#define PORT_PRINT printf
 
 /**
  * @brief Check if CPU is executing in Privileged or Unprivileged mode

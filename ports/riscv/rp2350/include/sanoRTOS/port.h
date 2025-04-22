@@ -67,6 +67,8 @@ extern "C"
 
     typedef void (*tickHandlerType)(void);
 
+#define USE_ISR_STACK 0
+
 #define MTIMER_TICK_FREQUENCY 1000000
 
 #define SET_MTIMECMP(val)                                    \
@@ -157,7 +159,7 @@ extern "C"
 
 #define PORT_CORE_ID() get_core_num()
 
-#define PORT_MEM_FENCE() asm volatile("fence rw,rw\n")
+#define PORT_MEM_FENCE() asm volatile("fence\n")
 
 #define PORT_TRIGGER_CONTEXT_SWITCH() (sio_hw->riscv_softirq = (get_core_num() == 0) ? SIO_RISCV_SOFTIRQ_CORE0_SET_BITS : SIO_RISCV_SOFTIRQ_CORE1_SET_BITS)
 
@@ -165,7 +167,7 @@ extern "C"
 
 #define PORT_ENTER_SLEEP_MODE() asm volatile("wfi");
 
-#define PORT_PRINTF printf
+#define PORT_PRINT printf
 
     volatile extern privilegeModesType privilegeMode;
 
@@ -236,7 +238,7 @@ extern "C"
 
 #else
 
-    return ((riscv_read_csr(mstatus) & RVCSR_MSTATUS_MIE_BITS) != 0);
+    return ((riscv_read_csr(mstatus) & RVCSR_MSTATUS_MIE_BITS));
 #endif
     }
 
