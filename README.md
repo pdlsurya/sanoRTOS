@@ -85,7 +85,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 3. Include sanoRTOS in Project:
    - Right-click on your project and select **Properties**.
    - Go to **C/C++ Build > Settings**.
-   - Under **Tool Settings**, go to **MCU GCC Compiler > Include paths** and add the path to **sanoRTOS** directory.
+   - Under **Tool Settings**, go to **MCU GCC Compiler > Include paths** and add the path to **sanoRTOS/include** and **sanoRTOS/ports/arm/stm32/include** directory.
 
 4. Add Source Files:
    - Navigate to **C/C++ General > Paths and Symbols**.
