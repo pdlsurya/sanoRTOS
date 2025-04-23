@@ -50,7 +50,7 @@ static inline taskNodeType *newNode(taskHandleType *pTask)
 /**
  * @brief Remove head node from Queue
  *
- * @param pTaskQueue
+ * @param pTaskQueue Pointer to the task queue
  */
 static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
@@ -62,10 +62,10 @@ static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
 }
 
 /**
- * @brief Remove task from Queue
- *
- * @param pTaskQueue
- * @param pTask
+ * @brief Remove task from Queue.
+ * @param pTaskQueue Pointer to the task queue from which the task should be removed.
+ * @param pTask Pointer to the task that needs to be removed from the queue.
+ * @return `true` if the tas
  */
 void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
@@ -115,8 +115,8 @@ void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
 /**
  * @brief Add task to Queue and  sort tasks in ascending order of
  * their priority
- * @param pTaskQueue
- * @param pTask
+ * @param pTaskQueue Pointer to the taskQueue struct
+ * @param pTask Pointer to the task to be added
  */
 void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
@@ -154,8 +154,8 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
  * @brief Get the highest priority task from the Queue. This corresponds to the
  * front task node in the Queue.
  * @param pTaskQueue Pointer to taskQueue struct
- * @retval Next highest priority task if exists
- * @retval NULL if Queue is empty
+ * @retval `Next highest priority task` if exists
+ * @retval `NULL` if Queue is empty
  */
 taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
 {
@@ -187,7 +187,7 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
  * @brief Get task corresponding to front node from the task queue without removing the node
  *
  * @param pTaskQueue Pointer to the taskQueue struct
- * @return Pointer to taskHandle struct corresponding to front node
+ * @return `Pointer to taskHandle struct corresponding to front node`
  */
 taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
 {

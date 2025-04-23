@@ -47,55 +47,45 @@ void idleTaskHandler0(void *params)
 /**
  * @brief Select next highest priority ready task for execution
  *
- * @retval TRUE if context switch  required
- * @retval FALSE  if context switch not required
+ * @retval `true` if context switch is required
+ * @retval `false` if context switch is not required
  */
-static bool selectNextTask()
+static bool selectNextTask(void)
 {
-    taskQueueType *pReadyQueue = getReadyQueue();
+    taskQueueType *const pReadyQueue = getReadyQueue();
 
     if (!taskQueueEmpty(pReadyQueue))
     {
-        // Current Running task
-        taskHandleType *pTask = taskGetCurrent();
+        taskHandleType *const pCurrentTask = taskGetCurrent();
 
-        if (pTask->status == TASK_STATUS_RUNNING)
+        if (pCurrentTask->status == TASK_STATUS_RUNNING)
         {
-            /*Perform context switch only if next highest priority ready task has equal or higher priority[lower priority value]
-            than the current running task*/
+            const taskHandleType *const pNextReadyTask = taskQueuePeek(pReadyQueue);
 
-            taskHandleType *nextReadyTask = taskQueuePeek(pReadyQueue);
-
-            if (nextReadyTask->priority <= pTask->priority)
+            if (pNextReadyTask->priority <= pCurrentTask->priority)
             {
-                /*Change current task's status to ready and add it to the readyQueue*/
-                pTask->status = TASK_STATUS_READY;
-                taskQueueAdd(pReadyQueue, pTask);
+                pCurrentTask->status = TASK_STATUS_READY;
+                taskQueueAdd(pReadyQueue, pCurrentTask);
             }
             else
             {
-                /*Current running task has higher priority than the next highest priority ready task;Hence, no need to perform context
-                  switch.*/
-                return false;
+                return false; // No need to switch to a lower priority task
             }
         }
 
-        currentTask[PORT_CORE_ID()] = pTask;
+        currentTask[PORT_CORE_ID()] = pCurrentTask;
 
+#if CONFIG_CHECK_STACK_OVERFLOW
         taskCheckStackOverflow();
+#endif
 
-        // Get the next highest priority  ready task
         nextTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
-
         nextTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
-
         taskSetCurrent(nextTask[PORT_CORE_ID()]);
 
-        // Context switch required
         return true;
     }
 
-    // No tasks in ready state, Context swtich not required
     return false;
 }
 
@@ -141,7 +131,7 @@ void taskYield()
 {
     bool contextSwitchRequired = false;
 
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     contextSwitchRequired = selectNextTask();
 
@@ -158,7 +148,7 @@ void taskYield()
 
 #endif
     }
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 }
 
 /**
@@ -168,7 +158,7 @@ void taskYield()
 void tickHandler()
 {
 
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     bool contextSwitchRequired = false;
 
@@ -195,7 +185,7 @@ void tickHandler()
         /*Trigger platform specific context switch mechanism*/
         PORT_TRIGGER_CONTEXT_SWITCH();
     }
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 }
 
 /**

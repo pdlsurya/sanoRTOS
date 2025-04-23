@@ -38,8 +38,8 @@
  * a mutex, this function cannot be called from an ISR.
  * @param pCondVar Pointer to condVarHandle struct
  * @param waitTicks Number of ticks to wait until timeout
- * @retval RET_SUCCESS(0) if wait succeeded
- * @retval RET_TIMEOUT if timeout occured while waiting
+ * @retval `RET_SUCCESS` if wait succeeded
+ * @retval `RET_TIMEOUT` if timeout occured while waiting
  */
 int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 {
@@ -48,7 +48,7 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 
     int retCode;
 
-    bool irqFlag = spinLock(&pCondVar->lock);
+    bool irqState = spinLock(&pCondVar->lock);
 
     /* Unlock previously acquired mutex;*/
     mutexUnlock(pCondVar->pMutex);
@@ -58,12 +58,12 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 wait:
     taskQueueAdd(&pCondVar->waitQueue, currentTask);
 
-    spinUnlock(&pCondVar->lock, irqFlag);
+    spinUnlock(&pCondVar->lock, irqState);
 
     /* Block current task and give CPU to other tasks while waiting on condition variable*/
     taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
 
-    irqFlag = spinLock(&pCondVar->lock);
+    irqState = spinLock(&pCondVar->lock);
 
     /*Task has been woken up either due to wait timeout or by another task by signalling the condtion variable.*/
     if (currentTask->wakeupReason == COND_VAR_SIGNALLED)
@@ -83,7 +83,7 @@ wait:
     {
         goto wait;
     }
-    spinUnlock(&pCondVar->lock, irqFlag);
+    spinUnlock(&pCondVar->lock, irqState);
 
     /*Re-acquire previously released mutex*/
     mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
@@ -95,8 +95,8 @@ wait:
  * @brief Signal a task waiting on conditional variable. This function cannot be
  * called from an ISR.
  * @param pCondVar Pointer to condVarHandle struct
- * @retval RET_SUCCESS if signal succeeded,
- * @retval RET_NOTASK if no tasks available to signal
+ * @retval `RET_SUCCESS` if signal succeeded,
+ * @retval `RET_NOTASK` if no tasks available to signal
  */
 int condVarSignal(condVarHandleType *pCondVar)
 {
@@ -104,7 +104,7 @@ int condVarSignal(condVarHandleType *pCondVar)
 
     taskHandleType *nextSignalTask = NULL;
 
-    bool irqFlag = spinLock(&pCondVar->lock);
+    bool irqState = spinLock(&pCondVar->lock);
 
     /*Get next highest priority waiting task to unblock*/
 getNextSignalTask:
@@ -118,7 +118,7 @@ getNextSignalTask:
         {
             goto getNextSignalTask;
         }
-        spinUnlock(&pCondVar->lock, irqFlag);
+        spinUnlock(&pCondVar->lock, irqState);
 
         taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
 
@@ -132,7 +132,7 @@ getNextSignalTask:
         }
         return RET_SUCCESS;
     }
-    spinUnlock(&pCondVar->lock, irqFlag);
+    spinUnlock(&pCondVar->lock, irqState);
 
     return RET_NOTASK;
 }
@@ -141,8 +141,8 @@ getNextSignalTask:
  * @brief Signal all the waiting tasks waiting on conditional variable. This function
  * cannot be called from an ISR.
  * @param pCondVar Pointer to condVarHandle struct
- * @retval RET_SUCCESS if broadcast succeeded,
- * @retval RET_NOTASK if not tasks available to broadcast
+ * @retval `RET_SUCCESS` if broadcast succeeded,
+ * @retval `RET_NOTASK` if not tasks available to broadcast
  */
 int condVarBroadcast(condVarHandleType *pCondVar)
 {
@@ -150,7 +150,7 @@ int condVarBroadcast(condVarHandleType *pCondVar)
 
     int retCode;
 
-    bool irqFlag = spinLock(&pCondVar->lock);
+    bool irqState = spinLock(&pCondVar->lock);
 
     if (!taskQueueEmpty(&pCondVar->waitQueue))
     {
@@ -171,7 +171,7 @@ int condVarBroadcast(condVarHandleType *pCondVar)
     {
         retCode = RET_NOTASK;
     }
-    spinUnlock(&pCondVar->lock, irqFlag);
+    spinUnlock(&pCondVar->lock, irqState);
 
     return retCode;
 }

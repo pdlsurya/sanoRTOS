@@ -151,8 +151,8 @@ extern "C"
     /**
      * @brief Check if cpu is executing in machine mode
      *
-     * @retval true, if cpu is executing in machine mode
-     * @retval false, otherwise
+     * @retval `true`, if cpu is executing in machine mode
+     * @retval `false`, otherwise
      */
     static inline bool isMachineMode()
     {
@@ -195,8 +195,8 @@ extern "C"
     /**
      * @brief Check if interrupts are enabled
      *
-     * @retval true, if interrupts are enabled
-     * @retval false, if interrupts are disabled
+     * @retval `true`, if interrupts are enabled
+     * @retval `false`, if interrupts are disabled
      */
     static inline bool portIrqEnabled()
     {
@@ -204,9 +204,9 @@ extern "C"
         if (!PORT_IS_PRIVILEGED())
         {
             PORT_ENTER_PRIVILEGED_MODE();
-            bool irqFlag = (RV_READ_CSR(mstatus) & MSTATUS_MIE);
+            bool irqState = (RV_READ_CSR(mstatus) & MSTATUS_MIE);
             PORT_EXIT_PRIVILEGED_MODE();
-            return irqFlag;
+            return irqState;
         }
         else
         {
@@ -222,15 +222,15 @@ extern "C"
     /**
      * @brief Disable interrupts and return previous irq status
      *
-     * @retval true, if interrupts were enabled previously
-     * @retval false, if interrupts were disabled previously
+     * @retval `true`, if interrupts were enabled previously
+     * @retval `false`, if interrupts were disabled previously
      */
     static inline bool portIrqLock()
     {
-        bool irqFlag = portIrqEnabled();
+        bool irqState = portIrqEnabled();
 
 #if CONFIG_TASK_USER_MODE
-        if (irqFlag)
+        if (irqState)
         {
             if (PORT_IS_PRIVILEGED())
             {
@@ -242,24 +242,24 @@ extern "C"
             }
         }
 #else
-    if (irqFlag)
+    if (irqState)
     {
         PORT_DISABLE_INTERRUPTS();
     }
 #endif
-        return irqFlag;
+        return irqState;
     }
 
     /**
-     * @brief Change interrupt status base on irqFlag
+     * @brief Change interrupt status base on irqState
      *
-     * @param irqFlag Flag representing previous irq status
+     * @param irqState Flag representing previous irq status
      */
-    static inline void portIrqUnlock(bool irqFlag)
+    static inline void portIrqUnlock(bool irqState)
     {
 #if CONFIG_TASK_USER_MODE
 
-        if (irqFlag)
+        if (irqState)
         {
             if (PORT_IS_PRIVILEGED())
             {
@@ -272,7 +272,7 @@ extern "C"
         }
 
 #else
-    if (irqFlag)
+    if (irqState)
     {
         PORT_ENABLE_INTERRUPTS();
     }
@@ -293,7 +293,7 @@ extern "C"
      * @param ptr Pointer to the target memory location
      * @param compare_val The expected old value
      * @param set_val The new value to be stored if `*ptr` is equal to `expected`
-     * @return true if the set was successful, false otherwise
+     * @return `true` if the set was successful, false otherwise
      */
     static inline bool portAtomicCAS(volatile uint32_t *ptr, uint32_t compare_val, uint32_t set_val)
     {

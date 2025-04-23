@@ -35,15 +35,21 @@ extern "C"
     /*Forward declaration of taskHandleType*/
     typedef struct taskHandle taskHandleType;
 
+    /**
+     * @brief Node structure for linked list of tasks in a task queue.
+     */
     typedef struct taskNode
     {
-        taskHandleType *pTask;
-        struct taskNode *nextTaskNode;
+        taskHandleType *pTask;         ///< Pointer to the task represented by this node.
+        struct taskNode *nextTaskNode; ///< Pointer to the next node in the task queue.
     } taskNodeType;
 
+    /**
+     * @brief Task queue structure used to manage a list of tasks (e.g., for ready, waiting, or blocked states).
+     */
     typedef struct
     {
-        taskNodeType *head;
+        taskNodeType *head; ///< Pointer to the head of the task queue linked list.
     } taskQueueType;
 
     taskHandleType *taskQueueGet(taskQueueType *pTaskQueue);
@@ -60,8 +66,8 @@ extern "C"
      * @brief Check if taskQueue is empty
      *
      * @param pTaskQueue
-     * @retval true if taskQueue is empty
-     * @retval false, otherwise
+     * @retval `true` if taskQueue is empty
+     * @retval `false`, otherwise
      */
     static inline __attribute__((always_inline)) bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {

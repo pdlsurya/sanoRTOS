@@ -64,7 +64,7 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
     assert(pTask != NULL);
 
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     if (pTask->status == TASK_STATUS_BLOCKED)
     {
@@ -83,7 +83,7 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
     /* Add task to queue of ready tasks*/
     taskQueueAdd(pReadyQueue, pTask);
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 }
 
 /**
@@ -97,7 +97,7 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
 {
     assert(pTask != NULL);
 
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     pTask->remainingSleepTicks = ticks;
     pTask->status = TASK_STATUS_BLOCKED;
@@ -109,14 +109,14 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
     // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
     taskQueueAddToFront(pBlockedQueue, pTask);
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 
     // Give CPU to other tasks
     taskYield();
 }
 
 /**
- * @brief Suspend task
+ * @brief Suspend the specified task
  *
  * @param pTask Pointer to taskHandle struct.
  */
@@ -124,7 +124,7 @@ void taskSuspend(taskHandleType *pTask)
 {
     assert(pTask != NULL);
 
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     /* If task status is ready, remove it from the readyQueue*/
     if (pTask->status == TASK_STATUS_READY)
@@ -144,7 +144,7 @@ void taskSuspend(taskHandleType *pTask)
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 
     /*If self suspended, give CPU to other tasks*/
     if (pTask == taskGetCurrent())
@@ -157,8 +157,8 @@ void taskSuspend(taskHandleType *pTask)
  * @brief Resume task from suspended state
  *
  * @param pTask Pointer to taskHandle struct
- * @return RET_SUCCESS if task resumed succesfully
- * @return RET_NOTSUSPENDED if task is not suspended
+ * @return `RET_SUCCESS` if task resumed succesfully
+ * @return `RET_NOTSUSPENDED` if task is not suspended
  */
 int taskResume(taskHandleType *pTask)
 {
@@ -184,30 +184,31 @@ void taskStart(taskHandleType *pTask)
 {
     assert(pTask != NULL);
 
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     taskQueueType *pReadyQueue = getReadyQueue();
 
     taskQueueAdd(pReadyQueue, pTask);
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 }
 
 /**
- * @brief Check for task stack overflow
+ * @brief Checks if the current task has experienced a stack overflow.
  *
- *
+ * This function is not meant to be called by the user. It is used internally by the
+ * scheduler to check for stack overflows. If a stack overflow is detected, the program
+ * halts in an infinite loop.
  */
 void taskCheckStackOverflow(void)
 {
-    taskHandleType *currentTask = taskGetCurrent();
+    taskHandleType *pCurrentTask = taskGetCurrent();
 
-    if (currentTask->stackPointer <= (uint32_t)(currentTask->stack + STACK_GUARD_WORDS))
+    if (pCurrentTask->stackPointer <= (uint32_t)(pCurrentTask->stack + STACK_GUARD_WORDS))
     {
+        LOG_ERROR("%s stack overflow at address: %p", pCurrentTask->taskName, pCurrentTask->stackPointer);
 
-        LOG_ERROR("Stack overflow: %s  sp: %p", currentTask->taskName, currentTask->stackPointer);
-
-        while (1)
+        for (;;)
             ;
     }
 }

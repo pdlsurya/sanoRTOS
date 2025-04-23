@@ -48,11 +48,14 @@ extern "C"
         .pMutex = p_mutex,            \
         .lock = 0}
 
+    /**
+     * @brief Condition variable structure for blocking and waking tasks based on specific conditions.
+     */
     typedef struct
     {
-        taskQueueType waitQueue;
-        mutexHandleType *pMutex;
-        atomic_t lock;
+        taskQueueType waitQueue; ///< Queue of tasks waiting on the condition variable.
+        mutexHandleType *pMutex; ///< Pointer to the associated mutex (used to avoid race conditions).
+        atomic_t lock;           ///< Spinlock to ensure atomic access to the condition variable's internal state.
     } condVarHandleType;
 
     int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks);
