@@ -6,6 +6,11 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - **Priority-Based Preemptive Scheduling**  
   Efficient task management with support for preemptive scheduling based on task priority levels.
 
+- **Optional Privileged and User-Level Tasks**
+  Supports the differentiation between privileged (kernel) tasks and user-level tasks. Privileged tasks have access to critical system resources and can execute sensitive operations, 
+  while user-level tasks operate with restricted permissions to enhance system security and stability. This separation allows for better isolation and protection between tasks of 
+  different trust levels, ensuring that critical system operations are secure from user-level task interference.
+
 - **Optional Priority Inheritance**  
   Prevents priority inversion during mutex acquisition by temporarily elevating the priority of lower-priority tasks.
 
