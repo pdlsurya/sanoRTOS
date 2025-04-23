@@ -40,6 +40,9 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - **taskSleepUS**: Delay a task for a specified number of microseconds.
 - **schedulerStart**: Start the RTOS scheduler.
 
+## Spin Lock
+- **spinLock**: Acquire a spin lock
+- **spinUnlock**: Release a spin lock
 
 ## Mutex
 
@@ -98,52 +101,84 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
    - Moreover, **sanoRTOS** includes definition for `PendSV_Handler` and `SVC_Handler` ISRs used for task scheduling and context switching. STM32 also 
    defines these ISRs in **stm32xxxx_it.c** file; Hence, we need to remove the definition of these ISRs from the **stm32xxxx_it.c** file to avoid multiple definition error. 
 
+## Example for RP2350(Raspberry Pi pico 2) using pico-sdk
+1. Clone the Repository:
+   - Open a terminal and clone the sanoRTOS repository
+     `git clone https://github.com/pdlsurya/sanoRTOS.git`
+
+2. Set Up Your Pico Project:
+  - You can either create a new CMake-based Pico SDK project or add sanoRTOS to an existing one. Add sanoRTOS folder to your project folder
+  - sanoRTOS supports both ARM and RISC-V cores of the RP2350.
+
+3. Include sanoRTOS in Your CMakeLists.txt:
+  - Update your CMakeLists.txt to include sanoRTOS headers and sources as follows:
+
+```cmake
+
+file(GLOB_RECURSE SANORTOS_SRCS
+    sanoRTOS/source/*.c
+    sanoRTOS/ports/arm/rp2350/port.c)
+#for Hazard3 RISC-V cores, add source files from risc-v port of rp2350 (sanoRTOS/ports/riscv/rp2350/port.c and  sanoRTOS/ports/riscv/rp2350/port.S)
+
+target_include_directories(project_name PRIVATE
+   sanoRTOS/include
+   sanoRTOS/ports/arm/rp2350/include #for RISC-V port replace this line  with sanoRTOS/ports/risc-v/rp2350/include 
+) 
+target_sources(project_name PRIVATE ${SANORTOS_SRCS})
+
+```
+
+## Example Code:
  
-7. Example Code:
-    ```c
-   #include "main.h"
-   #include "sanoRTOS/config.h"
-   #include "sanoRTOS/scheduler.h"
-   #include "sanoRTOS/task.h"
- 
-   TASK_DEFINE(task1, 512, firstTask, NULL, 1, AFFINITY_CORE_ANY);
-   TASK_DEFINE(task2, 512, secondTask, NULL, 1, AFFINITY_CORE_ANY);
+ ```c
 
-    void firstTask(void *args){
+#include "sanoRTOS/config.h"
+#include "sanoRTOS/scheduler.h"
+#include "sanoRTOS/task.h"
+//Include MCU-specific header files here
 
-        while(1){
-             //Task1 code to run repeatedly
+// Define two tasks with 1024-byte stacks.
+// These tasks are assigned to any available core using AFFINITY_CORE_ANY.
+//
+// On multicore MCUs (e.g. RP2350), sanoRTOS can schedule tasks on different cores
+// depending on the affinity setting. AFFINITY_CORE_ANY allows the scheduler to choose any core.
+// This can help distribute load across both cores and enable true parallel execution.
+//
+// On single-core MCUs, this setting is safely ignored — all tasks will run on the only available core.
+TASK_DEFINE(task1, 1024, firstTask, NULL, 1, AFFINITY_CORE_ANY);
+TASK_DEFINE(task2, 1024, secondTask, NULL, 1, AFFINITY_CORE_ANY);
 
-              }
+
+// Task 1 function – user-defined logic inside this loop
+void firstTask(void *args) {
+    while (1) {
+        // Task1 code to run repeatedly
     }
+}
 
-    void secondTask(void * args){
-
-       while(1){
-           //Task2 code to run repeatedly
-
-              }
-     
+// Task 2 function – user-defined logic inside this loop
+void secondTask(void *args) {
+    while (1) {
+        // Task2 code to run repeatedly
     }
+}
 
-    int main(){
+int main() {
+    // Perform MCU-specific initializations here
+    // Example: initialize GPIO, UART, peripherals, etc.
 
-      //STM32 Clock and peripheral initialization ...
+    // Start tasks
+    taskStart(&task1);
+    taskStart(&task2);
 
+    // Start the sanoRTOS scheduler (will not return)
+    schedulerStart();
 
-       //Start  tasks
-       taskStart(&task1);
-       taskStart(&task2);
-
-       //Start the RTOS scheduler
-       schedulerStart();
-
-       //Control should never reach here
-     
-       return 0;
-    }
-    
-    ```
+    // Control should never reach here if scheduler is working correctly
+    return 0;
+}
+```
+   
 
 # License
 This project is licensed under the MIT License-see the [LICENSE](LICENSE) file for details.
