@@ -96,7 +96,7 @@ extern "C"
 #define INITIAL_EXC_RETURN (EXC_RETURN_PREFIX | EXC_RETURN_SPSEL | EXC_RETURN_MODE | EXC_RETURN_S | EXC_RETURN_ES | EXC_RETURN_DCRS | EXC_RETURN_FTYPE)
 
 #define PORT_TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams) \
-    __aligned(4) uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                          \
+    static uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                                \
         [stackSize / sizeof(uint32_t) - 1] = 0x01000000,                                         \
         [stackSize / sizeof(uint32_t) - 2] = (uint32_t)taskEntryFunction,                        \
         [stackSize / sizeof(uint32_t) - 3] = (uint32_t)taskExitFunction,                         \

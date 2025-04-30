@@ -31,9 +31,16 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/timer.h"
+#include "sanoRTOS/log.h"
+
+LOG_MODULE_DEFINE(task);
 
 taskPoolType taskPool = {0};
+
+/*Currently scheduled task*/
 taskHandleType *currentTask[PORT_CORE_COUNT];
+
+/*Next task to be scheduled*/
 taskHandleType *nextTask[PORT_CORE_COUNT];
 
 static atomic_t lock;
@@ -61,16 +68,20 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 
     if (pTask->status == TASK_STATUS_BLOCKED)
     {
+        taskQueueType *pBlockedQueue = getBlockedQueue();
+
         /* Remove  task from the queue of blocked tasks*/
-        taskQueueRemove(&taskPool.blockedQueue, pTask);
+        taskQueueRemove(pBlockedQueue, pTask);
     }
     pTask->status = TASK_STATUS_READY;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = wakeupReason;
     pTask->remainingSleepTicks = 0;
 
+    taskQueueType *pReadyQueue = getReadyQueue();
+
     /* Add task to queue of ready tasks*/
-    taskQueueAdd(&taskPool.readyQueue, pTask);
+    taskQueueAdd(pReadyQueue, pTask);
 
     spinUnlock(&lock, irqFlag);
 }
@@ -93,8 +104,10 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
     pTask->blockedReason = blockedReason;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
+    taskQueueType *pBlockedQueue = getBlockedQueue();
+
     // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
-    taskQueueAddToFront(&taskPool.blockedQueue, pTask);
+    taskQueueAddToFront(pBlockedQueue, pTask);
 
     spinUnlock(&lock, irqFlag);
 
@@ -116,12 +129,14 @@ void taskSuspend(taskHandleType *pTask)
     /* If task status is ready, remove it from the readyQueue*/
     if (pTask->status == TASK_STATUS_READY)
     {
-        taskQueueRemove(&taskPool.readyQueue, pTask);
+        taskQueueType *pReadyQueue = getReadyQueue();
+        taskQueueRemove(pReadyQueue, pTask);
     }
     /*If task status is blocked, remove it from the blockedQueue*/
     else if (pTask->status == TASK_STATUS_BLOCKED)
     {
-        taskQueueRemove(&taskPool.blockedQueue, pTask);
+        taskQueueType *pBlockedQueue = getBlockedQueue();
+        taskQueueRemove(pBlockedQueue, pTask);
     }
 
     pTask->remainingSleepTicks = 0;
@@ -132,7 +147,7 @@ void taskSuspend(taskHandleType *pTask)
     spinUnlock(&lock, irqFlag);
 
     /*If self suspended, give CPU to other tasks*/
-    if (pTask == taskPool.currentTask[PORT_CORE_ID()])
+    if (pTask == taskGetCurrent())
     {
         taskYield();
     }
@@ -171,7 +186,28 @@ void taskStart(taskHandleType *pTask)
 
     bool irqFlag = spinLock(&lock);
 
-    taskQueueAdd(&taskPool.readyQueue, pTask);
+    taskQueueType *pReadyQueue = getReadyQueue();
+
+    taskQueueAdd(pReadyQueue, pTask);
 
     spinUnlock(&lock, irqFlag);
+}
+
+/**
+ * @brief Check for task stack overflow
+ *
+ *
+ */
+void taskCheckStackOverflow(void)
+{
+    taskHandleType *currentTask = taskGetCurrent();
+
+    if (currentTask->stackPointer <= (uint32_t)(currentTask->stack + STACK_GUARD_WORDS))
+    {
+
+        LOG_ERROR("Stack overflow: %s  sp: %p", currentTask->taskName, currentTask->stackPointer);
+
+        while (1)
+            ;
+    }
 }

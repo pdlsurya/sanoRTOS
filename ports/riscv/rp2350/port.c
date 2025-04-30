@@ -29,17 +29,32 @@
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/log.h"
+#include "pico/stdlib.h"
+
+// PMP config bits
+#define PMP_R (1 << 0)
+#define PMP_W (1 << 1)
+#define PMP_X (1 << 2)
+#define PMP_TOR (1 << 3)
+#define PMP_NA4 (2 << 3)
+#define PMP_NAPOT (3 << 3)
+#define PMP_L (1 << 7)
+
+// Helper to encode NAPOT address
+#define PMPADDR_NAPOT(base, size) (((base) >> 2) | (((size) - 1) >> 3))
 
 #if (CONFIG_SMP)
 
 TASK_DEFINE(idleTask1, 512, idleTaskHandler1, NULL, TASK_LOWEST_PRIORITY, AFFINITY_CORE_1);
+
+LOG_MODULE_DEFINE("timer");
 
 void idleTaskHandler1(void *params)
 {
     (void)params;
     while (1)
     {
-        PORT_ENTER_SLEEP_MODE();
+        // PORT_ENTER_SLEEP_MODE();
     }
 }
 #endif
@@ -124,19 +139,62 @@ static inline void portConfig()
 }
 
 /**
+ * @brief Configure Physical Memory Protection (PMP) to allow user mode access to peripherals and memory regions.
+ *
+ */
+
+void pmpConfigure(void)
+{
+    // Dynamic PMP regions (only 5 needed)
+    uint32_t pmpaddr0 = PMPADDR_NAPOT(0x10000000, 64 * 1024 * 1024); // XIP Cached
+    uint32_t pmpaddr1 = PMPADDR_NAPOT(0x14000000, 64 * 1024 * 1024); // XIP Uncached
+    uint32_t pmpaddr2 = PMPADDR_NAPOT(0x18000000, 64 * 1024 * 1024); // XIP Cache Maint.
+    uint32_t pmpaddr3 = PMPADDR_NAPOT(0x1C000000, 64 * 1024 * 1024); // XIP Untranslated
+    uint32_t pmpaddr4 = PMPADDR_NAPOT(0x20000000, 512 * 1024);       // Main SRAM
+
+    // PMP config bytes (8-bit each)
+    uint8_t pmpcfg0 = PMP_R | PMP_X | PMP_NAPOT;         // XIP Cached
+    uint8_t pmpcfg1 = PMP_R | PMP_X | PMP_NAPOT;         // XIP Uncached
+    uint8_t pmpcfg2 = PMP_W | PMP_NAPOT;                 // XIP Cache Maint.
+    uint8_t pmpcfg3 = PMP_R | PMP_X | PMP_NAPOT;         // XIP Untranslated
+    uint8_t pmpcfg4 = PMP_R | PMP_W | PMP_X | PMP_NAPOT; // Main SRAM
+
+    // Write PMPADDR registers
+    riscv_write_csr(pmpaddr0, pmpaddr0);
+    riscv_write_csr(pmpaddr1, pmpaddr1);
+    riscv_write_csr(pmpaddr2, pmpaddr2);
+    riscv_write_csr(pmpaddr3, pmpaddr3);
+    riscv_write_csr(pmpaddr4, pmpaddr4);
+
+    // Pack config bytes into PMPCFG0 and PMPCFG1
+    uint32_t pmpcfg_reg0 = (pmpcfg3 << 24) | (pmpcfg2 << 16) | (pmpcfg1 << 8) | pmpcfg0;
+    uint32_t pmpcfg_reg1 = pmpcfg4; // Only one byte used in pmpcfg1
+
+    riscv_write_csr(pmpcfg0, pmpcfg_reg0);
+    riscv_write_csr(pmpcfg1, pmpcfg_reg1);
+}
+
+/**
  * @brief Run the first task.
  *
  */
 void portRunFirstTask()
 {
     bool irqFlag = spinLock(&lock);
+
+    taskQueueType *pReadyQueue = getReadyQueue();
+
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = taskPool.currentTask[PORT_CORE_ID()] = taskQueueGet(&taskPool.readyQueue);
+    currentTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
+
+    taskSetCurrent(currentTask[PORT_CORE_ID()]);
 
     /*Change status to RUNNING*/
     currentTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
 
     portConfig();
+
+    spinUnlock(&lock, irqFlag);
 
 #if USE_ISR_STACK
     /*Save main sp to mscratch so that exception/interrupt handler can retrieve it during an
@@ -151,7 +209,7 @@ void portRunFirstTask()
   should be configured to allow user mode access to memory and peripheral regions */
 #if (CONFIG_TASK_USER_MODE)
 
-    // pmpConfigure();
+    pmpConfigure();
 
     /* Clear MPP bits of mstatus to switch to user mode(U-mode)*/
     riscv_clear_csr(mstatus, RVCSR_MSTATUS_MPP_BITS);
@@ -162,13 +220,11 @@ void portRunFirstTask()
     /* Set up the user-mode entry point*/
     riscv_write_csr(mepc, (uint32_t)currentTask[PORT_CORE_ID()]->taskEntry);
 
-    spinUnlock(&lock, irqFlag);
-
     // Execute mret to switch to U-mode
     asm volatile("mret");
 
 #else
-    spinUnlock(&lock, irqFlag);
+
     /*If user mode not enabled, jump directly to the first task*/
     currentTask[PORT_CORE_ID()]->taskEntry(currentTask[PORT_CORE_ID()]->params);
 #endif
@@ -207,14 +263,12 @@ __attribute__((interrupt)) __attribute__((section(".time_critical"))) void isr_r
 #endif
     SET_MTIMECMP((GET_MTIME() + mtimer_period_ticks));
 
-    /*Store mcause, mepc and mstatus in local variables before enabling interrupt nesting*/
     uint32_t mcause_val = riscv_read_csr(mcause);
     uint32_t mepc_val = riscv_read_csr(mepc);
     uint32_t mstatus_val = riscv_read_csr(mstatus);
 
     // Invoke RTOS tickHandler function
     tickHandler();
-   // LOG_DEBUG("timer", "Timer on core=%d\n", PORT_CORE_ID());
 
     /* Restore mstatus, mepc and mcause*/
     riscv_write_csr(mstatus, mstatus_val);
@@ -235,6 +289,20 @@ __attribute__((section(".time_critical"))) void isr_riscv_machine_ecall_mmode_ex
 
     uint32_t arg;
     asm volatile("mv %0,a0" : "=r"(arg));
+    // Invoke the RTOS syscall handler
+    syscallHandler(arg);
+}
+
+__attribute__((section(".time_critical"))) void isr_riscv_machine_ecall_umode_exception()
+{
+
+    uint32_t mepc = riscv_read_csr(mepc);
+    mepc += 4;
+    riscv_write_csr(mepc, mepc);
+
+    uint32_t arg;
+    asm volatile("mv %0,a0" : "=r"(arg));
+    // LOG_DEBUG("eCALL\n");
     // Invoke the RTOS syscall handler
     syscallHandler(arg);
 }

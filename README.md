@@ -1,14 +1,32 @@
 # sanoRTOS
 sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-M and RISC-V microcontrollers. This implementation provides a simple yet effective API for task management, synchronization, and communication, enabling efficient and predictable multitasking in embedded systems.
 
-# Features
+## 🚀 Features
 
-- Priority based preemptive scheduling
-- Optional priority inheritance to avoid priority inversion problem while using mutexes
-- Configurable tick rate
-- Task synchronization
-- Inter-task communication
-- Lightweight and minimalistic design
+- **Priority-Based Preemptive Scheduling**  
+  Efficient task management with support for preemptive scheduling based on task priority levels.
+
+- **Optional Priority Inheritance**  
+  Prevents priority inversion during mutex acquisition by temporarily elevating the priority of lower-priority tasks.
+
+- **Symmetric Multiprocessing (SMP) Support**  
+  Fully supports multi-core systems with per-task **core affinity** configuration for optimal load balancing.
+
+- **Dynamic Stack Overflow Detection**  
+  Runtime monitoring of task stacks to catch and handle stack overflows proactively.
+
+- **Configurable Tick Rate**  
+  Easily adjustable tick frequency to match application-specific timing and power requirements.
+
+- **Task Synchronization Primitives**  
+  Includes mutexes, semaphores, and condition variables for safe and efficient coordination between tasks.
+
+- **Inter-Task Communication**  
+  Enables message passing between tasks using message queue.
+
+- **Minimalistic and Lightweight Design**  
+  Designed for embedded systems with limited resources — small footprint, fast context switches, and no unnecessary bloat.
+
 
 # API Functions
 
@@ -67,15 +85,12 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 3. Include sanoRTOS in Project:
    - Right-click on your project and select **Properties**.
    - Go to **C/C++ Build > Settings**.
-   - Under **Tool Settings**, go to **MCU GCC Compiler > Include paths** and add the path to **sanoRTOS** directory.
+   - Under **Tool Settings**, go to **MCU GCC Compiler > Include paths** and add the path to **sanoRTOS/include** and **sanoRTOS/ports/arm/stm32/include** directory.
 
 4. Add Source Files:
    - Navigate to **C/C++ General > Paths and Symbols**.
-   - In the **Source Location** tab, click on **Link folder** and add the path to **sanoRTOS** directory by selecting **Link to folder in the filesystem**.
+   - In the **Source Location** tab, click on **Link folder** and add the path to **sanoRTOS/source** and **sanoRTOS/ports/arm/stm32** directory by selecting **Link to folder in the filesystem**.
      
-5. Specify STM32 platform:
-   - Open **osConfig.h** file and define the macro **PLATFORM_STM32**
-
 6. Edit **stm32xxxx_it.c** file:
    - STM32 initializes the SysTick timer during its clock initialization process and defines the `SysTick_Handler` ISR function for the implementation of the delay function in the 
    **Core > Src > stm32xxxx_it.c** file. Hence, the `SysTick_Handler` ISR function cannot be redefined inside the sanoRTOS. Instead, we need to call the function `osSysTick_Handler` from the `SysTick_Handler` ISR function.
@@ -87,12 +102,12 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 7. Example Code:
     ```c
    #include "main.h"
-   #include "osConfig.h"
-   #include "scheduler/scheduler.h"
-   #include "task/task.h"
-
-   TASK_DEFINE(task1, 512, firstTask, NULL, 1);
-   TASK_DEFINE(task2, 512, secondTask, NULL, 1);
+   #include "sanoRTOS/config.h"
+   #include "sanoRTOS/scheduler.h"
+   #include "sanoRTOS/task.h"
+ 
+   TASK_DEFINE(task1, 512, firstTask, NULL, 1, AFFINITY_CORE_ANY);
+   TASK_DEFINE(task2, 512, secondTask, NULL, 1, AFFINITY_CORE_ANY);
 
     void firstTask(void *args){
 

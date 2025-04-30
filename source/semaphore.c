@@ -63,7 +63,7 @@ retry:
     }
     else
     {
-        taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
+        taskHandleType *currentTask = taskGetCurrent();
 
         /*Put current task in semaphore's wait queue*/
 
@@ -134,9 +134,11 @@ int semaphoreGive(semaphoreHandleType *pSem)
             }
             taskSetReady(nextTask, SEMAPHORE_TAKEN);
 
+            taskHandleType *currentTask = taskGetCurrent();
+
             /*Perform context switch if unblocked task has equal or
              *higher priority[lower priority value] than that of current task */
-            if (nextTask->priority <= taskPool.currentTask[PORT_CORE_ID()]->priority)
+            if (nextTask->priority <= currentTask->priority)
             {
                 contextSwitchRequired = true;
             }
