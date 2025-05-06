@@ -29,16 +29,16 @@
 #include "sanoRTOS//task.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/mem.h"
+
 /**
- * @brief Dynamically allocate memory for new task Node.
+ * @brief Dynamically allocates and initializes a new task node.
  *
- * @param pTask Pointer to taskHandle struct
- * @return Pointer to new task node
+ * @param pTask Pointer to the task handle structure.
+ * @return Pointer to the newly allocated task node.
  */
 static inline taskNodeType *newNode(taskHandleType *pTask)
 {
     taskNodeType *newTaskNode = (taskNodeType *)memAlloc(sizeof(taskNodeType));
-
     assert(newTaskNode != NULL);
 
     newTaskNode->pTask = pTask;
@@ -48,24 +48,27 @@ static inline taskNodeType *newNode(taskHandleType *pTask)
 }
 
 /**
- * @brief Remove head node from Queue
+ * @brief Removes the front (head) node from the given task queue.
  *
- * @param pTaskQueue Pointer to the task queue
+ * Frees the memory associated with the removed node.
+ *
+ * @param pTaskQueue Pointer to the task queue.
  */
 static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
     taskNodeType *temp = pTaskQueue->head->nextTaskNode;
-
     memFree(pTaskQueue->head);
-
     pTaskQueue->head = temp;
 }
 
 /**
- * @brief Remove task from Queue.
- * @param pTaskQueue Pointer to the task queue from which the task should be removed.
- * @param pTask Pointer to the task that needs to be removed from the queue.
- * @return `true` if the tas
+ * @brief Removes a specific task from the task queue.
+ *
+ * If the task is at the front, it removes the head node. Otherwise, it traverses
+ * the list and unlinks the node associated with the given task.
+ *
+ * @param pTaskQueue Pointer to the task queue.
+ * @param pTask Pointer to the task handle to be removed.
  */
 void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
@@ -76,29 +79,27 @@ void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
     {
         taskQueueRemoveHead(pTaskQueue);
     }
-
     else
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
-
         while (currentTaskNode->nextTaskNode->pTask != pTask)
         {
             currentTaskNode = currentTaskNode->nextTaskNode;
         }
 
         taskNodeType *temp = currentTaskNode->nextTaskNode->nextTaskNode;
-
         memFree(currentTaskNode->nextTaskNode);
-
         currentTaskNode->nextTaskNode = temp;
     }
 }
 
 /**
- * @brief Add task to front of the Queue without sorting
+ * @brief Inserts a task at the front of the queue without considering task priority.
  *
- * @param pTaskQueue Pointer to the taskQueue struct.
- * @param pTask  Pointer to the taskHandle struct
+ * Useful when priority ordering is not required.
+ *
+ * @param pTaskQueue Pointer to the task queue.
+ * @param pTask Pointer to the task to be inserted.
  */
 void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
@@ -106,17 +107,18 @@ void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
     assert(pTask != NULL);
 
     taskNodeType *newTaskNode = newNode(pTask);
-
     newTaskNode->nextTaskNode = pTaskQueue->head;
-
     pTaskQueue->head = newTaskNode;
 }
 
 /**
- * @brief Add task to Queue and  sort tasks in ascending order of
- * their priority
- * @param pTaskQueue Pointer to the taskQueue struct
- * @param pTask Pointer to the task to be added
+ * @brief Inserts a task into the queue in ascending order of priority.
+ *
+ * Lower numerical value indicates higher priority. The queue is kept sorted
+ * to enable efficient retrieval of the highest-priority task.
+ *
+ * @param pTaskQueue Pointer to the task queue.
+ * @param pTask Pointer to the task to be inserted.
  */
 void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
@@ -129,33 +131,32 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
     {
         pTaskQueue->head = newTaskNode;
     }
-
     else if (pTaskQueue->head->pTask->priority > pTask->priority)
     {
         newTaskNode->nextTaskNode = pTaskQueue->head;
-
         pTaskQueue->head = newTaskNode;
     }
     else
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
-        while (currentTaskNode->nextTaskNode && currentTaskNode->nextTaskNode->pTask->priority <= pTask->priority)
+        while (currentTaskNode->nextTaskNode &&
+               currentTaskNode->nextTaskNode->pTask->priority <= pTask->priority)
         {
             currentTaskNode = currentTaskNode->nextTaskNode;
         }
 
         newTaskNode->nextTaskNode = currentTaskNode->nextTaskNode;
-
         currentTaskNode->nextTaskNode = newTaskNode;
     }
 }
 
 /**
- * @brief Get the highest priority task from the Queue. This corresponds to the
- * front task node in the Queue.
- * @param pTaskQueue Pointer to taskQueue struct
- * @retval `Next highest priority task` if exists
- * @retval `NULL` if Queue is empty
+ * @brief Retrieves and removes the highest-priority task that is eligible to run on this core.
+ *
+ * Scans the queue from front to back, checking each task's core affinity.
+ *
+ * @param pTaskQueue Pointer to the task queue.
+ * @return Pointer to the task handle of the selected task, or NULL if none found.
  */
 taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
 {
@@ -168,12 +169,11 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
 
         while (currentTaskNode != NULL)
         {
-            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() || currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
+            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() ||
+                currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
             {
                 pTask = currentTaskNode->pTask;
-
                 taskQueueRemove(pTaskQueue, pTask);
-
                 return pTask;
             }
             currentTaskNode = currentTaskNode->nextTaskNode;
@@ -184,10 +184,12 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
 }
 
 /**
- * @brief Get task corresponding to front node from the task queue without removing the node
+ * @brief Peeks the highest-priority task eligible to run on this core without removing it.
  *
- * @param pTaskQueue Pointer to the taskQueue struct
- * @return `Pointer to taskHandle struct corresponding to front node`
+ * Similar to taskQueueGet() but does not modify the queue.
+ *
+ * @param pTaskQueue Pointer to the task queue.
+ * @return Pointer to the task handle, or NULL if no eligible task is found.
  */
 taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
 {
@@ -196,7 +198,8 @@ taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
         taskNodeType *currentTaskNode = pTaskQueue->head;
         while (currentTaskNode != NULL)
         {
-            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() || currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
+            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() ||
+                currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
             {
                 return currentTaskNode->pTask;
             }

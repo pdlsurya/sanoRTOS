@@ -77,7 +77,7 @@ void portSchedulerStart()
     __DSB(); // Data Synchronization Barrier
 
     /*Jump to first task*/
-    currentTask[PORT_CORE_ID()]->taskEntry(currentTask[PORT_CORE_ID()]->params);
+    currentTask[PORT_CORE_ID()]->entry(currentTask[PORT_CORE_ID()]->params);
 }
 
 /**

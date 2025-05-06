@@ -133,7 +133,7 @@ extern "C"
 
 #define PORT_CORE_ID() get_core_num()
 
-#define PORT_PRINT printf
+#define PORT_PRINTF printf
 
 #if CONFIG_TASK_USER_MODE
 
@@ -155,7 +155,7 @@ extern "C"
  * @retval True, if cpu is in privileged mode
  * @retval False, if cpu is in unprivileged mode
  */
-#define PORT_IS_PRIVILEGED() ((__get_IPSR() > 0) ? true : (((__get_CONTROL() & 0x1) == 0) ? true : false))
+#define PORT_IS_PRIVILEGED() ((__get_IPSR()!=0) ? true : (((__get_CONTROL() & 0x1) == 0) ? true : false))
 
     /**
      * @brief Disable interrupts and return previous irq status

@@ -25,8 +25,6 @@
 #ifndef __SANO_RTOS_CONFIG_H
 #define __SANO_RTOS_CONFIG_H
 
-#include "sanoRTOS/retCodes.h"
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -38,6 +36,7 @@ extern "C"
 #define CONFIG_LOG 1 ///< Configure logging: Enables or disables logging in the system.
 
 #if CONFIG_LOG
+#define CONFIG_LOG_LEVEL 4 ///< Configure log level: Sets the level of logging to be enabled (0 = None, 1 = Error, 2 = Warning, 3 = Info, 4 = Debug).
 #define CONFIG_LOG_COLOR 1 ///< Configure log color: Enables or disables colored output in logs when logging is enabled.
 #endif
 

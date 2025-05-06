@@ -44,11 +44,12 @@ extern "C"
  * @param initialCount Initial semaphore count.
  * @param maxCnt Maximum semaphore count.
  */
-#define SEMAPHORE_DEFINE(name, initialCount, maxCnt) \
-    semaphoreHandleType name = {                     \
-        .lock = 0,                                   \
-        .waitQueue = {0},                            \
-        .count = initialCount,                       \
+#define SEMAPHORE_DEFINE(_name, initialCount, maxCnt) \
+    semaphoreHandleType _name = {                     \
+        .name = #_name,                               \
+        .lock = 0,                                    \
+        .waitQueue = {0},                             \
+        .count = initialCount,                        \
         .maxCount = maxCnt}
 
     /**
@@ -56,6 +57,7 @@ extern "C"
      */
     typedef struct
     {
+        const char *name;        ///< Name of the semaphore.
         atomic_t lock;           ///< Spinlock variable used to ensure atomic access to the semaphore.
         taskQueueType waitQueue; ///< Queue of tasks waiting to acquire the semaphore.
         uint8_t count;           ///< Current count of the semaphore (number of available resources).

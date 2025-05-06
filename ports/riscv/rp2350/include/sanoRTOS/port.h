@@ -67,7 +67,7 @@ extern "C"
 
     typedef void (*tickHandlerType)(void);
 
-#define USE_ISR_STACK 1
+#define USE_ISR_STACK 0
 
 #define MTIMER_TICK_FREQUENCY 1000000
 
@@ -167,15 +167,15 @@ extern "C"
 
 #define PORT_ENTER_SLEEP_MODE() asm volatile("wfi");
 
-#define PORT_PRINT printf
+#define PORT_PRINTF printf
 
     volatile extern privilegeModesType privilegeMode;
 
     /**
      * @brief Check if cpu is executing in machine mode
      *
-     * @retval true, if cpu is executing in machine mode
-     * @retval false, otherwise
+     * @retval `TRUE`, if cpu is executing in machine mode
+     * @retval `FALSE`, otherwise
      */
     static inline bool isMachineMode()
     {
@@ -218,8 +218,8 @@ extern "C"
     /**
      * @brief Check if interrupts are enabled
      *
-     * @retval true, if interrupts are enabled
-     * @retval false, if interrupts are disabled
+     * @retval `TRUE`, if interrupts are enabled
+     * @retval `FALSE`, if interrupts are disabled
      */
     static inline bool portIrqEnabled()
     {
@@ -245,8 +245,8 @@ extern "C"
     /**
      * @brief Disable interrupts and return previous irq status
      *
-     * @retval true, if interrupts were enabled previously
-     * @retval false, if interrupts were disabled previously
+     * @retval `TRUE`, if interrupts were enabled previously
+     * @retval `FALSE`, if interrupts were disabled previously
      */
     static inline bool portIrqLock()
     {

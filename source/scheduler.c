@@ -35,11 +35,21 @@ TASK_DEFINE(idleTask0, 1024, idleTaskHandler0, NULL, TASK_LOWEST_PRIORITY, AFFIN
 
 static atomic_t lock;
 
+/**
+ * @brief Task handler for idle task on core 0
+ *
+ * This task handler is responsible for entering sleep mode when there are no
+ * tasks to run on core 0. This is a low priority task and is only executed when
+ * there are no other tasks to run.
+ *
+ * @param params parameters passed to the task (not used)
+ */
 void idleTaskHandler0(void *params)
 {
     (void)params;
     while (1)
     {
+        // Enter sleep mode
         PORT_ENTER_SLEEP_MODE();
     }
 }
@@ -47,8 +57,12 @@ void idleTaskHandler0(void *params)
 /**
  * @brief Select next highest priority ready task for execution
  *
- * @retval `true` if context switch is required
- * @retval `false` if context switch is not required
+ * This function is responsible for selecting the next highest priority task
+ * from the ready queue. It checks if a context switch is required and if so,
+ * it performs the context switch.
+ *
+ * @retval `TRUE` if context switch is required
+ * @retval `FALSE` if context switch is not required
  */
 static bool selectNextTask(void)
 {
@@ -58,10 +72,13 @@ static bool selectNextTask(void)
     {
         taskHandleType *const pCurrentTask = taskGetCurrent();
 
+        // If the current task is running, add it to the ready queue
         if (pCurrentTask->status == TASK_STATUS_RUNNING)
         {
             const taskHandleType *const pNextReadyTask = taskQueuePeek(pReadyQueue);
 
+            // If the next ready task has a higher priority than the current task,
+            // add the current task to the ready queue.
             if (pNextReadyTask->priority <= pCurrentTask->priority)
             {
                 pCurrentTask->status = TASK_STATUS_READY;
@@ -73,14 +90,21 @@ static bool selectNextTask(void)
             }
         }
 
+        // Set the current task to the next ready task
         currentTask[PORT_CORE_ID()] = pCurrentTask;
 
 #if CONFIG_CHECK_STACK_OVERFLOW
+        // Check for stack overflow
         taskCheckStackOverflow();
 #endif
 
+        // Get the next task from the ready queue
         nextTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
+
+        // Set the status of the next task to RUNNING
         nextTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
+
+        // Set the current task to the next task
         taskSetCurrent(nextTask[PORT_CORE_ID()]);
 
         return true;
@@ -92,17 +116,22 @@ static bool selectNextTask(void)
 /**
  * @brief Check for timeout of blocked tasks and change  status to READY
  * with corresponding timeout reason.
+ *
+ * This function periodically checks each task in the blocked queue and
+ * decrements the sleep counter. If the sleep counter reaches zero, the
+ * task is set to READY with the corresponding wake-up reason.
  */
 static void checkTimeout()
 {
     taskQueueType *pBlockedQueue = getBlockedQueue();
 
+    /* Iterate over each task in the blocked queue */
     taskNodeType *currentTaskNode = pBlockedQueue->head;
 
     while (currentTaskNode != NULL)
     {
-        /*Save next task node to avoid losing track of linked list after task node
-         is freed while setting corresponding task to READY */
+        /* Save next task node to avoid losing track of linked list after task node
+         * is freed while setting corresponding task to READY */
         taskNodeType *nextTaskNode = currentTaskNode->nextTaskNode;
 
         if (currentTaskNode->pTask->remainingSleepTicks > 0)
@@ -110,6 +139,10 @@ static void checkTimeout()
             currentTaskNode->pTask->remainingSleepTicks--;
             if (currentTaskNode->pTask->remainingSleepTicks == 0)
             {
+                /**
+                 * If the task was sleeping, set wake-up reason to
+                 * SLEEP_TIME_TIMEOUT. Otherwise, set it to WAIT_TIMEOUT.
+                 */
                 if (currentTaskNode->pTask->blockedReason == SLEEP)
                 {
                     taskSetReady(currentTaskNode->pTask, SLEEP_TIME_TIMEOUT);
@@ -126,6 +159,10 @@ static void checkTimeout()
 
 /**
  * @brief Voluntarily relinquish control of the CPU to allow other tasks to execute.
+ *
+ * This function will switch to the next task in the ready queue, if there is one.
+ * If there is no other task in the ready queue, the current task will continue
+ * executing.
  */
 void taskYield()
 {

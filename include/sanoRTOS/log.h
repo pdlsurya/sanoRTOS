@@ -79,34 +79,57 @@
 #define ANSI_BRIGHT_CYAN
 #define ANSI_BRIGHT_WHITE
 #define ANSI_BOLD
-
 #endif
+
+#define LOG_LEVEL_NONE 0
+#define LOG_LEVEL_ERROR 1
+#define LOG_LEVEL_WARNING 2
+#define LOG_LEVEL_INFO 3
+#define LOG_LEVEL_DEBUG 4
+
 #if CONFIG_LOG
 
-#define LOG_PRINT(fmt, ...) log_internal_printf(fmt, ##__VA_ARGS__)
+#define LOG_PRINT(fmt, ...) \
+    PORT_PRINTF(fmt, ##__VA_ARGS__)
 
-#define LOG_INFO(fmt, ...) log_internal_printf(ANSI_GREEN "[INF] [%s]: " fmt ANSI_RESET "\n", tag, ##__VA_ARGS__)
-
-#define LOG_WARNING(fmt, ...) log_internal_printf(ANSI_BRIGHT_YELLOW "[WRN] [%s]: " fmt ANSI_RESET "\n", tag, ##__VA_ARGS__)
-
-#define LOG_ERROR(fmt, ...) log_internal_printf(ANSI_RED "[ERR] [%s]: " fmt ANSI_RESET "\n", tag, ##__VA_ARGS__)
-
-#define LOG_DEBUG(fmt, ...) log_internal_printf(ANSI_CYAN "[DBG] [%s]: " fmt ANSI_RESET "\n", tag, ##__VA_ARGS__)
-
+#if CONFIG_LOG_LEVEL >= LOG_LEVEL_INFO
+#define LOG_INFO(fmt, ...) \
+    PORT_PRINTF(ANSI_BRIGHT_GREEN "[INF] [%s]: " fmt ANSI_RESET "\n", tag, ##__VA_ARGS__)
 #else
-
-#define LOG_PRINT(fmt, ...)
-
 #define LOG_INFO(fmt, ...)
-
-#define LOG_WARNING(fmt, ...)
-
-#define LOG_ERROR(fmt, ...)
-
-#define LOG_DEBUG(fmt, ...)
-
 #endif
 
-int log_internal_printf(const char *format, ...);
+#if CONFIG_LOG_LEVEL >= LOG_LEVEL_WARNING
+#define LOG_WARNING(fmt, ...) \
+    PORT_PRINTF(ANSI_BRIGHT_YELLOW "[WRN] [%s]: " fmt ANSI_RESET "\n", tag, ##__VA_ARGS__)
+#else
+#define LOG_WARNING(fmt, ...)
+#endif
+
+#if CONFIG_LOG_LEVEL >= LOG_LEVEL_ERROR
+#define LOG_ERROR(fmt, ...) \
+    PORT_PRINTF(ANSI_BRIGHT_RED "[ERR] [%s]: " fmt ANSI_RESET "\n", tag, ##__VA_ARGS__)
+#else
+#define LOG_ERROR(fmt, ...)
+#endif
+
+#if CONFIG_LOG_LEVEL >= LOG_LEVEL_DEBUG
+#define LOG_DEBUG(fmt, ...) \
+    PORT_PRINTF(ANSI_BRIGHT_CYAN "[DBG] [%s]: " fmt ANSI_RESET "\n", tag, ##__VA_ARGS__)
+#else
+#define LOG_DEBUG(fmt, ...)
+#endif
+
+#else // CONFIG_LOG not defined
+
+#define LOG_PRINT(fmt, ...)
+#define LOG_INFO(fmt, ...)
+#define LOG_WARNING(fmt, ...)
+#define LOG_ERROR(fmt, ...)
+#define LOG_DEBUG(fmt, ...)
+
+#endif // CONFIG_LOG
+
+int PORT_PRINTF(const char *format, ...);
 
 #endif // __SANORTOS_LOG_H

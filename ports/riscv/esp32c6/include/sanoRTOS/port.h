@@ -144,7 +144,7 @@ extern "C"
 
 #define PORT_ENTER_SLEEP_MODE() asm volatile("wfi");
 
-#define PORT_PRINT serial_printf
+#define PORT_PRINTF serial_printf
 
     volatile extern privilegeModesType privilegeMode;
 

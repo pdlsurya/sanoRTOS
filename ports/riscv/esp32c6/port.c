@@ -185,13 +185,13 @@ void portSchedulerStart()
     RV_SET_CSR(mstatus, MSTATUS_MPIE);
 
     /* Set up the user-mode entry point*/
-    RV_WRITE_CSR(mepc, currentTask[PORT_CORE_ID()]->taskEntry);
+    RV_WRITE_CSR(mepc, currentTask[PORT_CORE_ID()]->entry);
 
     // Execute mret to switch to U-mode
     asm volatile("mret");
 
 #else
     /*If user mode not enabled, jump directly to the first task*/
-    currentTask[PORT_CORE_ID()]->taskEntry(currentTask[PORT_CORE_ID()]->params);
+    currentTask[PORT_CORE_ID()]->entry(currentTask[PORT_CORE_ID()]->params);
 #endif
 }

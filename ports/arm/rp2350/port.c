@@ -71,7 +71,7 @@ static void portRunFirstTask()
 
     /*Get the highest priority ready task from ready Queue*/
     currentTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
-    
+
     taskSetCurrent(currentTask[PORT_CORE_ID()]);
 
     /*Change status to RUNNING*/
@@ -90,7 +90,7 @@ static void portRunFirstTask()
     spinUnlock(&lock, irqState);
 
     /*Jump to first task*/
-    currentTask[PORT_CORE_ID()]->taskEntry(currentTask[PORT_CORE_ID()]->params);
+    currentTask[PORT_CORE_ID()]->entry(currentTask[PORT_CORE_ID()]->params);
 }
 
 /**
