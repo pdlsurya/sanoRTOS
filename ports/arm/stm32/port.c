@@ -67,8 +67,6 @@ void portSchedulerStart()
 
     __ISB(); // Instruction Synchronization Barrier
 
-    __DSB(); // Data Synchronization Barrier
-
     /*Jump to first task*/
     currentTask[PORT_CORE_ID()]->entry(currentTask[PORT_CORE_ID()]->params);
 }
@@ -171,6 +169,8 @@ __attribute__((naked)) void PendSV_Handler(void)
 
         "mrs r0, psp\n" // Get current process stack pointer
 
+        "isb\n"
+
         // If task uses FPU, save s16–s31
         "tst lr, #0x10\n"
         "it eq\n"
@@ -179,15 +179,12 @@ __attribute__((naked)) void PendSV_Handler(void)
         // Save r4-r11 and lr to current task's stack
         "stmdb r0!, {r4-r11, lr}\n"
 
-        "dmb\n" // Ensure all stores complete before task switch
-
+       
         // Save current stack pointer to *currentTask
         "str r0, [%[current]]\n"
 
         // Load next stack pointer from *nextTask
         "ldr r0, [%[next]]\n"
-
-        "dmb\n" // Ensure we loaded the correct value
 
         // Restore r4-r11 and lr
         "ldmia r0!, {r4-r11, lr}\n"

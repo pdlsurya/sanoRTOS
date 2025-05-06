@@ -161,9 +161,6 @@
 
 isr_riscv_machine_soft_irq:
 
-    fence 
-    fence.i
-
 /* Start by saving the general purpose registers and the PC value before
  * the interrupt happened. */
     save_general_regs
@@ -181,7 +178,6 @@ isr_riscv_machine_soft_irq:
     add t0, t0, t3         // t0 = &currentTask[hartid]
     lw t1, 0(t0)           // t1 = currentTask[hartid]
     sw sp, 0(t1)           // Save SP to currentTask[hartid]->sp
-    fence 
 
     /* Load next task's stack pointer */
     la t0, nextTask        // t0 = &nextTask
@@ -191,10 +187,7 @@ isr_riscv_machine_soft_irq:
 
     restore_mepc
     restore_general_regs
-
-    fence
-    fence.i
-
+    
     mret
 
 .size isr_riscv_machine_soft_irq, .-isr_riscv_machine_soft_irq
