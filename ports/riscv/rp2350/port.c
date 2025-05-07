@@ -193,7 +193,7 @@ void portRunFirstTask()
     taskQueueType *pReadyQueue = getReadyQueue();
 
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
+    currentTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
 
     taskSetCurrent(currentTask[PORT_CORE_ID()]);
 

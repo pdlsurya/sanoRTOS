@@ -109,7 +109,7 @@ int condVarSignal(condVarHandleType *pCondVar)
     /*Get next highest priority waiting task to unblock*/
 getNextSignalTask:
 
-    nextSignalTask = taskQueueGet(&pCondVar->waitQueue);
+    nextSignalTask = TASK_GET_FROM_WAIT_QUEUE(&pCondVar->waitQueue);
 
     if (nextSignalTask != NULL)
     {
@@ -156,7 +156,7 @@ int condVarBroadcast(condVarHandleType *pCondVar)
     {
         taskHandleType *pTask = NULL;
 
-        while ((pTask = taskQueueGet(&pCondVar->waitQueue)))
+        while ((pTask = TASK_GET_FROM_WAIT_QUEUE(&pCondVar->waitQueue)) != NULL)
         {
             if (pTask->status != TASK_STATUS_SUSPENDED)
             {

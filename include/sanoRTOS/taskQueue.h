@@ -32,6 +32,47 @@
 extern "C"
 {
 #endif
+
+/**
+ * @brief Retrieve the next highest-priority task from the ready queue.
+ *
+ * This macro fetches the task for immediate scheduling, so affinity checking is enabled.
+ *
+ * @param pReadyQueue Pointer to the ready task queue.
+ * @return Task control block (TCB) pointer of the next task to run.
+ */
+#define TASK_GET_FROM_READY_QUEUE(pReadyQueue) taskQueueGet(pReadyQueue, true)
+
+/**
+ * @brief Retrieve the next highest-priority task from the wait queue.
+ *
+ * Affinity checking is disabled as this queue is not used for direct scheduling.
+ *
+ * @param pWaitQueue Pointer to the wait task queue.
+ * @return Task control block (TCB) pointer of the next waiting task.
+ */
+#define TASK_GET_FROM_WAIT_QUEUE(pWaitQueue) taskQueueGet(pWaitQueue, false)
+
+/**
+ * @brief Peek at the next highest-priority task in the ready queue without removing it.
+ *
+ * Useful for inspecting which task is scheduled to run next, with affinity checking enabled.
+ *
+ * @param pReadyQueue Pointer to the ready task queue.
+ * @return Task control block (TCB) pointer of the next task to run.
+ */
+#define TASK_PEEK_FROM_READY_QUEUE(pReadyQueue) taskQueuePeek(pReadyQueue, true)
+
+/**
+ * @brief Peek at the next highest-priority task in the wait queue without removing it.
+ *
+ * Affinity check is disabled. This is typically used for monitoring or diagnostics.
+ *
+ * @param pWaitQueue Pointer to the wait task queue.
+ * @return Task control block (TCB) pointer of the next waiting task.
+ */
+#define TASK_PEEK_FROM_WAIT_QUEUE(pWaitQueue) taskQueuePeek(pWaitQueue, false)
+
     /*Forward declaration of taskHandleType*/
     typedef struct taskHandle taskHandleType;
 
@@ -52,7 +93,9 @@ extern "C"
         taskNodeType *head; ///< Pointer to the head of the task queue linked list.
     } taskQueueType;
 
-    taskHandleType *taskQueueGet(taskQueueType *pTaskQueue);
+    taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck);
+
+    taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck);
 
     void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
@@ -60,14 +103,12 @@ extern "C"
 
     void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
-    taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue);
-
     /**
      * @brief Check if taskQueue is empty
      *
      * @param pTaskQueue
-     * @retval `true` if taskQueue is empty
-     * @retval `false`, otherwise
+     * @retval `TRUE` if taskQueue is empty
+     * @retval `TRUE`, otherwise
      */
     static inline __attribute__((always_inline)) bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {

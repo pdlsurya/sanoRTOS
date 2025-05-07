@@ -54,7 +54,7 @@ static bool msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 
         // Get next waiting pConsumerTask task to unblock
     getNextConsumer:
-        pConsumerTask = taskQueueGet(&pQueueHandle->consumerWaitQueue);
+        pConsumerTask = TASK_GET_FROM_WAIT_QUEUE(&pQueueHandle->consumerWaitQueue);
         if (pConsumerTask != NULL)
         {
             /*If task was suspended while waiting for Queue data, skipt the task and get another waiting task from the waitQueue*/
@@ -113,7 +113,7 @@ static bool msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 
         // Get next waiting pProducerTask task to unblock
     getNextProducer:
-        pProducerTask = taskQueueGet(&pQueueHandle->producerWaitQueue);
+        pProducerTask = TASK_GET_FROM_WAIT_QUEUE(&pQueueHandle->producerWaitQueue);
         if (pProducerTask != NULL)
         {
             /*If task was suspended while waiting for Queue space, skip the task and get another waiting task from the wait Queue*/
