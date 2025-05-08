@@ -57,17 +57,20 @@ extern "C"
         .writeIndex = 0,                          \
         .lock = 0}
 
+    /**
+     * @brief Message queue structure for inter-task communication.
+     */
     typedef struct
     {
-        taskQueueType producerWaitQueue;
-        taskQueueType consumerWaitQueue;
-        uint8_t *buffer;
-        uint32_t queueLength;
-        uint32_t itemSize;
-        uint32_t itemCount;
-        uint32_t readIndex;
-        uint32_t writeIndex;
-        atomic_t lock;
+        taskQueueType producerWaitQueue; ///< Queue of producer tasks waiting to enqueue data when the buffer is full.
+        taskQueueType consumerWaitQueue; ///< Queue of consumer tasks waiting to dequeue data when the buffer is empty.
+        uint8_t *buffer;                 ///< Pointer to the buffer storing messages/items.
+        uint32_t queueLength;            ///< Maximum number of items the queue can hold.
+        uint32_t itemSize;               ///< Size (in bytes) of each item/message.
+        uint32_t itemCount;              ///< Current number of items in the queue.
+        uint32_t readIndex;              ///< Index from which the next item will be read.
+        uint32_t writeIndex;             ///< Index at which the next item will be written.
+        atomic_t lock;                   ///< Spinlock to ensure atomic access to the queue for both producers and consumers.
     } msgQueueHandleType;
 
     /**

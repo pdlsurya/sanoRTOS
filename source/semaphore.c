@@ -36,9 +36,9 @@
  * should be set to TASK_NO_WAIT.
  * @param pSem  pointer to the semaphore structure
  * @param waitTicks Number of ticks to wait if semaphore is not available
- * @retval RET_SUCCESS if semaphore is taken succesfully.
- * @retval RET_BUSY if semaphore is not available
- * @retval RET_TIMEOUT if timeout occured while waiting for semaphore
+ * @retval `RET_SUCCESS` if semaphore is taken succesfully.
+ * @retval `RET_BUSY` if semaphore is not available
+ * @retval `RET_TIMEOUT` if timeout occured while waiting for semaphore
  */
 int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
@@ -46,7 +46,7 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 
     int retCode;
 
-    bool irqFlag = spinLock(&pSem->lock);
+    bool irqState = spinLock(&pSem->lock);
 
 retry:
     if (pSem->count != 0)
@@ -69,13 +69,13 @@ retry:
 
         taskQueueAdd(&pSem->waitQueue, currentTask);
 
-        spinUnlock(&pSem->lock, irqFlag);
+        spinUnlock(&pSem->lock, irqState);
 
         /* Block current task and give CPU to other tasks while waiting for semaphore*/
         taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
 
         /*Re-acquire spinlock after being unblocked*/
-        irqFlag = spinLock(&pSem->lock);
+        irqState = spinLock(&pSem->lock);
 
         if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
         {
@@ -96,7 +96,7 @@ retry:
             goto retry;
         }
     }
-    spinUnlock(&pSem->lock, irqFlag);
+    spinUnlock(&pSem->lock, irqState);
 
     return retCode;
 }
@@ -104,8 +104,8 @@ retry:
 /**
  * @brief Function to give/signal semaphore
  * @param pSem  pointer to the semaphoreHandle struct.
- * @retval RET_SUCCESS if semaphore give succesfully.
- * @retval RET_NOSEM no semaphore available to give
+ * @retval `RET_SUCCESS` if semaphore give succesfully.
+ * @retval `RET_NOSEM` no semaphore available to give
  */
 int semaphoreGive(semaphoreHandleType *pSem)
 {
@@ -117,7 +117,7 @@ int semaphoreGive(semaphoreHandleType *pSem)
 
     taskHandleType *nextTask = NULL;
 
-    bool irqFlag = spinLock(&pSem->lock);
+    bool irqState = spinLock(&pSem->lock);
 
     if (pSem->count != pSem->maxCount)
     {
@@ -155,7 +155,7 @@ int semaphoreGive(semaphoreHandleType *pSem)
         retCode = RET_NOSEM;
     }
 
-    spinUnlock(&pSem->lock, irqFlag);
+    spinUnlock(&pSem->lock, irqState);
 
     if (contextSwitchRequired)
     {

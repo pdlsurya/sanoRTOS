@@ -227,9 +227,9 @@ extern "C"
         if (!PORT_IS_PRIVILEGED())
         {
             PORT_ENTER_PRIVILEGED_MODE();
-            bool irqFlag = (riscv_read_csr(mstatus) & RVCSR_MSTATUS_MIE_BITS);
+            bool irqState = (riscv_read_csr(mstatus) & RVCSR_MSTATUS_MIE_BITS);
             PORT_EXIT_PRIVILEGED_MODE();
-            return irqFlag;
+            return irqState;
         }
         else
         {
@@ -250,10 +250,10 @@ extern "C"
      */
     static inline bool portIrqLock()
     {
-        bool irqFlag = portIrqEnabled();
+        bool irqState = portIrqEnabled();
 
 #if CONFIG_TASK_USER_MODE
-        if (irqFlag)
+        if (irqState)
         {
             if (PORT_IS_PRIVILEGED())
             {
@@ -265,24 +265,24 @@ extern "C"
             }
         }
 #else
-    if (irqFlag)
+    if (irqState)
     {
         PORT_DISABLE_INTERRUPTS();
     }
 #endif
-        return irqFlag;
+        return irqState;
     }
 
     /**
-     * @brief Change interrupt status base on irqFlag
+     * @brief Change interrupt status base on irqState
      *
-     * @param irqFlag Flag representing previous irq status
+     * @param irqState Flag representing previous irq status
      */
-    static inline void portIrqUnlock(bool irqFlag)
+    static inline void portIrqUnlock(bool irqState)
     {
 #if CONFIG_TASK_USER_MODE
 
-        if (irqFlag)
+        if (irqState)
         {
             if (PORT_IS_PRIVILEGED())
             {
@@ -295,7 +295,7 @@ extern "C"
         }
 
 #else
-    if (irqFlag)
+    if (irqState)
     {
         PORT_ENABLE_INTERRUPTS();
     }
@@ -316,7 +316,7 @@ extern "C"
      * @param ptr Pointer to the target memory location
      * @param compare_val The expected old value
      * @param set_val The new value to be stored if `*ptr` is equal to `expected`
-     * @return true if the set was successful, false otherwise
+     * @return `True` if the set was successful, false otherwise
      */
     static inline bool portAtomicCAS(volatile uint32_t *ptr, uint32_t compare_val, uint32_t set_val)
     {

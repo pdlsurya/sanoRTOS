@@ -60,34 +60,43 @@ extern "C"
 
     typedef void (*timeoutHandlerType)(void); // Timeout handler function type definition
 
-    /*Timer node structure*/
+    /**
+     * @brief Structure representing a timer node in the system timer list.
+     */
     typedef struct timerNode
     {
-        timeoutHandlerType timeoutHandler;
-        uint32_t intervalTicks;
-        uint32_t ticksToExpire;
-        struct timerNode *nextNode;
-        timerModeType mode;
-        bool isRunning;
-
+        timeoutHandlerType timeoutHandler; ///< Function to call when the timer expires.
+        uint32_t intervalTicks;            ///< Timer interval in ticks (used for periodic timers).
+        uint32_t ticksToExpire;            ///< Remaining ticks before the timer expires.
+        struct timerNode *nextNode;        ///< Pointer to the next timer node in the list.
+        timerModeType mode;                ///< Timer mode (e.g., one-shot or periodic).
+        bool isRunning;                    ///< Indicates whether the timer is currently running.
     } timerNodeType;
 
+    /**
+     * @brief Node structure for a queue of timeout handlers to be invoked.
+     */
     typedef struct timeoutHandlerNode
     {
-        timeoutHandlerType timeoutHandler;
-        struct timeoutHandlerNode *nextNode;
-
+        timeoutHandlerType timeoutHandler;   ///< Function pointer to be invoked on timeout.
+        struct timeoutHandlerNode *nextNode; ///< Pointer to the next handler in the queue.
     } timeoutHandlerNodeType;
 
+    /**
+     * @brief Queue structure for managing pending timeout handlers.
+     */
     typedef struct
     {
-        timeoutHandlerNodeType *head;
-        timeoutHandlerNodeType *tail;
+        timeoutHandlerNodeType *head; ///< Pointer to the head of the timeout handler queue.
+        timeoutHandlerNodeType *tail; ///< Pointer to the tail of the timeout handler queue.
     } timeoutHandlerQueueType;
 
+    /**
+     * @brief Timer list structure to manage active timers.
+     */
     typedef struct
     {
-        timerNodeType *head;
+        timerNodeType *head; ///< Pointer to the head of the active timer list.
     } timerListType;
 
     int timerStart(timerNodeType *pTimerNode, uint32_t interval);

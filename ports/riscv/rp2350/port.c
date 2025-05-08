@@ -180,7 +180,7 @@ void pmpConfigure(void)
  */
 void portRunFirstTask()
 {
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     taskQueueType *pReadyQueue = getReadyQueue();
 
@@ -194,7 +194,7 @@ void portRunFirstTask()
 
     portConfig();
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 
 #if USE_ISR_STACK
     /*Save main sp to mscratch so that exception/interrupt handler can retrieve it during an

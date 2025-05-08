@@ -38,12 +38,14 @@ static atomic_t lock;
  */
 void *memAlloc(size_t size)
 {
-    void *ptr;
-    bool irqFlag = spinLock(&lock);
+    void *ptr = NULL;
+
+    bool irqState = spinLock(&lock);
 
     ptr = malloc(size);
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
+
     return ptr;
 }
 
@@ -54,11 +56,11 @@ void *memAlloc(size_t size)
  */
 void memFree(void *ptr)
 {
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     free(ptr);
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 }
 
 /**
@@ -70,11 +72,13 @@ void memFree(void *ptr)
  */
 void *memRealloc(void *ptr, size_t size)
 {
-    void *new_ptr;
-    bool irqFlag = spinLock(&lock);
+    void *new_ptr = NULL;
+
+    bool irqState = spinLock(&lock);
 
     new_ptr = realloc(ptr, size);
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
+
     return new_ptr;
 }

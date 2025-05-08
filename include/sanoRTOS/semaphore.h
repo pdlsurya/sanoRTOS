@@ -51,12 +51,15 @@ extern "C"
         .count = initialCount,                       \
         .maxCount = maxCnt}
 
+    /**
+     * @brief Structure representing a counting semaphore for task synchronization.
+     */
     typedef struct
     {
-        atomic_t lock;
-        taskQueueType waitQueue;
-        uint8_t count;
-        uint8_t maxCount;
+        atomic_t lock;           ///< Spinlock variable used to ensure atomic access to the semaphore.
+        taskQueueType waitQueue; ///< Queue of tasks waiting to acquire the semaphore.
+        uint8_t count;           ///< Current count of the semaphore (number of available resources).
+        uint8_t maxCount;        ///< Maximum count the semaphore can reach (resource capacity limit).
     } semaphoreHandleType;
 
     int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks);

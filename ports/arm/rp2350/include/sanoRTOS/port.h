@@ -160,17 +160,17 @@ extern "C"
     /**
      * @brief Disable interrupts and return previous irq status
      *
-     * @retval true, if interrupts were enabled previously
-     * @retval false, if interrupts were disabled previously
+     * @retval `true`, if interrupts were enabled previously
+     * @retval `false`, if interrupts were disabled previously
      */
     static inline bool portIrqLock()
     {
-        bool irqFlag;
+        bool irqState;
 #if CONFIG_TASK_USER_MODE
 
-        irqFlag = (__get_BASEPRI() == 0);
+        irqState = (__get_BASEPRI() == 0);
 
-        if (irqFlag)
+        if (irqState)
         {
 
             if (PORT_IS_PRIVILEGED())
@@ -185,8 +185,8 @@ extern "C"
         }
 
 #else
-    irqFlag = (__get_PRIMASK() == 0);
-    if (irqFlag)
+    irqState = (__get_PRIMASK() == 0);
+    if (irqState)
     {
 
         PORT_DISABLE_INTERRUPTS();
@@ -194,19 +194,19 @@ extern "C"
 
 #endif
 
-        return irqFlag;
+        return irqState;
     }
 
     /**
-     * @brief Change interrupt status base on irqFlag
+     * @brief Change interrupt status base on irqState
      *
-     * @param irqFlag Flag representing previous irq status
+     * @param irqState Flag representing previous irq status
      */
-    static inline void portIrqUnlock(bool irqFlag)
+    static inline void portIrqUnlock(bool irqState)
     {
 #if CONFIG_TASK_USER_MODE
 
-        if (irqFlag)
+        if (irqState)
         {
             if (PORT_IS_PRIVILEGED())
             {
@@ -219,7 +219,7 @@ extern "C"
         }
 
 #else
-    if (irqFlag)
+    if (irqState)
     {
         PORT_ENABLE_INTERRUPTS();
     }
@@ -232,7 +232,7 @@ extern "C"
      * @param ptr Pointer to the target memory location
      * @param compare_val The expected old value
      * @param set_val The new value to be stored if `*ptr` is equal to `expected`
-     * @return bool Returns true if the set was successful, false otherwise
+     * @return `true` if the set was successful, `false` otherwise
      */
     static inline bool portAtomicCAS(volatile uint32_t *ptr, uint32_t compare_val, uint32_t set_val)
     {

@@ -35,12 +35,12 @@
 /**
  * @brief Insert an item to the queue buffer
  *
- * @param pQueueHandle
- * @param pItem
+ * @param pQueueHandle Pointer to msgQueueHandle struct.
+ * @param pItem Pointer to the item
  */
 static bool msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 {
-    bool irqFlag = spinLock(&pQueueHandle->lock);
+    bool irqState = spinLock(&pQueueHandle->lock);
 
     bool contextSwitchRequired = false;
 
@@ -74,7 +74,7 @@ static bool msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
             }
         }
 
-        spinUnlock(&pQueueHandle->lock, irqFlag);
+        spinUnlock(&pQueueHandle->lock, irqState);
 
         if (contextSwitchRequired)
         {
@@ -84,7 +84,7 @@ static bool msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
     }
     else
     {
-        spinUnlock(&pQueueHandle->lock, irqFlag);
+        spinUnlock(&pQueueHandle->lock, irqState);
         return false;
     }
 }
@@ -92,13 +92,13 @@ static bool msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 /**
  * @brief  Get an item from the queue buffer
  *
- * @param pQueueHandle
- * @param pItem
+ * @param pQueueHandle Pointer to msgQueueHandle struct.
+ * @param pItem Pointer to the item
  */
 static bool msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 {
 
-    bool irqFlag = spinLock(&pQueueHandle->lock);
+    bool irqState = spinLock(&pQueueHandle->lock);
 
     bool contextSwitchRequired = false;
 
@@ -133,7 +133,7 @@ static bool msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
             }
         }
 
-        spinUnlock(&pQueueHandle->lock, irqFlag);
+        spinUnlock(&pQueueHandle->lock, irqState);
 
         if (contextSwitchRequired)
         {
@@ -144,7 +144,7 @@ static bool msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
     }
     else
     {
-        spinUnlock(&pQueueHandle->lock, irqFlag);
+        spinUnlock(&pQueueHandle->lock, irqState);
 
         return false;
     }
@@ -156,9 +156,9 @@ static bool msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
  * @param pQueueHandle Pointer to queueHandle struct.
  * @param pItem Pointer to the item to be sent to the Queue.
  * @param waitTicks Number of ticks to wait if Queue is full.
- * @retval RET_SUCCESS if message sent successfully.
- * @retval RET_FULL if Queue is full.
- * @retval RET_TIMEOUT if wait timeout occured.
+ * @retval `RET_SUCCESS` if message sent successfully.
+ * @retval `RET_FUL`L if Queue is full.
+ * @retval `RET_TIMEOUT` if wait timeout occured.
  */
 int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
@@ -181,11 +181,11 @@ retry:
     {
         taskHandleType *currentTask = taskGetCurrent();
 
-        bool irqFlag = spinLock(&pQueueHandle->lock);
+        bool irqState = spinLock(&pQueueHandle->lock);
 
         taskQueueAdd(&pQueueHandle->producerWaitQueue, currentTask);
 
-        spinUnlock(&pQueueHandle->lock, irqFlag);
+        spinUnlock(&pQueueHandle->lock, irqState);
 
         // Block current task and  give CPU to other tasks while waiting for space to be available
         taskBlock(currentTask, WAIT_FOR_MSG_QUEUE_SPACE, waitTicks);
@@ -197,12 +197,12 @@ retry:
         }
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
-            irqFlag = spinLock(&pQueueHandle->lock);
+            irqState = spinLock(&pQueueHandle->lock);
 
             /*Wait timed out,remove task from wait Queue.*/
             taskQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
 
-            spinUnlock(&pQueueHandle->lock, irqFlag);
+            spinUnlock(&pQueueHandle->lock, irqState);
 
             retCode = RET_TIMEOUT;
         }
@@ -222,9 +222,9 @@ retry:
  * @param pQueueHandle Pointer to queueHandle struct
  * @param pItem Pointer to the variable to be assigned the data received from the Queue.
  * @param waitTicks Number of ticks to wait if Queue is empty.
- * @retval RET_SUCCESS if message received successfully.
- * @retval RET_EMPTY if Queue is empty.
- * @retval RET_TIMEOUT if wait timeout occured.
+ * @retval `RET_SUCCESS` if message received successfully.
+ * @retval `RET_EMPTY` if Queue is empty.
+ * @retval `RET_TIMEOUT` if wait timeout occured.
  */
 int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
@@ -246,11 +246,11 @@ retry:
     {
         taskHandleType *currentTask = taskGetCurrent();
 
-        bool irqFlag = spinLock(&pQueueHandle->lock);
+        bool irqState = spinLock(&pQueueHandle->lock);
 
         taskQueueAdd(&pQueueHandle->consumerWaitQueue, currentTask);
 
-        spinUnlock(&pQueueHandle->lock, irqFlag);
+        spinUnlock(&pQueueHandle->lock, irqState);
 
         // Block current task and give CPU to other tasks while waiting for data to be available
         taskBlock(currentTask, WAIT_FOR_MSG_QUEUE_DATA, waitTicks);
@@ -261,14 +261,14 @@ retry:
         }
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
-            irqFlag = spinLock(&pQueueHandle->lock);
+            irqState = spinLock(&pQueueHandle->lock);
 
             spinLock(&pQueueHandle->lock);
 
             /*Wait timed out,remove task from wait Queue.*/
             taskQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
 
-            spinUnlock(&pQueueHandle->lock, irqFlag);
+            spinUnlock(&pQueueHandle->lock, irqState);
 
             retCode = RET_TIMEOUT;
         }

@@ -117,22 +117,24 @@ extern "C"
 
     } wakeupReasonType;
 
-    /*Task control block struct*/
-    typedef struct taskHandle
-    {
-        uint32_t stackPointer;
-        uint32_t *stack;
-        taskFunctionType taskEntry;
-        void *params;
-        const char *taskName;
-        uint32_t remainingSleepTicks;
-        taskStatusType status;
-        blockedReasonType blockedReason;
-        wakeupReasonType wakeupReason;
-        uint8_t priority;
-        coreAffinityType coreAffinity;
+   /**
+ * @brief Task Control Block (TCB) structure used to manage a task in the system.
+ */
+typedef struct taskHandle
+{
+    uint32_t stackPointer;                 ///< Current value of the task's stack pointer (used during context switches).
+    uint32_t *stack;                       ///< Pointer to the base of the task's stack memory.
+    taskFunctionType taskEntry;            ///< Function pointer to the task's entry function.
+    void *params;                          ///< Pointer to parameters passed to the task function.
+    const char *taskName;                  ///< Human-readable name of the task (for debugging or logging).
+    uint32_t remainingSleepTicks;          ///< Number of ticks remaining for which the task is sleeping.
+    taskStatusType status;                 ///< Current status of the task (e.g., running, ready, blocked).
+    blockedReasonType blockedReason;       ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
+    wakeupReasonType wakeupReason;         ///< Reason the task was woken up (e.g., timeout, signal).
+    uint8_t priority;                      ///< Priority level of the task (lower value indicate higher priority).
+    coreAffinityType coreAffinity;         ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
+} taskHandleType;
 
-    } taskHandleType;
 
     typedef struct
     {

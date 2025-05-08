@@ -32,17 +32,16 @@
 
 static atomic_t lock;
 
-
 int log_internal_printf(const char *format, ...)
 {
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
     char buffer[192];
     va_list args;
     va_start(args, format);
     int size = vsprintf(buffer, format, args);
     va_end(args);
     PORT_PRINT(buffer);
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 
     return size;
 }

@@ -50,14 +50,16 @@ extern "C"
         .ownerDefaultPriority = -1, \
         .locked = false}
 
+    /**
+     * @brief Structure representing a mutex for task synchronization.
+     */
     typedef struct
     {
-        atomic_t lock;
-        taskQueueType waitQueue;
-        taskHandleType *ownerTask;
-        int16_t ownerDefaultPriority;
-        bool locked;
-
+        atomic_t lock;                ///< Spinlock variable used for atomic access to the mutex (for low-level synchronization).
+        taskQueueType waitQueue;      ///< Queue of tasks waiting to acquire the mutex.
+        taskHandleType *ownerTask;    ///< Pointer to the task currently holding the mutex.
+        int16_t ownerDefaultPriority; ///< Original priority of the owner task before priority inheritance (if used).
+        bool locked;                  ///< Indicates whether the mutex is currently locked.
     } mutexHandleType;
 
     int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks);

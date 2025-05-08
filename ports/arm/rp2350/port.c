@@ -65,7 +65,7 @@ static inline void portConfig()
 
 static void portRunFirstTask()
 {
-    bool irqFlag = spinLock(&lock);
+    bool irqState = spinLock(&lock);
 
     taskQueueType *pReadyQueue = getReadyQueue();
 
@@ -87,7 +87,7 @@ static void portRunFirstTask()
 
     __ISB(); // Instruction Synchronization Barrier
 
-    spinUnlock(&lock, irqFlag);
+    spinUnlock(&lock, irqState);
 
     /*Jump to first task*/
     currentTask[PORT_CORE_ID()]->taskEntry(currentTask[PORT_CORE_ID()]->params);

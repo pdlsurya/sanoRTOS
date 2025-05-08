@@ -71,7 +71,7 @@ static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueu
  * @brief Get timeoutHandler node from the front of the Queue
  *
  * @param pTimeoutHandlerQueue
- * @retval timeoutHandler function
+ * @retval `timeoutHandler function`
  */
 static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeoutHandlerQueue)
 {
@@ -120,8 +120,8 @@ static inline void timerListDeleteFirstNode(timerListType *pTimerList)
  *
  * @param pTimerList Pointer to the timerList struct.
  * @param pTimerNode Pointer to the timerNode struct.
- * @retval RET_SUCCESS if timerNode deleted successfully
- * @retval RET_EMPTY if timerList is empty
+ * @retval `RET_SUCCESS` if timerNode deleted successfully
+ * @retval `RET_EMPTY` if timerList is empty
  */
 static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
@@ -156,8 +156,8 @@ static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerN
  *
  * @param pTimerNode Pointer timerNode struct
  * @param intervalTicks Timer intervalTicks
- * @retval RET_SUCCESS if timer started successfully
- * @retval RET_ALREADYACTIVE if timer is already running
+ * @retval `RET_SUCCESS` if timer started successfully
+ * @retval `RET_ALREADYACTIVE` if timer is already running
  */
 int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
 {
@@ -185,9 +185,9 @@ int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
  *  and delete timer from the list of running timers
  *
  * @param pTimerNode Pointer to timerNode struct
- * @retval RET_SUCCESS if timer stopped successfully
- * @retval RET_EMPTY if timerList is empty
- * @retval RET_NOTACTIVE if timer is not running
+ * @retval `RET_SUCCESS` if timer stopped successfully
+ * @retval `RET_EMPTY` if timerList is empty
+ * @retval `RET_NOTACTIVE` if timer is not running
  */
 int timerStop(timerNodeType *pTimerNode)
 {

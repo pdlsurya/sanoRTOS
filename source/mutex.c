@@ -37,9 +37,9 @@
  * priority inheritance, calling this function from an ISR is not allowed.
  * @param pMutex Pointer to the mutex structure
  * @param waitTicks Number of ticks to wait if mutex is not available
- * @retval RET_SUCCESS if mutex locked successfully
- * @retval RET_BUSY  if mutex not available
- * @retval RET_TIMEOUT if timeout occured while waiting for mutex
+ * @retval `RET_SUCCESS` if mutex locked successfully
+ * @retval `RET_BUSY`  if mutex not available
+ * @retval `RET_TIMEOUT` if timeout occured while waiting for mutex
  */
 int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
@@ -47,7 +47,7 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 
     int retCode;
 
-    bool irqFlag = spinLock(&pMutex->lock);
+    bool irqState = spinLock(&pMutex->lock);
 
     taskHandleType *currentTask = taskGetCurrent();
 
@@ -84,13 +84,13 @@ retry:
         taskQueueAdd(&pMutex->waitQueue, currentTask);
 
         /*Release spinlock before blocking the task*/
-        spinUnlock(&pMutex->lock, irqFlag);
+        spinUnlock(&pMutex->lock, irqState);
 
         /* Block current task and give CPU to other tasks while waiting for mutex*/
         taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
 
         /*Re-acquire spinlock section after being unblocked*/
-        irqFlag = spinLock(&pMutex->lock);
+        irqState = spinLock(&pMutex->lock);
 
         if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
         {
@@ -111,7 +111,7 @@ retry:
         }
     }
 
-    spinUnlock(&pMutex->lock, irqFlag);
+    spinUnlock(&pMutex->lock, irqState);
 
     return retCode;
 }
@@ -120,9 +120,9 @@ retry:
  * @brief Unlock/Release mutex.Because mutexes incorporate ownership control and
  * priority inheritance, calling this function from an ISR is not allowed.
  * @param pMutex Pointer to the mutex structure
- * @retval RET_SUCCESS if mutex unlocked successfully
- * @retval RET_NOTOWNER if current owner doesnot owns the mutex
- * @retval RET_NOTLOCKED if mutex was not previously locked
+ * @retval `RET_SUCCESS` if mutex unlocked successfully
+ * @retval `RET_NOTOWNER` if current owner doesnot owns the mutex
+ * @retval `RET_NOTLOCKED` if mutex was not previously locked
  */
 int mutexUnlock(mutexHandleType *pMutex)
 {
@@ -131,7 +131,7 @@ int mutexUnlock(mutexHandleType *pMutex)
 
     int retCode;
 
-    bool irqFlag;
+    bool irqState;
 
     bool contextSwitchRequired = false;
 
@@ -158,11 +158,11 @@ int mutexUnlock(mutexHandleType *pMutex)
 #endif
             /* Get next owner of the mutex*/
         getNextOwner:
-            irqFlag = spinLock(&pMutex->lock);
+            irqState = spinLock(&pMutex->lock);
 
             nextOwner = taskQueueGet(&pMutex->waitQueue);
 
-            spinUnlock(&pMutex->lock, irqFlag);
+            spinUnlock(&pMutex->lock, irqState);
 
             if (nextOwner != NULL)
             {
@@ -174,7 +174,7 @@ int mutexUnlock(mutexHandleType *pMutex)
 
                 taskSetReady(nextOwner, MUTEX_LOCKED);
 
-                               /*Perform context switch if next owner task has equal or
+                /*Perform context switch if next owner task has equal or
                  *higher priority[lower priority value] than that of current task */
                 if (nextOwner->priority <= currentTask->priority)
                 {
