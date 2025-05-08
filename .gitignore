@@ -21,20 +21,6 @@ $RECYCLE.BIN/
 *.bak
 *.tmp
 
-# Build artifacts
-*.o
-*.obj
-*.a
-*.lib
-*.dll
-*.exe
-*.out
-*.elf
-*.bin
-*.hex
-*.map
-*.d
-*.log
 
 # Build system directories
 /build/
@@ -49,19 +35,4 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 
-# Autotools (if used)
-aclocal.m4
-m4/
-autom4te.cache/
-configure
-config.h
-config.log
-config.status
-depcomp
-install-sh
-ltmain.sh
-missing
 
-# Clangd index (if used)
-.clangd/
-.cache/
