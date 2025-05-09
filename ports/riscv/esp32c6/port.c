@@ -36,8 +36,11 @@ extern void tickHandler(void);
 
 volatile privilegeModesType privilegeMode = MACHINE_MODE;
 
-void IRAM_ATTR syscallHandler(uint32_t sysCode)
+void IRAM_ATTR ecall_handler()
 {
+    uint32_t sysCode;
+    asm volatile("mv %0,a0" : "=r"(sysCode));
+
     switch (sysCode)
     {
     case SWITCH_CONTEXT:
