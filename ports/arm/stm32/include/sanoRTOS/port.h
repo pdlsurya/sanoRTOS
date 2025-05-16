@@ -134,7 +134,7 @@ extern "C"
 
 #define PORT_TIMER_TICK_FREQ SystemCoreClock
 
-#define PORT_PRINT printf
+#define PORT_PRINTF printf
 
 #define PORT_ENTER_SLEEP_MODE() __WFI()
     /**
@@ -143,7 +143,7 @@ extern "C"
      * @retval `True`, if cpu is in privileged mode
      * @retval `False`, if cpu is in unprivileged mode
      */
-#define PORT_IS_PRIVILEGED() ((__get_IPSR() > 0) ? true : (((__get_CONTROL() & 0x1) == 0) ? true : false))
+#define PORT_IS_PRIVILEGED() ((__get_IPSR() != 0) ? true : (((__get_CONTROL() & 0x1) == 0) ? true : false))
 
     /**
      * @brief Disable interrupts and return previous irq status

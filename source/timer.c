@@ -260,7 +260,7 @@ void timerTaskStart()
 /**
  * @brief RTOS timer task function
  *
- * @param args
+ * @param args task function arguments
  */
 void timerTaskFunction(void *args)
 {

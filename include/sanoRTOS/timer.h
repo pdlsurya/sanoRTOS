@@ -48,14 +48,15 @@ extern "C"
  * @param timer_mode Timer mode[PERIODIC or SINGLE_SHOT].
  *
  */
-#define TIMER_DEFINE(name, timeout_handler, timer_mode) \
-    void timeout_handler(void);                         \
-    timerNodeType name = {                              \
-        .isRunning = false,                             \
-        .mode = timer_mode,                             \
-        .timeoutHandler = timeout_handler,              \
-        .ticksToExpire = 0,                             \
-        .intervalTicks = 0,                             \
+#define TIMER_DEFINE(_name, timeout_handler, timer_mode) \
+    void timeout_handler(void);                          \
+    timerNodeType _name = {                              \
+        .name = #_name,                                  \
+        .isRunning = false,                              \
+        .mode = timer_mode,                              \
+        .timeoutHandler = timeout_handler,               \
+        .ticksToExpire = 0,                              \
+        .intervalTicks = 0,                              \
         .nextNode = NULL}
 
     typedef void (*timeoutHandlerType)(void); // Timeout handler function type definition
@@ -65,6 +66,7 @@ extern "C"
      */
     typedef struct timerNode
     {
+        const char *name;                  ///< Name of the timer.
         timeoutHandlerType timeoutHandler; ///< Function to call when the timer expires.
         uint32_t intervalTicks;            ///< Timer interval in ticks (used for periodic timers).
         uint32_t ticksToExpire;            ///< Remaining ticks before the timer expires.

@@ -42,10 +42,11 @@ extern "C"
  * @param name Name of the condition variable
  * @param p_mutex Pointer to a mutex that condition variable uses internally.
  */
-#define CONDVAR_DEFINE(name, p_mutex) \
-    condVarHandleType name = {        \
-        .waitQueue = {0},             \
-        .pMutex = p_mutex,            \
+#define CONDVAR_DEFINE(_name, p_mutex) \
+    condVarHandleType _name = {        \
+        .name = #_name,                \
+        .waitQueue = {0},              \
+        .pMutex = p_mutex,             \
         .lock = 0}
 
     /**
@@ -53,6 +54,7 @@ extern "C"
      */
     typedef struct
     {
+        const char *name;        ///< Name of the condition variable.
         taskQueueType waitQueue; ///< Queue of tasks waiting on the condition variable.
         mutexHandleType *pMutex; ///< Pointer to the associated mutex (used to avoid race conditions).
         atomic_t lock;           ///< Spinlock to ensure atomic access to the condition variable's internal state.

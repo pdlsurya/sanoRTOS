@@ -42,8 +42,9 @@ extern "C"
  * @brief Statically define and initialize a mutex.
  * @param name Name of the mutex.
  */
-#define MUTEX_DEFINE(name)          \
-    mutexHandleType name = {        \
+#define MUTEX_DEFINE(_name)         \
+    mutexHandleType _name = {       \
+        .name = #_name,             \
         .lock = 0,                  \
         .waitQueue = {0},           \
         .ownerTask = NULL,          \
@@ -55,6 +56,7 @@ extern "C"
      */
     typedef struct
     {
+        const char *name;             ///< Name of the mutex.
         atomic_t lock;                ///< Spinlock variable used for atomic access to the mutex (for low-level synchronization).
         taskQueueType waitQueue;      ///< Queue of tasks waiting to acquire the mutex.
         taskHandleType *ownerTask;    ///< Pointer to the task currently holding the mutex.

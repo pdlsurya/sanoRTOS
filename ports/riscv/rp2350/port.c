@@ -54,7 +54,7 @@ void idleTaskHandler1(void *params)
     (void)params;
     while (1)
     {
-        // PORT_ENTER_SLEEP_MODE();
+        PORT_ENTER_SLEEP_MODE();
     }
 }
 #endif
@@ -147,17 +147,24 @@ void pmpConfigure(void)
 {
     // Dynamic PMP regions (only 5 needed)
     uint32_t pmpaddr0 = PMPADDR_NAPOT(0x10000000, 64 * 1024 * 1024); // XIP Cached
+    uint8_t pmp0cfg = PMP_R | PMP_X | PMP_NAPOT | PMP_L;             // XIP Cached
+
     uint32_t pmpaddr1 = PMPADDR_NAPOT(0x14000000, 64 * 1024 * 1024); // XIP Uncached
+    uint8_t pmp1cfg = PMP_R | PMP_X | PMP_NAPOT | PMP_L;             // XIP Uncached
+
     uint32_t pmpaddr2 = PMPADDR_NAPOT(0x18000000, 64 * 1024 * 1024); // XIP Cache Maint.
+    uint8_t pmp2cfg = PMP_W | PMP_NAPOT | PMP_L;                     // XIP Cache Maint.
+
     uint32_t pmpaddr3 = PMPADDR_NAPOT(0x1C000000, 64 * 1024 * 1024); // XIP Untranslated
-    uint32_t pmpaddr4 = PMPADDR_NAPOT(0x20000000, 512 * 1024);       // Main SRAM
+    uint8_t pmp3cfg = PMP_R | PMP_X | PMP_NAPOT | PMP_L;             // XIP Untranslated
+
+    uint32_t pmpaddr4 = PMPADDR_NAPOT(0x20000000, 512 * 1024);   // Main SRAM(first 512KB)
+    uint8_t pmp4cfg = PMP_R | PMP_W | PMP_X | PMP_NAPOT | PMP_L; // Main SRAM(first 512KB)
+
+    uint32_t pmpaddr5 = PMPADDR_NAPOT(0x20080000, 8 * 1024);     // Main SRAM(second 8KB)
+    uint8_t pmp5cfg = PMP_R | PMP_W | PMP_X | PMP_NAPOT | PMP_L; // Main SRAM(second 8KB)
 
     // PMP config bytes (8-bit each)
-    uint8_t pmpcfg0 = PMP_R | PMP_X | PMP_NAPOT;         // XIP Cached
-    uint8_t pmpcfg1 = PMP_R | PMP_X | PMP_NAPOT;         // XIP Uncached
-    uint8_t pmpcfg2 = PMP_W | PMP_NAPOT;                 // XIP Cache Maint.
-    uint8_t pmpcfg3 = PMP_R | PMP_X | PMP_NAPOT;         // XIP Untranslated
-    uint8_t pmpcfg4 = PMP_R | PMP_W | PMP_X | PMP_NAPOT; // Main SRAM
 
     // Write PMPADDR registers
     riscv_write_csr(pmpaddr0, pmpaddr0);
@@ -165,10 +172,11 @@ void pmpConfigure(void)
     riscv_write_csr(pmpaddr2, pmpaddr2);
     riscv_write_csr(pmpaddr3, pmpaddr3);
     riscv_write_csr(pmpaddr4, pmpaddr4);
+    riscv_write_csr(pmpaddr5, pmpaddr5);
 
     // Pack config bytes into PMPCFG0 and PMPCFG1
-    uint32_t pmpcfg_reg0 = (pmpcfg3 << 24) | (pmpcfg2 << 16) | (pmpcfg1 << 8) | pmpcfg0;
-    uint32_t pmpcfg_reg1 = pmpcfg4; // Only one byte used in pmpcfg1
+    uint32_t pmpcfg_reg0 = (pmp3cfg << 24) | (pmp2cfg << 16) | (pmp1cfg << 8) | pmp0cfg;
+    uint32_t pmpcfg_reg1 = pmp4cfg | (pmp5cfg << 8);
 
     riscv_write_csr(pmpcfg0, pmpcfg_reg0);
     riscv_write_csr(pmpcfg1, pmpcfg_reg1);
@@ -218,7 +226,7 @@ void portRunFirstTask()
     riscv_set_csr(mstatus, RVCSR_MSTATUS_MPIE_BITS);
 
     /* Set up the user-mode entry point*/
-    riscv_write_csr(mepc, (uint32_t)currentTask[PORT_CORE_ID()]->taskEntry);
+    riscv_write_csr(mepc, (uint32_t)currentTask[PORT_CORE_ID()]->entry);
 
     // Execute mret to switch to U-mode
     asm volatile("mret");
@@ -226,7 +234,7 @@ void portRunFirstTask()
 #else
 
     /*If user mode not enabled, jump directly to the first task*/
-    currentTask[PORT_CORE_ID()]->taskEntry(currentTask[PORT_CORE_ID()]->params);
+    currentTask[PORT_CORE_ID()]->entry(currentTask[PORT_CORE_ID()]->params);
 #endif
 }
 

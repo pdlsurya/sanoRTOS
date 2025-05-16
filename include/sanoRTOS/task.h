@@ -63,16 +63,16 @@ extern "C"
  * @param taskParams Entry point parameter.
  * @param taskPriority Task priority.
  */
-#define TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                 \
+#define TASK_DEFINE(_name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                \
     void taskEntryFunction(void *);                                                                         \
-    PORT_TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams);               \
-    static taskHandleType name = {                                                                          \
-        .taskName = #name,                                                                                  \
-        .stackPointer = (uint32_t)(name##Stack + stackSize / sizeof(uint32_t) - INITIAL_TASK_STACK_OFFSET), \
-        .stack = name##Stack,                                                                               \
+    PORT_TASK_STACK_DEFINE(_name, stackSize, taskEntryFunction, taskExitFunction, taskParams);              \
+    static taskHandleType _name = {                                                                         \
+        .name = #_name,                                                                                     \
+        .stackPointer = (uint32_t)(_name##Stack + stackSize / sizeof(uint32_t) - INITIAL_TASK_STACK_OFFSET), \
+        .stack = _name##Stack,                                                                               \
         .priority = taskPriority,                                                                           \
         .coreAffinity = affinity,                                                                           \
-        .taskEntry = taskEntryFunction,                                                                     \
+        .entry = taskEntryFunction,                                                                         \
         .params = taskParams,                                                                               \
         .remainingSleepTicks = 0,                                                                           \
         .status = TASK_STATUS_READY,                                                                        \
@@ -117,24 +117,23 @@ extern "C"
 
     } wakeupReasonType;
 
-   /**
- * @brief Task Control Block (TCB) structure used to manage a task in the system.
- */
-typedef struct taskHandle
-{
-    uint32_t stackPointer;                 ///< Current value of the task's stack pointer (used during context switches).
-    uint32_t *stack;                       ///< Pointer to the base of the task's stack memory.
-    taskFunctionType taskEntry;            ///< Function pointer to the task's entry function.
-    void *params;                          ///< Pointer to parameters passed to the task function.
-    const char *taskName;                  ///< Human-readable name of the task (for debugging or logging).
-    uint32_t remainingSleepTicks;          ///< Number of ticks remaining for which the task is sleeping.
-    taskStatusType status;                 ///< Current status of the task (e.g., running, ready, blocked).
-    blockedReasonType blockedReason;       ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
-    wakeupReasonType wakeupReason;         ///< Reason the task was woken up (e.g., timeout, signal).
-    uint8_t priority;                      ///< Priority level of the task (lower value indicate higher priority).
-    coreAffinityType coreAffinity;         ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
-} taskHandleType;
-
+    /**
+     * @brief Task Control Block (TCB) structure used to manage a task in the system.
+     */
+    typedef struct taskHandle
+    {
+        uint32_t stackPointer;           ///< Current value of the task's stack pointer (used during context switches).
+        uint32_t *stack;                 ///< Pointer to the base of the task's stack memory.
+        taskFunctionType entry;          ///< Function pointer to the task's entry function.
+        void *params;                    ///< Pointer to parameters passed to the task function.
+        const char *name;                ///< Human-readable name of the task (for debugging or logging).
+        uint32_t remainingSleepTicks;    ///< Number of ticks remaining for which the task is sleeping.
+        taskStatusType status;           ///< Current status of the task (e.g., running, ready, blocked).
+        blockedReasonType blockedReason; ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
+        wakeupReasonType wakeupReason;   ///< Reason the task was woken up (e.g., timeout, signal).
+        uint8_t priority;                ///< Priority level of the task (lower value indicate higher priority).
+        coreAffinityType coreAffinity;   ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
+    } taskHandleType;
 
     typedef struct
     {
@@ -202,7 +201,7 @@ typedef struct taskHandle
      */
     static inline __attribute__((always_inline)) const char *taskGetName()
     {
-        return taskPool.currentTask[PORT_CORE_ID()]->taskName;
+        return taskPool.currentTask[PORT_CORE_ID()]->name;
     }
 
     /**

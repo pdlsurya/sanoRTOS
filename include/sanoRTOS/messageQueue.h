@@ -44,17 +44,18 @@ extern "C"
  * @param length Maximum number of message items the message queue can hold.
  * @param item_size Size of a message item in bytes.
  */
-#define MSG_QUEUE_DEFINE(name, length, item_size) \
-    uint8_t name##Buffer[length * item_size];     \
-    msgQueueHandleType name = {                   \
-        .producerWaitQueue = {0},                 \
-        .consumerWaitQueue = {0},                 \
-        .buffer = name##Buffer,                   \
-        .queueLength = length,                    \
-        .itemSize = item_size,                    \
-        .itemCount = 0,                           \
-        .readIndex = 0,                           \
-        .writeIndex = 0,                          \
+#define MSG_QUEUE_DEFINE(_name, length, item_size) \
+    uint8_t _name##Buffer[length * item_size];     \
+    msgQueueHandleType _name = {                   \
+        .name = #_name,                            \
+        .producerWaitQueue = {0},                  \
+        .consumerWaitQueue = {0},                  \
+        .buffer = name##Buffer,                    \
+        .queueLength = length,                     \
+        .itemSize = item_size,                     \
+        .itemCount = 0,                            \
+        .readIndex = 0,                            \
+        .writeIndex = 0,                           \
         .lock = 0}
 
     /**
@@ -62,6 +63,7 @@ extern "C"
      */
     typedef struct
     {
+        const char *name;                ///< Name of the message queue
         taskQueueType producerWaitQueue; ///< Queue of producer tasks waiting to enqueue data when the buffer is full.
         taskQueueType consumerWaitQueue; ///< Queue of consumer tasks waiting to dequeue data when the buffer is empty.
         uint8_t *buffer;                 ///< Pointer to the buffer storing messages/items.
