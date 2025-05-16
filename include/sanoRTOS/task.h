@@ -126,9 +126,9 @@ extern "C"
         uint32_t stackPointer;           ///< Current value of the task's stack pointer (used during context switches).
         uint32_t *stack;                 ///< Pointer to the base of the task's stack memory.
         const char *name;                ///< Human-readable name of the task (for debugging or logging).
-        taskFunctionType entry;          ///< Function pointer to the task's entry function.
         void *params;                    ///< Pointer to parameters passed to the task function.
-        uint32_t remainingSleepTicks;    ///< Number of ticks remaining for which the task is sleeping.
+        taskFunctionType entry;          ///< Function pointer to the task's entry function.
+        uint32_t remainingSleepTicks;    ///< Number of ticks remaining for which the task is sleeping or being blocked.
         taskStatusType status;           ///< Current status of the task (e.g., running, ready, blocked).
         blockedReasonType blockedReason; ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
         wakeupReasonType wakeupReason;   ///< Reason the task was woken up (e.g., timeout, signal).
