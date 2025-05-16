@@ -26,6 +26,7 @@
 #define __SANO_RTOS_TASK_H
 
 #include <assert.h>
+#include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
 #include "sanoRTOS/taskQueue.h"
@@ -63,20 +64,20 @@ extern "C"
  * @param taskParams Entry point parameter.
  * @param taskPriority Task priority.
  */
-#define TASK_DEFINE(_name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                \
-    void taskEntryFunction(void *);                                                                         \
-    PORT_TASK_STACK_DEFINE(_name, stackSize, taskEntryFunction, taskExitFunction, taskParams);              \
-    static taskHandleType _name = {                                                                         \
-        .name = #_name,                                                                                     \
+#define TASK_DEFINE(_name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                 \
+    void taskEntryFunction(void *);                                                                          \
+    PORT_TASK_STACK_DEFINE(_name, stackSize, taskEntryFunction, taskExitFunction, taskParams);               \
+    static taskHandleType _name = {                                                                          \
+        .name = #_name,                                                                                      \
         .stackPointer = (uint32_t)(_name##Stack + stackSize / sizeof(uint32_t) - INITIAL_TASK_STACK_OFFSET), \
         .stack = _name##Stack,                                                                               \
-        .priority = taskPriority,                                                                           \
-        .coreAffinity = affinity,                                                                           \
-        .entry = taskEntryFunction,                                                                         \
-        .params = taskParams,                                                                               \
-        .remainingSleepTicks = 0,                                                                           \
-        .status = TASK_STATUS_READY,                                                                        \
-        .blockedReason = BLOCK_REASON_NONE,                                                                 \
+        .priority = taskPriority,                                                                            \
+        .coreAffinity = affinity,                                                                            \
+        .entry = taskEntryFunction,                                                                          \
+        .params = taskParams,                                                                                \
+        .remainingSleepTicks = 0,                                                                            \
+        .status = TASK_STATUS_READY,                                                                         \
+        .blockedReason = BLOCK_REASON_NONE,                                                                  \
         .wakeupReason = WAKEUP_REASON_NONE}
 
     typedef void (*taskFunctionType)(void *params);
@@ -124,15 +125,15 @@ extern "C"
     {
         uint32_t stackPointer;           ///< Current value of the task's stack pointer (used during context switches).
         uint32_t *stack;                 ///< Pointer to the base of the task's stack memory.
+        const char *name;                ///< Human-readable name of the task (for debugging or logging).
         taskFunctionType entry;          ///< Function pointer to the task's entry function.
         void *params;                    ///< Pointer to parameters passed to the task function.
-        const char *name;                ///< Human-readable name of the task (for debugging or logging).
         uint32_t remainingSleepTicks;    ///< Number of ticks remaining for which the task is sleeping.
         taskStatusType status;           ///< Current status of the task (e.g., running, ready, blocked).
         blockedReasonType blockedReason; ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
         wakeupReasonType wakeupReason;   ///< Reason the task was woken up (e.g., timeout, signal).
-        uint8_t priority;                ///< Priority level of the task (lower value indicate higher priority).
         coreAffinityType coreAffinity;   ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
+        uint8_t priority;                ///< Priority level of the task (lower value indicate higher priority).
     } taskHandleType;
 
     typedef struct
