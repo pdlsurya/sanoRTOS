@@ -87,7 +87,7 @@ extern "C"
        <-32bits->                                 <-32bits->
       *************************************************************************************/
 
-#define INITIAL_TASK_STACK_OFFSET 17
+#define PORT_INITIAL_TASK_STACK_OFFSET 17
 
 #define PORT_TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams) \
     uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                                       \

@@ -91,8 +91,6 @@ extern "C"
        <-32bits->                                 <-32bits->
       *************************************************************************************/
 
-#define INITIAL_TASK_STACK_OFFSET 17
-
 #define INITIAL_EXC_RETURN (EXC_RETURN_PREFIX | EXC_RETURN_SPSEL | EXC_RETURN_MODE | EXC_RETURN_S | EXC_RETURN_ES | EXC_RETURN_DCRS | EXC_RETURN_FTYPE)
 
 #define PORT_TASK_STACK_DEFINE(name, stackSize, taskEntryFunction, taskExitFunction, taskParams) \
@@ -102,6 +100,8 @@ extern "C"
         [stackSize / sizeof(uint32_t) - 3] = (uint32_t)taskExitFunction,                         \
         [stackSize / sizeof(uint32_t) - 8] = (uint32_t)taskParams,                               \
         [stackSize / sizeof(uint32_t) - 9] = INITIAL_EXC_RETURN}
+
+#define PORT_INITIAL_TASK_STACK_OFFSET 17
 
 /*Macro to invoke System call. This triggers SVC exception with specified sysCode*/
 #define PORT_SYSCALL(sysCode) __asm volatile("svc %0" : : "I"(sysCode) : "memory")
@@ -155,7 +155,7 @@ extern "C"
  * @retval True, if cpu is in privileged mode
  * @retval False, if cpu is in unprivileged mode
  */
-#define PORT_IS_PRIVILEGED() ((__get_IPSR()!=0) ? true : (((__get_CONTROL() & 0x1) == 0) ? true : false))
+#define PORT_IS_PRIVILEGED() ((__get_IPSR() != 0) ? true : (((__get_CONTROL() & 0x1) == 0) ? true : false))
 
     /**
      * @brief Disable interrupts and return previous irq status

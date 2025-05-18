@@ -25,6 +25,9 @@
 #ifndef __SANO_RTOS_CONDITION_VARIABLE
 #define __SANO_RTOS_CONDITION_VARIABLE
 
+#include <stdint.h>
+#include <stdbool.h>
+#include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/mutex.h"
 #include "sanoRTOS/taskQueue.h"

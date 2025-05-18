@@ -69,7 +69,7 @@ extern "C"
     PORT_TASK_STACK_DEFINE(_name, stackSize, taskEntryFunction, taskExitFunction, taskParams);               \
     static taskHandleType _name = {                                                                          \
         .name = #_name,                                                                                      \
-        .stackPointer = (uint32_t)(_name##Stack + stackSize / sizeof(uint32_t) - INITIAL_TASK_STACK_OFFSET), \
+        .stackPointer = (uint32_t)(_name##Stack + stackSize / sizeof(uint32_t) - PORT_INITIAL_TASK_STACK_OFFSET), \
         .stack = _name##Stack,                                                                               \
         .priority = taskPriority,                                                                            \
         .coreAffinity = affinity,                                                                            \

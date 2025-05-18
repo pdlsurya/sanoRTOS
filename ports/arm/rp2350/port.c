@@ -40,7 +40,7 @@ void idleTaskHandler1(void *params)
     (void)params;
     while (true)
     {
-        //__WFI();
+       PORT_ENTER_SLEEP_MODE();
     }
 }
 #endif
