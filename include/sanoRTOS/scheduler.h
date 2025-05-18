@@ -25,9 +25,6 @@
 #ifndef __SANO_RTOS_SCHEDULER_H
 #define __SANO_RTOS_SCHEDULER_H
 
-#include <stdint.h>
-#include <stdbool.h>
-#include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
 
@@ -45,7 +42,7 @@ extern "C"
  * @param us Duration in microseconds.
  * @return Equivalent number of timer ticks.
  */
-#define US_TO_TIMER_TICKS(us) ((uint64_t)((us) * (PORT_TIMER_TICK_FREQ / 1000000)))
+#define US_TO_TIMER_TICKS(us) ((uint32_t)((uint64_t)(us) * PORT_TIMER_TICK_FREQ / 1000000))
 
 /**
  * @brief Number of hardware timer ticks in one RTOS tick.
