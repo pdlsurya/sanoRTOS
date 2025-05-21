@@ -51,7 +51,7 @@ extern "C"
         .name = #_name,                            \
         .producerWaitQueue = {0},                  \
         .consumerWaitQueue = {0},                  \
-        .buffer = name##Buffer,                    \
+        .buffer = _name##Buffer,                    \
         .queueLength = length,                     \
         .itemSize = item_size,                     \
         .itemCount = 0,                            \
