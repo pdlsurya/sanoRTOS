@@ -75,7 +75,7 @@ static bool selectNextTask(void)
         // If the current task is running, add it to the ready queue
         if (pCurrentTask->status == TASK_STATUS_RUNNING)
         {
-            const taskHandleType *const pNextReadyTask = taskQueuePeek(pReadyQueue);
+            taskHandleType *pNextReadyTask = TASK_PEEK_FROM_READY_QUEUE(pReadyQueue);
 
             // If the next ready task has a higher priority than the current task,
             // add the current task to the ready queue.
@@ -99,7 +99,7 @@ static bool selectNextTask(void)
 #endif
 
         // Get the next task from the ready queue
-        nextTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
+        nextTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
 
         // Set the status of the next task to RUNNING
         nextTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;

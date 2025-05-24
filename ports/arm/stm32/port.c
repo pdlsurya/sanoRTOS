@@ -50,7 +50,7 @@ void portSchedulerStart()
     taskQueueType *pReadyQueue = getReadyQueue();
 
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
+    currentTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue, true);
 
     taskSetCurrent(currentTask[PORT_CORE_ID()]);
 
@@ -179,8 +179,7 @@ __attribute__((naked)) void PendSV_Handler(void)
         // Save r4-r11 and lr to current task's stack
         "stmdb r0!, {r4-r11, lr}\n"
 
-       
-        // Save current stack pointer to *currentTask
+               // Save current stack pointer to *currentTask
         "str r0, [%[current]]\n"
 
         // Load next stack pointer from *nextTask

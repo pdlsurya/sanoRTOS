@@ -151,14 +151,16 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 }
 
 /**
- * @brief Retrieves and removes the highest-priority task that is eligible to run on this core.
+ * @brief Retrieves the highest-priority task eligible to run  and removes it from the queue.
  *
- * Scans the queue from front to back, checking each task's core affinity.
+ * If `affinityCheck` is `true`, only tasks with a matching core affinity or
+ * AFFINITY_CORE_ANY are considered eligible. `affinityCheck` is required only when retrieving tasks from the readyQueue.
  *
  * @param pTaskQueue Pointer to the task queue.
- * @return Pointer to the task handle of the selected task, or NULL if none found.
+ * @param affinityCheck `true` to check core affinity of the task, `false` to ignore it.
+ * @return Pointer to the task handle, or NULL if no eligible task is found.
  */
-taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
+taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck)
 {
     assert(pTaskQueue != NULL);
     taskHandleType *pTask;
@@ -167,6 +169,14 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
 
+        if (!affinityCheck)
+        {
+            pTask = currentTaskNode->pTask;
+            taskQueueRemove(pTaskQueue, pTask);
+            return pTask;
+        }
+
+        /* Check each task in the queue for a matching core affinity */
         while (currentTaskNode != NULL)
         {
             if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() ||
@@ -191,11 +201,17 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue)
  * @param pTaskQueue Pointer to the task queue.
  * @return Pointer to the task handle, or NULL if no eligible task is found.
  */
-taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue)
+taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck)
 {
     if (!taskQueueEmpty(pTaskQueue))
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
+
+        if (!affinityCheck)
+        {
+            return currentTaskNode->pTask;
+        }
+
         while (currentTaskNode != NULL)
         {
             if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() ||

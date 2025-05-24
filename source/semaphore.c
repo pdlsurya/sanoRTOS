@@ -123,7 +123,7 @@ int semaphoreGive(semaphoreHandleType *pSem)
     {
         /*Get next highest priority task to unblock from the wait Queue*/
     getNextTask:
-        nextTask = taskQueueGet(&pSem->waitQueue);
+        nextTask = TASK_GET_FROM_WAIT_QUEUE(&pSem->waitQueue);
 
         if (nextTask != NULL)
         {

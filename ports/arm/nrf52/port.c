@@ -56,8 +56,7 @@ void portSchedulerStart()
     taskQueueType *pReadyQueue = getReadyQueue();
 
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue);
-
+    currentTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
     // set the current running task
     taskSetCurrent(currentTask[PORT_CORE_ID()]);
 

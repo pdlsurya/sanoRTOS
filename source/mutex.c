@@ -119,6 +119,7 @@ retry:
 /**
  * @brief Unlock/Release mutex.Because mutexes incorporate ownership control and
  * priority inheritance, calling this function from an ISR is not allowed.
+ *
  * @param pMutex Pointer to the mutex structure
  * @retval `RET_SUCCESS` if mutex unlocked successfully
  * @retval `RET_NOTOWNER` if current owner doesnot owns the mutex
@@ -160,7 +161,8 @@ int mutexUnlock(mutexHandleType *pMutex)
         getNextOwner:
             irqState = spinLock(&pMutex->lock);
 
-            nextOwner = taskQueueGet(&pMutex->waitQueue);
+            /*Get next highest priority task from waitQueue.*/
+            nextOwner = TASK_GET_FROM_WAIT_QUEUE(&pMutex->waitQueue);
 
             spinUnlock(&pMutex->lock, irqState);
 
