@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
 #include "sanoRTOS/task.h"

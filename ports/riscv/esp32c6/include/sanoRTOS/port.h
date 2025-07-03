@@ -114,7 +114,7 @@ extern "C"
         [stackSize / sizeof(uint32_t) - 31] = (uint32_t)taskExitFunction,                        \
         [stackSize / sizeof(uint32_t) - 24] = (uint32_t)taskParams}
 
-#define INITIAL_TASK_STACK_OFFSET 32
+#define PORT_INITIAL_TASK_STACK_OFFSET 32
 
 /*Macro to invoke System call. This triggers SVC exception with specified sysCode*/
 #define PORT_SYSCALL(sysCode) asm volatile("mv a0,%0\n" \

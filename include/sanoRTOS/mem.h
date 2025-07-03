@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/port.h"
 
 #ifdef __cplusplus

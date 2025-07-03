@@ -27,6 +27,7 @@
 
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
+#include "sanoRTOS/retCodes.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -108,7 +109,7 @@ extern "C"
      *
      * @param pTaskQueue
      * @retval `TRUE` if taskQueue is empty
-     * @retval `TRUE`, otherwise
+     * @retval `FALSE`, otherwise
      */
     static inline __attribute__((always_inline)) bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {

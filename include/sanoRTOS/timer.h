@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/scheduler.h"
+#include "sanoRTOS/retCodes.h"
 
 #ifdef __cplusplus
 extern "C"
