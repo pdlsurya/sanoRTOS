@@ -130,9 +130,9 @@ extern "C"
 
 #define PORT_IS_PRIVILEGED() isMachineMode()
 
-#define PORT_TIMER_TICK_FREQ 160000000
+#define PORT_TIMER_TICK_FREQ 360000000
 
-#define PORT_CORE_COUNT 1
+#define PORT_CORE_COUNT 2
 
 #define PORT_CORE_ID() portCoreId()
 

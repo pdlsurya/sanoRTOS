@@ -47,8 +47,6 @@
 
 TASK_DEFINE(idleTask1, 512, idleTaskHandler1, NULL, TASK_LOWEST_PRIORITY, AFFINITY_CORE_1);
 
-LOG_MODULE_DEFINE("timer");
-
 void idleTaskHandler1(void *params)
 {
     (void)params;
