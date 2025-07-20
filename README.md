@@ -183,7 +183,33 @@ int main() {
     return 0;
 }
 ```
-   
+
+## ESP32 Ports
+
+This RTOS includes ports for the following Espressif RISC-V based MCUs:
+
+- **ESP32-C6**
+- **ESP32-P4**
+
+Unlike most ESP32 projects, these ports **do not use Espressif's ESP-IDF**.  
+Instead, they are built on top of custom [ESP32 RISC-V bare-metal SDK](https://github.com/pdlsurya/esp32-riscv-bare-metal-sdk) developed specifically for low-level control and minimal system overhead.
+
+The bare-metal SDK provides:
+
+- Startup code and linker scripts
+- Register definitions and peripheral structures
+- Interrupt and exception handling
+- Basic hardware initialization
+- Minimal HAL required for RTOS operation
+
+This SDK allows the RTOS to run **without the ESP-IDF framework**, making the
+implementation closer to traditional embedded RTOS ports.
+
+### Notes
+
+- The RTOS ports assume the system is initialized using the
+  corresponding bare-metal SDK.
+- ESP-IDF is **not required** to build or run these ports.
 
 # License
 This project is licensed under the MIT License-see the [LICENSE](LICENSE) file for details.
