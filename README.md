@@ -39,6 +39,8 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 ## Task Management
 
 - **TASK_DEFINE**: Macro to statically define and initialize a task.
+- **taskCreate**: Dynamically create and start a task.
+- **taskDelete**: Delete a task. Dynamically created task resources are freed.
 - **taskStart** : Start the task.
 - **taskYield**: Yield the processor to allow other tasks to run.
 - **taskSleepMS**: Delay a task for a specified number of milliseconds.
@@ -213,5 +215,4 @@ implementation closer to traditional embedded RTOS ports.
 
 # License
 This project is licensed under the MIT License-see the [LICENSE](LICENSE) file for details.
-
 

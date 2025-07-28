@@ -114,6 +114,14 @@ extern "C"
         [stackSize / sizeof(uint32_t) - 31] = (uint32_t)taskExitFunction,                        \
         [stackSize / sizeof(uint32_t) - 24] = (uint32_t)taskParams}
 
+#define PORT_TASK_STACK_INIT(stack, stackWords, taskEntryFunction, taskExitFunction, taskParams) \
+    do                                                                                             \
+    {                                                                                              \
+        (stack)[(stackWords)-32] = (uint32_t)(taskEntryFunction);                                 \
+        (stack)[(stackWords)-31] = (uint32_t)(taskExitFunction);                                  \
+        (stack)[(stackWords)-24] = (uint32_t)(taskParams);                                        \
+    } while (0)
+
 #define PORT_INITIAL_TASK_STACK_OFFSET 32
 
 /*Macro to invoke System call. This triggers SVC exception with specified sysCode*/

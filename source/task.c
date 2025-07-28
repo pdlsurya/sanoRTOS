@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/spinLock.h"
@@ -31,6 +32,7 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/timer.h"
+#include "sanoRTOS/mem.h"
 #include "sanoRTOS/log.h"
 
 LOG_MODULE_DEFINE(task);
@@ -45,10 +47,6 @@ taskHandleType *nextTask[PORT_CORE_COUNT];
 
 static atomic_t lock;
 
-/**
- * @brief Function to execute when task returns
- *
- */
 void taskExitFunction()
 {
 
@@ -56,10 +54,29 @@ void taskExitFunction()
         ;
 }
 
-/**
- * @brief Change task's status to ready
- * @param pTask Pointer to the taskHandle struct.
- */
+static void taskInitStack(uint32_t *stack, uint32_t stackSize, taskFunctionType taskEntryFunction, void *taskParams)
+{
+    uint32_t stackWords = stackSize / sizeof(uint32_t);
+
+    memset(stack, 0, stackSize);
+    PORT_TASK_STACK_INIT(stack, stackWords, taskEntryFunction, taskExitFunction, taskParams);
+}
+
+static inline void taskDestroyDynamicResources(taskHandleType *pTask)
+{
+    if ((pTask->internalFlags & TASK_INTERNAL_FLAG_OWN_NAME) && (pTask->name != NULL))
+    {
+        memFree((void *)pTask->name);
+    }
+
+    if ((pTask->internalFlags & TASK_INTERNAL_FLAG_OWN_STACK) && (pTask->stack != NULL))
+    {
+        memFree(pTask->stack);
+    }
+
+    memFree(pTask);
+}
+
 void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
     assert(pTask != NULL);
@@ -86,13 +103,6 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
     spinUnlock(&lock, irqState);
 }
 
-/**
- * @brief Block task with the specified blocking reason and number to ticks to block the task for.
- *
- * @param pTask Pointer to taskHandle struct.
- * @param blockReason Block reason
- * @param ticks Number to ticks to block the task for.
- */
 void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
 {
     assert(pTask != NULL);
@@ -115,11 +125,6 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
     taskYield();
 }
 
-/**
- * @brief Suspend the specified task
- *
- * @param pTask Pointer to taskHandle struct.
- */
 void taskSuspend(taskHandleType *pTask)
 {
     assert(pTask != NULL);
@@ -153,13 +158,6 @@ void taskSuspend(taskHandleType *pTask)
     }
 }
 
-/**
- * @brief Resume task from suspended state
- *
- * @param pTask Pointer to taskHandle struct
- * @return `RET_SUCCESS` if task resumed succesfully
- * @return `RET_NOTSUSPENDED` if task is not suspended
- */
 int taskResume(taskHandleType *pTask)
 {
     assert(pTask != NULL);
@@ -173,13 +171,6 @@ int taskResume(taskHandleType *pTask)
     return RET_NOTSUSPENDED;
 }
 
-/**
- * @brief Store pointer to the taskHandle struct to the queue of ready tasks. Calling this
- * function from main does not start execution of the task if Scheduler is not started.To start executeion of task, osStartScheduler must be
- * called from  main after calling taskStart. If this function is called from other running tasks, execution happens based on priority of the task.
- *
- * @param pTask Pointer to taskHandle struct
- */
 void taskStart(taskHandleType *pTask)
 {
     assert(pTask != NULL);
@@ -193,20 +184,125 @@ void taskStart(taskHandleType *pTask)
     spinUnlock(&lock, irqState);
 }
 
-/**
- * @brief Checks if the current task has experienced a stack overflow.
- *
- * This function is not meant to be called by the user. It is used internally by the
- * scheduler to check for stack overflows. If a stack overflow is detected, the program
- * halts in an infinite loop.
- */
+int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
+               taskFunctionType taskEntryFunction, void *taskParams,
+               uint8_t taskPriority, coreAffinityType affinity)
+{
+    taskHandleType *pTask = NULL;
+    uint32_t *stack = NULL;
+    char *taskName = NULL;
+
+    if ((ppTask == NULL) || (taskEntryFunction == NULL) ||
+        (stackSize < (PORT_INITIAL_TASK_STACK_OFFSET * sizeof(uint32_t))) ||
+        ((stackSize % sizeof(uint32_t)) != 0))
+    {
+        return RET_INVAL;
+    }
+
+    pTask = (taskHandleType *)memAlloc(sizeof(taskHandleType));
+    if (pTask == NULL)
+    {
+        return RET_NOMEM;
+    }
+
+    stack = (uint32_t *)memAlloc(stackSize);
+    if (stack == NULL)
+    {
+        memFree(pTask);
+        return RET_NOMEM;
+    }
+
+    if (name != NULL)
+    {
+        size_t nameLen = strlen(name) + 1U;
+        taskName = (char *)memAlloc(nameLen);
+        if (taskName == NULL)
+        {
+            memFree(stack);
+            memFree(pTask);
+            return RET_NOMEM;
+        }
+        memcpy(taskName, name, nameLen);
+    }
+
+    taskInitStack(stack, stackSize, taskEntryFunction, taskParams);
+
+    memset(pTask, 0, sizeof(taskHandleType));
+    pTask->stackPointer = (uint32_t)(stack + (stackSize / sizeof(uint32_t)) - PORT_INITIAL_TASK_STACK_OFFSET);
+    pTask->userFlags = 0;
+    pTask->stack = stack;
+    pTask->name = (taskName != NULL) ? taskName : "dynamicTask";
+    pTask->params = taskParams;
+    pTask->entry = taskEntryFunction;
+    pTask->remainingSleepTicks = 0;
+    pTask->status = TASK_STATUS_READY;
+    pTask->blockedReason = BLOCK_REASON_NONE;
+    pTask->wakeupReason = WAKEUP_REASON_NONE;
+    pTask->coreAffinity = affinity;
+    pTask->priority = taskPriority;
+    pTask->internalFlags = TASK_INTERNAL_FLAG_DYNAMIC | TASK_INTERNAL_FLAG_OWN_STACK;
+
+    if (taskName != NULL)
+    {
+        pTask->internalFlags |= TASK_INTERNAL_FLAG_OWN_NAME;
+    }
+
+    taskStart(pTask);
+    *ppTask = pTask;
+
+    return RET_SUCCESS;
+}
+
+int taskDelete(taskHandleType *pTask)
+{
+    bool isDynamicTask;
+
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    bool irqState = spinLock(&lock);
+
+    if (pTask->status == TASK_STATUS_RUNNING)
+    {
+        spinUnlock(&lock, irqState);
+        return RET_BUSY;
+    }
+
+    if (pTask->status == TASK_STATUS_READY)
+    {
+        taskQueueRemove(getReadyQueue(), pTask);
+    }
+    else if (pTask->status == TASK_STATUS_BLOCKED)
+    {
+        taskQueueRemove(getBlockedQueue(), pTask);
+    }
+
+    pTask->remainingSleepTicks = 0;
+    pTask->status = TASK_STATUS_SUSPENDED;
+    pTask->blockedReason = BLOCK_REASON_NONE;
+    pTask->wakeupReason = WAKEUP_REASON_NONE;
+
+    isDynamicTask = ((pTask->internalFlags & TASK_INTERNAL_FLAG_DYNAMIC) != 0U);
+
+    spinUnlock(&lock, irqState);
+
+    if (isDynamicTask)
+    {
+        taskDestroyDynamicResources(pTask);
+    }
+
+    return RET_SUCCESS;
+}
+
 void taskCheckStackOverflow(void)
 {
     taskHandleType *pCurrentTask = taskGetCurrent();
 
     if (pCurrentTask->stackPointer <= (uint32_t)(pCurrentTask->stack + STACK_GUARD_WORDS))
     {
-        LOG_ERROR("%s stack overflow at address: %p", pCurrentTask->name,(void*) pCurrentTask->stackPointer);
+        LOG_ERROR("%s stack overflow at address: %p", pCurrentTask->name, (void *)pCurrentTask->stackPointer);
 
         while (1)
             ;

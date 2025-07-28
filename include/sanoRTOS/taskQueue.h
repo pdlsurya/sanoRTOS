@@ -94,14 +94,46 @@ extern "C"
         taskNodeType *head; ///< Pointer to the head of the task queue linked list.
     } taskQueueType;
 
+    /**
+     * @brief Get and remove the next eligible task from queue.
+     *
+     * @param pTaskQueue Pointer to task queue.
+     * @param affinityCheck `true` to enforce core-affinity filtering.
+     * @return Task handle pointer, or `NULL` if none available.
+     */
     taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck);
 
+    /**
+     * @brief Peek next eligible task from queue without removing it.
+     *
+     * @param pTaskQueue Pointer to task queue.
+     * @param affinityCheck `true` to enforce core-affinity filtering.
+     * @return Task handle pointer, or `NULL` if none available.
+     */
     taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck);
 
+    /**
+     * @brief Add a task to queue sorted by priority.
+     *
+     * @param pTaskQueue Pointer to task queue.
+     * @param pTask Pointer to task handle.
+     */
     void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
+    /**
+     * @brief Add a task to the front of queue.
+     *
+     * @param pTaskQueue Pointer to task queue.
+     * @param pTask Pointer to task handle.
+     */
     void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
+    /**
+     * @brief Remove a specific task from queue.
+     *
+     * @param pTaskQueue Pointer to task queue.
+     * @param pTask Pointer to task handle.
+     */
     void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
     /**

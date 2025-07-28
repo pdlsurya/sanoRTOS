@@ -45,6 +45,13 @@ extern "C"
 
 #define STACK_GUARD_WORDS 8
 
+#define TASK_INTERNAL_FLAG_DYNAMIC (1U << 0)
+#define TASK_INTERNAL_FLAG_OWN_STACK (1U << 1)
+#define TASK_INTERNAL_FLAG_OWN_NAME (1U << 2)
+
+    /**
+     * @brief Internal function executed if a task entry returns.
+     */
     void taskExitFunction();
 
     typedef enum
@@ -79,7 +86,8 @@ extern "C"
         .remainingSleepTicks = 0,                                                                                 \
         .status = TASK_STATUS_READY,                                                                              \
         .blockedReason = BLOCK_REASON_NONE,                                                                       \
-        .wakeupReason = WAKEUP_REASON_NONE}
+        .wakeupReason = WAKEUP_REASON_NONE,                                                                        \
+        .internalFlags = 0}
 
     typedef void (*taskFunctionType)(void *params);
 
@@ -136,6 +144,7 @@ extern "C"
         wakeupReasonType wakeupReason;   ///< Reason the task was woken up (e.g., timeout, signal).
         coreAffinityType coreAffinity;   ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
         uint8_t priority;                ///< Priority level of the task (lower value indicate higher priority).
+        uint8_t internalFlags;           ///< Internal ownership flags used by dynamic task APIs.
     } taskHandleType;
 
     typedef struct
@@ -155,16 +164,74 @@ extern "C"
     extern taskHandleType *nextTask[PORT_CORE_COUNT];
     extern taskPoolType taskPool;
 
+    /**
+     * @brief Set task state to READY and enqueue it in ready queue.
+     *
+     * @param pTask Pointer to task handle.
+     * @param wakeupReason Reason for waking the task.
+     */
     void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
 
+    /**
+     * @brief Block a task with a reason and timeout.
+     *
+     * @param pTask Pointer to task handle.
+     * @param blockedReason Reason why task is blocked.
+     * @param ticks Ticks to remain blocked.
+     */
     void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
 
+    /**
+     * @brief Suspend a task.
+     *
+     * @param pTask Pointer to task handle.
+     */
     void taskSuspend(taskHandleType *pTask);
 
+    /**
+     * @brief Resume a suspended task.
+     *
+     * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, `RET_NOTSUSPENDED` otherwise.
+     */
     int taskResume(taskHandleType *pTask);
 
+    /**
+     * @brief Enqueue a task to ready queue.
+     *
+     * @param pTask Pointer to task handle.
+     */
     void taskStart(taskHandleType *pTask);
 
+    /**
+     * @brief Dynamically create and start a task.
+     *
+     * @param ppTask Output pointer receiving created task handle.
+     * @param name Task name (optional).
+     * @param stackSize Stack size in bytes.
+     * @param taskEntryFunction Task entry function.
+     * @param taskParams Entry function argument.
+     * @param taskPriority Task priority.
+     * @param affinity Core affinity.
+     * @return `RET_SUCCESS` on success, error code otherwise.
+     */
+    int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
+                   taskFunctionType taskEntryFunction, void *taskParams,
+                   uint8_t taskPriority, coreAffinityType affinity);
+
+    /**
+     * @brief Delete a task.
+     *
+     * Dynamically-created task resources are freed by this API.
+     *
+     * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, error code otherwise.
+     */
+    int taskDelete(taskHandleType *pTask);
+
+    /**
+     * @brief Check current task stack-overflow guard.
+     */
     void taskCheckStackOverflow();
 
     /**

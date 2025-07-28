@@ -31,15 +31,6 @@
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/semaphore.h"
 
-/**
- * @brief Function to take/wait for the semaphore. If calling this function from an ISR, the parameter waitTicks
- * should be set to TASK_NO_WAIT.
- * @param pSem  pointer to the semaphore structure
- * @param waitTicks Number of ticks to wait if semaphore is not available
- * @retval `RET_SUCCESS` if semaphore is taken succesfully.
- * @retval `RET_BUSY` if semaphore is not available
- * @retval `RET_TIMEOUT` if timeout occured while waiting for semaphore
- */
 int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
     assert(pSem != NULL);
@@ -101,12 +92,6 @@ retry:
     return retCode;
 }
 
-/**
- * @brief Function to give/signal semaphore
- * @param pSem  pointer to the semaphoreHandle struct.
- * @retval `RET_SUCCESS` if semaphore give succesfully.
- * @retval `RET_NOSEM` no semaphore available to give
- */
 int semaphoreGive(semaphoreHandleType *pSem)
 {
     assert(pSem != NULL);

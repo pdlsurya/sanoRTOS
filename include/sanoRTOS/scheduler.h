@@ -74,8 +74,17 @@ extern "C"
  */
 #define MS_TO_RTOS_TICKS(ms) (((ms) * 1000) / CONFIG_TICK_INTERVAL_US)
 
+    /**
+     * @brief Start the RTOS scheduler.
+     *
+     * This function starts timer services, idle tasks, and performs the first
+     * context switch to begin task scheduling.
+     */
     void schedulerStart();
 
+    /**
+     * @brief Voluntarily yield CPU execution to another ready task.
+     */
     void taskYield();
 
 #ifdef __cplusplus

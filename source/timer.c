@@ -40,12 +40,6 @@ static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout ha
 /*Define timer task with highest possible priority*/
 TASK_DEFINE(timerTask, 4096, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, AFFINITY_CORE_0);
 
-/**
- * @brief Insert timeoutHandler node at the end of the Queue
- *
- * @param pTimeoutHandlerQueue Pointer to the timeoutHandlerQueue struct
- * @param timeoutHandler timeoutHandler function
- */
 static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue, timeoutHandlerType timeoutHandler)
 {
     timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)memAlloc(sizeof(timeoutHandlerNodeType));
@@ -67,12 +61,6 @@ static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueu
     }
 }
 
-/**
- * @brief Get timeoutHandler node from the front of the Queue
- *
- * @param pTimeoutHandlerQueue
- * @retval `timeoutHandler function`
- */
 static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeoutHandlerQueue)
 {
 
@@ -87,12 +75,6 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
     return timeoutHandler;
 }
 
-/**
- * @brief Add a timer node to the list of running timers
- *
- * @param pTimerList  Pointer to the timer list struct
- * @param pTimerNode  Pointer to the timerNode struct
- */
 static void timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
 
@@ -101,11 +83,6 @@ static void timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNod
     pTimerList->head = pTimerNode;
 }
 
-/**
- * @brief Delete the timerNode from the beginning of the list
- *
- * @param pTimerList Pointer to the timerNode struct
- */
 static inline void timerListDeleteFirstNode(timerListType *pTimerList)
 {
     timerNodeType *tempNode = pTimerList->head->nextNode;
@@ -115,14 +92,6 @@ static inline void timerListDeleteFirstNode(timerListType *pTimerList)
     pTimerList->head = tempNode;
 }
 
-/**
- * @brief Delete a specified timerNode from the list of running timers.
- *
- * @param pTimerList Pointer to the timerList struct.
- * @param pTimerNode Pointer to the timerNode struct.
- * @retval `RET_SUCCESS` if timerNode deleted successfully
- * @retval `RET_EMPTY` if timerList is empty
- */
 static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerNode)
 {
 
@@ -151,14 +120,6 @@ static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerN
     return RET_EMPTY;
 }
 
-/**
- * @brief  Function to start the timer. This stores the timerNode in the list of running timers.
- *
- * @param pTimerNode Pointer timerNode struct
- * @param intervalTicks Timer intervalTicks
- * @retval `RET_SUCCESS` if timer started successfully
- * @retval `RET_ALREADYACTIVE` if timer is already running
- */
 int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
 {
     assert(pTimerNode != NULL);
@@ -180,15 +141,6 @@ int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
     return RET_SUCCESS;
 }
 
-/**
- * @brief Function to stop the specified timerNode. This sets isRunning flag to false to prevent subsequent events from this timer
- *  and delete timer from the list of running timers
- *
- * @param pTimerNode Pointer to timerNode struct
- * @retval `RET_SUCCESS` if timer stopped successfully
- * @retval `RET_EMPTY` if timerList is empty
- * @retval `RET_NOTACTIVE` if timer is not running
- */
 int timerStop(timerNodeType *pTimerNode)
 {
     assert(pTimerNode != NULL);
@@ -201,10 +153,6 @@ int timerStop(timerNodeType *pTimerNode)
     return RET_NOTACTIVE;
 }
 
-/**
- * @brief Check for timer timeout and add the corresponding timeout handler to the
- *  Queue of timeout handlers
- */
 void processTimers()
 {
     if (timerList.head != NULL) // Check if timer list is empty
@@ -247,21 +195,12 @@ void processTimers()
     }
 }
 
-/**
- * @brief Function to Start timerTask. This function will be called when starting the scheduler.
- *
- */
 void timerTaskStart()
 {
 
     taskStart(&timerTask);
 }
 
-/**
- * @brief RTOS timer task function
- *
- * @param args task function arguments
- */
 void timerTaskFunction(void *args)
 {
     (void)args;

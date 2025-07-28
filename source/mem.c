@@ -30,12 +30,6 @@
 
 static atomic_t lock;
 
-/**
- * @brief Allocate a  memory block of specified size in bytes
- *
- * @param size Size of memory to be allocated in bytes
- * @retval Address of the allocated memory block
- */
 void *memAlloc(size_t size)
 {
     void *ptr = NULL;
@@ -49,11 +43,6 @@ void *memAlloc(size_t size)
     return ptr;
 }
 
-/**
- * @brief Deallocate the memory block
- *
- * @param ptr Pointer to the  memory block
- */
 void memFree(void *ptr)
 {
     bool irqState = spinLock(&lock);
@@ -63,13 +52,6 @@ void memFree(void *ptr)
     spinUnlock(&lock, irqState);
 }
 
-/**
- * @brief Re-allocate the  memory block with given size
- *
- * @param ptr Pointer to the memory block to be reallocated
- * @param size New size of the memory block
- * @retval Address of new memeory block
- */
 void *memRealloc(void *ptr, size_t size)
 {
     void *new_ptr = NULL;

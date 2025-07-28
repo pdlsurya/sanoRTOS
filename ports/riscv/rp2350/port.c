@@ -66,11 +66,6 @@ static uint64_t mtimer_period_ticks;
 
 static atomic_t lock;
 
-/**
- * @brief rtos system call handler
- *
- * @param sysCode
- */
 void syscallHandler(uint32_t sysCode)
 {
     switch (sysCode)
@@ -104,10 +99,6 @@ void syscallHandler(uint32_t sysCode)
     }
 }
 
-/**
- * @brief Configure rtos tick timer.
- *
- */
 static inline void portTickConfig()
 {
     mtimer_period_ticks = TIMER_TICKS_PER_RTOS_TICK;
@@ -120,10 +111,6 @@ static inline void portTickConfig()
     riscv_set_csr(mstatus, RVCSR_MSTATUS_MIE_BITS);
 }
 
-/**
- * @brief Configure platform specific interrupts and tick timer.
- *
- */
 static inline void portConfig()
 {
     /*Replace this with vendor specific machine software interrupt enable api and
@@ -136,10 +123,6 @@ static inline void portConfig()
     portTickConfig();
 }
 
-/**
- * @brief Configure Physical Memory Protection (PMP) to allow user mode access to peripherals and memory regions.
- *
- */
 
 void pmpConfigure(void)
 {
@@ -180,10 +163,6 @@ void pmpConfigure(void)
     riscv_write_csr(pmpcfg1, pmpcfg_reg1);
 }
 
-/**
- * @brief Run the first task.
- *
- */
 void portRunFirstTask()
 {
     bool irqState = spinLock(&lock);
@@ -236,20 +215,12 @@ void portRunFirstTask()
 #endif
 }
 
-/**
- * @brief Entry point for core 1
- *
- */
 static void core1_entry(void)
 {
 
     portRunFirstTask();
 }
 
-/**
- * @brief Setup the scheduler to start the first task.
- *
- */
 void portSchedulerStart()
 {
 #if (CONFIG_SMP)

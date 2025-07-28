@@ -65,8 +65,23 @@ extern "C"
         bool locked;                  ///< Indicates whether the mutex is currently locked.
     } mutexHandleType;
 
+    /**
+     * @brief Acquire a mutex.
+     *
+     * If the mutex is already locked, the caller waits up to `waitTicks`.
+     *
+     * @param pMutex Pointer to mutex handle.
+     * @param waitTicks Maximum ticks to wait for lock acquisition.
+     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, error code otherwise.
+     */
     int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks);
 
+    /**
+     * @brief Release a mutex.
+     *
+     * @param pMutex Pointer to mutex handle.
+     * @return `RET_SUCCESS` on success, `RET_NOTOWNER` if caller is not owner, error code otherwise.
+     */
     int mutexUnlock(mutexHandleType *pMutex);
 
 #ifdef __cplusplus

@@ -72,10 +72,6 @@ void IRAM_ATTR ecall_handler()
     }
 }
 
-/**
- * @brief Configure platform specific interrupts and tick timer.
- *
- */
 static inline void portConfig()
 {
     /*Replace this with vendor specific machine software interrupt enable api and
@@ -91,10 +87,6 @@ static inline void portConfig()
     mtimer_callback_init(&mtimer_cb_init);
 }
 
-/**
- * @brief Configure esp32 specific Aceess Permission Management (APM) to allow user mode access to peripherals and memory regions.
- *
- */
 static inline void apmConfigure()
 {
     apm_ll_hp_apm_set_region_start_addr(0, SOC_PERIPHERAL_LOW);
@@ -104,10 +96,6 @@ static inline void apmConfigure()
     apm_ll_hp_apm_enable_region_filter(0, true);
 }
 
-/**
- * @brief Configure Physical Memory Protection (PMP) to allow user mode access to peripherals and memory regions.
- *
- */
 void pmpConfigure()
 {
     /*NAPOT pmpaddr value= (start_address >> 2) | (size - 1) >> 3 */
@@ -145,10 +133,6 @@ void pmpConfigure()
     RV_WRITE_CSR(pmpcfg1, pmp4cfg);
 }
 
-/**
- * @brief Start the scheduler by jumping to the first task.
- *
- */
 void portSchedulerStart()
 {
 

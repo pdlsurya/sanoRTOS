@@ -33,14 +33,6 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/conditionVariable.h"
 
-/**
- * @brief Wait on condition variable. Since waiting on a condition variable internally uses
- * a mutex, this function cannot be called from an ISR.
- * @param pCondVar Pointer to condVarHandle struct
- * @param waitTicks Number of ticks to wait until timeout
- * @retval `RET_SUCCESS` if wait succeeded
- * @retval `RET_TIMEOUT` if timeout occured while waiting
- */
 int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 {
     assert(pCondVar != NULL);
@@ -91,13 +83,6 @@ wait:
     return retCode;
 }
 
-/**
- * @brief Signal a task waiting on conditional variable. This function cannot be
- * called from an ISR.
- * @param pCondVar Pointer to condVarHandle struct
- * @retval `RET_SUCCESS` if signal succeeded,
- * @retval `RET_NOTASK` if no tasks available to signal
- */
 int condVarSignal(condVarHandleType *pCondVar)
 {
     assert(pCondVar != NULL);
@@ -137,13 +122,6 @@ getNextSignalTask:
     return RET_NOTASK;
 }
 
-/**
- * @brief Signal all the waiting tasks waiting on conditional variable. This function
- * cannot be called from an ISR.
- * @param pCondVar Pointer to condVarHandle struct
- * @retval `RET_SUCCESS` if broadcast succeeded,
- * @retval `RET_NOTASK` if not tasks available to broadcast
- */
 int condVarBroadcast(condVarHandleType *pCondVar)
 {
     assert(pCondVar != NULL);

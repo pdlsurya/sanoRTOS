@@ -30,9 +30,6 @@
 /*RTOS tick handler function*/
 extern void tickHandler(void);
 
-/**
- * @brief Configure platform specific interrupts and tick timer.
- */
 static inline void portConfig()
 {
 
@@ -45,11 +42,6 @@ static inline void portConfig()
     SysTick_Config(TIMER_TICKS_PER_RTOS_TICK);
 }
 
-/**
- * @brief Setup the scheduler to start the first task.
- *
- * @param pTask
- */
 void portSchedulerStart()
 {
 
@@ -77,20 +69,11 @@ void portSchedulerStart()
     currentTask[PORT_CORE_ID()]->entry(currentTask[PORT_CORE_ID()]->params);
 }
 
-/**
- * @brief SysTick Timer interrupt handler. It selects next task to run and
- * triggers PendSV to perform actual context switch.
- */
 void SysTick_Handler()
 {
     tickHandler();
 }
 
-/**
- * @brief SVC interrupt service routine(ISR). SVC interrupt is triggered via SYSCALL
- * with a specific SVC number. SVC number is decoded to perform corresponding action.
- *
- */
 void SVC_Handler()
 {
 
@@ -146,26 +129,6 @@ void SVC_Handler()
     }
 }
 
-/**
- * @brief PendSV Handler for context switching between tasks.
- *
- * This function is triggered by the PendSV exception and performs
- * a context switch by saving the state (registers and optionally FPU registers)
- * of the currently running task and restoring the state of the next task.
- *
- * It uses inline assembly to:
- * - Save r4–r11 and LR of the current task to its stack.
- * - Conditionally save FPU registers s16–s31 if the task used the FPU.
- * - Update the `currentTask` stack pointer.
- * - Load the stack pointer of the `nextTask`.
- * - Restore r4–r11, LR, and optionally FPU registers s16–s31.
- * - Update the process stack pointer (PSP) for the new task.
- *
- *
- * @note This function is marked as `naked` and must not contain
- *       any C code outside inline assembly. Only called by the
- *       Cortex-M exception mechanism (PendSV).
- */
 
 __attribute__((naked)) void PendSV_Handler(void)
 {

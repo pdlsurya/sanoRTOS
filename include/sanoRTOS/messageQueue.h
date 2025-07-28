@@ -100,8 +100,28 @@ extern "C"
         return (pQueueHandle->itemCount == 0);
     }
 
+    /**
+     * @brief Send an item to a message queue.
+     *
+     * If the queue is full, the caller waits up to `waitTicks` for space.
+     *
+     * @param pQueueHandle Pointer to queue handle.
+     * @param pItem Pointer to item buffer to send.
+     * @param waitTicks Maximum ticks to wait when queue is full.
+     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, error code otherwise.
+     */
     int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
 
+    /**
+     * @brief Receive an item from a message queue.
+     *
+     * If the queue is empty, the caller waits up to `waitTicks` for data.
+     *
+     * @param pQueueHandle Pointer to queue handle.
+     * @param pItem Pointer to destination buffer.
+     * @param waitTicks Maximum ticks to wait when queue is empty.
+     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, error code otherwise.
+     */
     int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
 
 #ifdef __cplusplus

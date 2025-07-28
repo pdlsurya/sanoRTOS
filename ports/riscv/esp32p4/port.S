@@ -1,7 +1,7 @@
 /*
 * MIT License
 * 
-* Copyright (c) 2025 Surya Poudel
+* Copyright (c) 2024 Surya Poudel
 * 
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -251,14 +251,14 @@ m_software_interrupt_handler:
     add t0, t0, t3         // t0 = &currentTask[hartid]
     lw t1, 0(t0)           // t1 = currentTask[hartid]
     sw sp, 0(t1)           // Save SP to currentTask[hartid]->sp
-    sw t4, 4(t1)           // Store fpu usage flag in userFlags of TCB
+    sw t4, 4(t1)
 
     /* Load next task's stack pointer */
     la t0, nextTask        // t0 = &nextTask
     add t0, t0, t3         // t0 = &nextTask[hartid]
     lw t1, 0(t0)           // t1 = nextTask[hartid]
     lw sp, 0(t1)           // Load SP from nextTask[hartid]->sp
-    lw t4, 4(t1)           // Load fpu usage flag from userFlags of TCB
+    lw t4, 4(t1)
 
     beq x0, t4, 2f
 

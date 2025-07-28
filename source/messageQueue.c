@@ -32,12 +32,6 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 
-/**
- * @brief Insert an item to the queue buffer
- *
- * @param pQueueHandle Pointer to msgQueueHandle struct.
- * @param pItem Pointer to the item
- */
 static bool msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 {
     bool irqState = spinLock(&pQueueHandle->lock);
@@ -89,12 +83,6 @@ static bool msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
     }
 }
 
-/**
- * @brief  Get an item from the queue buffer
- *
- * @param pQueueHandle Pointer to msgQueueHandle struct.
- * @param pItem Pointer to the item
- */
 static bool msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 {
 
@@ -150,16 +138,6 @@ static bool msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
     }
 }
 
-/**
- * @brief Send an item to the queue. If the queue if full, block the task for specified number of wait ticks.
- * If calling this function from an ISR, the parameter waitTicksshould be set to TASK_NO_WAIT.
- * @param pQueueHandle Pointer to queueHandle struct.
- * @param pItem Pointer to the item to be sent to the Queue.
- * @param waitTicks Number of ticks to wait if Queue is full.
- * @retval `RET_SUCCESS` if message sent successfully.
- * @retval `RET_FUL`L if Queue is full.
- * @retval `RET_TIMEOUT` if wait timeout occured.
- */
 int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
     assert(pQueueHandle != NULL);
@@ -216,16 +194,6 @@ retry:
     return retCode;
 }
 
-/**
- * @brief Receive an item from the queue. If the queue is empty, block the task for specified  number of wait ticks.
- * If calling this function from an ISR, the parameter waitTicks should be set to TASK_NO_WAIT.
- * @param pQueueHandle Pointer to queueHandle struct
- * @param pItem Pointer to the variable to be assigned the data received from the Queue.
- * @param waitTicks Number of ticks to wait if Queue is empty.
- * @retval `RET_SUCCESS` if message received successfully.
- * @retval `RET_EMPTY` if Queue is empty.
- * @retval `RET_TIMEOUT` if wait timeout occured.
- */
 int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
     assert(pQueueHandle != NULL);

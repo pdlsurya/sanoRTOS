@@ -96,6 +96,16 @@ extern "C"
         [stackSize / sizeof(uint32_t) - 8] = (uint32_t)taskParams,                               \
         [stackSize / sizeof(uint32_t) - 9] = EXC_RETURN_THREAD_PSP};
 
+#define PORT_TASK_STACK_INIT(stack, stackWords, taskEntryFunction, taskExitFunction, taskParams) \
+    do                                                                                             \
+    {                                                                                              \
+        (stack)[(stackWords)-1] = 0x01000000;                                                     \
+        (stack)[(stackWords)-2] = (uint32_t)(taskEntryFunction);                                  \
+        (stack)[(stackWords)-3] = (uint32_t)(taskExitFunction);                                   \
+        (stack)[(stackWords)-8] = (uint32_t)(taskParams);                                         \
+        (stack)[(stackWords)-9] = EXC_RETURN_THREAD_PSP;                                          \
+    } while (0)
+
 /*Macro to invoke System call. This triggers SVC exception with specified sysCode*/
 #define PORT_SYSCALL(sysCode) __asm volatile("svc %0" : : "I"(sysCode) : "memory");
 

@@ -65,8 +65,23 @@ extern "C"
         uint8_t maxCount;        ///< Maximum count the semaphore can reach (resource capacity limit).
     } semaphoreHandleType;
 
+    /**
+     * @brief Take (acquire) a semaphore.
+     *
+     * If count is zero, the caller waits up to `waitTicks`.
+     *
+     * @param pSem Pointer to semaphore handle.
+     * @param waitTicks Maximum ticks to wait when unavailable.
+     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, error code otherwise.
+     */
     int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks);
 
+    /**
+     * @brief Give (release) a semaphore.
+     *
+     * @param pSem Pointer to semaphore handle.
+     * @return `RET_SUCCESS` on success, `RET_NOSEM` if at max count, error code otherwise.
+     */
     int semaphoreGive(semaphoreHandleType *pSem);
 
 #ifdef __cplusplus

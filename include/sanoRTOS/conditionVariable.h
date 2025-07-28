@@ -63,10 +63,32 @@ extern "C"
         atomic_t lock;           ///< Spinlock to ensure atomic access to the condition variable's internal state.
     } condVarHandleType;
 
+    /**
+     * @brief Wait on a condition variable.
+     *
+     * The current task blocks until the condition variable is signaled,
+     * broadcast, or the timeout expires.
+     *
+     * @param pCondVar Pointer to condition variable handle.
+     * @param waitTicks Maximum ticks to wait (`TASK_MAX_WAIT` for infinite wait).
+     * @return `RET_SUCCESS` if signaled, `RET_TIMEOUT` on timeout, error code otherwise.
+     */
     int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks);
 
+    /**
+     * @brief Signal a condition variable and wake one waiting task.
+     *
+     * @param pCondVar Pointer to condition variable handle.
+     * @return `RET_SUCCESS` on success, error code otherwise.
+     */
     int condVarSignal(condVarHandleType *pCondVar);
 
+    /**
+     * @brief Broadcast a condition variable and wake all waiting tasks.
+     *
+     * @param pCondVar Pointer to condition variable handle.
+     * @return `RET_SUCCESS` on success, error code otherwise.
+     */
     int condVarBroadcast(condVarHandleType *pCondVar);
 
 #ifdef __cplusplus

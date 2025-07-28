@@ -90,10 +90,6 @@ void IRAM_ATTR ecall_handler()
     }
 }
 
-/**
- * @brief Configure platform specific interrupts and tick timer.
- *
- */
 static inline void portConfig()
 {
     /*Replace this with vendor specific machine software interrupt enable api and
@@ -112,10 +108,6 @@ static inline void portConfig()
     mtimer_callback_init(&mtimer_cb_init);
 }
 
-/**
- * @brief Configure esp32 specific Aceess Permission Management (APM) to allow user mode access to peripherals and memory regions.
- *
- */
 static inline void apmConfigure()
 {
     apm_ll_peri_region_config(0, SOC_PERIPHERAL_LOW, SOC_PERIPHERAL_HIGH);
@@ -125,10 +117,6 @@ static inline void apmConfigure()
     apm_ll_peri_region_pms(APM_LL_MASTER_HPCPU1, APM_LL_SECURE_MODE_REE, 0, BIT(0));
 }
 
-/**
- * @brief Configure Physical Memory Protection (PMP) to allow user mode access to peripherals and memory regions.
- *
- */
 void pmpConfigure(void)
 {
     /* FLASH (16MB @0x40000000) */
@@ -177,10 +165,6 @@ void pmpConfigure(void)
 
     RV_WRITE_CSR(pmpcfg1, pmpcfg1);
 }
-/**
- * @brief Run the first task.
- *
- */
 void portRunFirstTask()
 {
     bool irqState = spinLock(&lock);
@@ -240,10 +224,6 @@ void core1_main(void)
     portRunFirstTask();
 }
 
-/**
- * @brief Setup the scheduler to start the first task.
- *
- */
 void portSchedulerStart()
 {
 #if (CONFIG_SMP)

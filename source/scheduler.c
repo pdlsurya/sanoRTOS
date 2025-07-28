@@ -38,15 +38,6 @@ TASK_DEFINE(idleTask0, 1024, idleTaskHandler0, NULL, TASK_LOWEST_PRIORITY, AFFIN
 
 static atomic_t lock;
 
-/**
- * @brief Task handler for idle task on core 0
- *
- * This task handler is responsible for entering sleep mode when there are no
- * tasks to run on core 0. This is a low priority task and is only executed when
- * there are no other tasks to run.
- *
- * @param params parameters passed to the task (not used)
- */
 void idleTaskHandler0(void *params)
 {
     (void)params;
@@ -57,16 +48,6 @@ void idleTaskHandler0(void *params)
     }
 }
 
-/**
- * @brief Select next highest priority ready task for execution
- *
- * This function is responsible for selecting the next highest priority task
- * from the ready queue. It checks if a context switch is required and if so,
- * it performs the context switch.
- *
- * @retval `TRUE` if context switch is required
- * @retval `FALSE` if context switch is not required
- */
 static bool selectNextTask(void)
 {
     taskQueueType *const pReadyQueue = getReadyQueue();
@@ -116,14 +97,6 @@ static bool selectNextTask(void)
     return false;
 }
 
-/**
- * @brief Check for timeout of blocked tasks and change  status to READY
- * with corresponding timeout reason.
- *
- * This function periodically checks each task in the blocked queue and
- * decrements the sleep counter. If the sleep counter reaches zero, the
- * task is set to READY with the corresponding wake-up reason.
- */
 static void checkTimeout()
 {
     taskQueueType *pBlockedQueue = getBlockedQueue();
@@ -142,10 +115,6 @@ static void checkTimeout()
             currentTaskNode->pTask->remainingSleepTicks--;
             if (currentTaskNode->pTask->remainingSleepTicks == 0)
             {
-                /**
-                 * If the task was sleeping, set wake-up reason to
-                 * SLEEP_TIME_TIMEOUT. Otherwise, set it to WAIT_TIMEOUT.
-                 */
                 if (currentTaskNode->pTask->blockedReason == SLEEP)
                 {
                     taskSetReady(currentTaskNode->pTask, SLEEP_TIME_TIMEOUT);
@@ -160,13 +129,6 @@ static void checkTimeout()
     }
 }
 
-/**
- * @brief Voluntarily relinquish control of the CPU to allow other tasks to execute.
- *
- * This function will switch to the next task in the ready queue, if there is one.
- * If there is no other task in the ready queue, the current task will continue
- * executing.
- */
 void taskYield()
 {
     bool contextSwitchRequired = false;
@@ -191,10 +153,6 @@ void taskYield()
     spinUnlock(&lock, irqState);
 }
 
-/**
- * @brief RTOS Tick interrupt handler. It selects next task to run and
- * triggers platform specific context switch mechanism.
- */
 void tickHandler()
 {
 
@@ -228,9 +186,6 @@ void tickHandler()
     spinUnlock(&lock, irqState);
 }
 
-/**
- * @brief Function to start the RTOS task scheduler.
- */
 void schedulerStart()
 {
     /*Start timerTask*/

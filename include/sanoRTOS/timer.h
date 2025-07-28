@@ -102,12 +102,33 @@ extern "C"
         timerNodeType *head; ///< Pointer to the head of the active timer list.
     } timerListType;
 
+    /**
+     * @brief Start a software timer.
+     *
+     * @param pTimerNode Pointer to timer node.
+     * @param interval Timer interval in RTOS ticks.
+     * @return `RET_SUCCESS` on success, error code otherwise.
+     */
     int timerStart(timerNodeType *pTimerNode, uint32_t interval);
 
+    /**
+     * @brief Stop a running software timer.
+     *
+     * @param pTimerNode Pointer to timer node.
+     * @return `RET_SUCCESS` on success, `RET_NOTACTIVE` if timer not running, error code otherwise.
+     */
     int timerStop(timerNodeType *pTimerNode);
 
+    /**
+     * @brief Process active timers and timeout handlers.
+     *
+     * Internal scheduler/tick path API.
+     */
     void processTimers();
 
+    /**
+     * @brief Start internal timer service task.
+     */
     void timerTaskStart();
 
 #ifdef __cplusplus

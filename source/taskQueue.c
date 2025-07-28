@@ -30,12 +30,6 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/mem.h"
 
-/**
- * @brief Dynamically allocates and initializes a new task node.
- *
- * @param pTask Pointer to the task handle structure.
- * @return Pointer to the newly allocated task node.
- */
 static inline taskNodeType *newNode(taskHandleType *pTask)
 {
     taskNodeType *newTaskNode = (taskNodeType *)memAlloc(sizeof(taskNodeType));
@@ -47,13 +41,6 @@ static inline taskNodeType *newNode(taskHandleType *pTask)
     return newTaskNode;
 }
 
-/**
- * @brief Removes the front (head) node from the given task queue.
- *
- * Frees the memory associated with the removed node.
- *
- * @param pTaskQueue Pointer to the task queue.
- */
 static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
     taskNodeType *temp = pTaskQueue->head->nextTaskNode;
@@ -61,15 +48,6 @@ static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
     pTaskQueue->head = temp;
 }
 
-/**
- * @brief Removes a specific task from the task queue.
- *
- * If the task is at the front, it removes the head node. Otherwise, it traverses
- * the list and unlinks the node associated with the given task.
- *
- * @param pTaskQueue Pointer to the task queue.
- * @param pTask Pointer to the task handle to be removed.
- */
 void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
     assert(pTaskQueue != NULL);
@@ -93,14 +71,6 @@ void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
     }
 }
 
-/**
- * @brief Inserts a task at the front of the queue without considering task priority.
- *
- * Useful when priority ordering is not required.
- *
- * @param pTaskQueue Pointer to the task queue.
- * @param pTask Pointer to the task to be inserted.
- */
 void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
     assert(pTaskQueue != NULL);
@@ -111,15 +81,6 @@ void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
     pTaskQueue->head = newTaskNode;
 }
 
-/**
- * @brief Inserts a task into the queue in ascending order of priority.
- *
- * Lower numerical value indicates higher priority. The queue is kept sorted
- * to enable efficient retrieval of the highest-priority task.
- *
- * @param pTaskQueue Pointer to the task queue.
- * @param pTask Pointer to the task to be inserted.
- */
 void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
     assert(pTaskQueue != NULL);
@@ -150,16 +111,6 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
     }
 }
 
-/**
- * @brief Retrieves the highest-priority task eligible to run  and removes it from the queue.
- *
- * If `affinityCheck` is `true`, only tasks with a matching core affinity or
- * AFFINITY_CORE_ANY are considered eligible. `affinityCheck` is required only when retrieving tasks from the readyQueue.
- *
- * @param pTaskQueue Pointer to the task queue.
- * @param affinityCheck `true` to check core affinity of the task, `false` to ignore it.
- * @return Pointer to the task handle, or NULL if no eligible task is found.
- */
 taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck)
 {
     assert(pTaskQueue != NULL);
@@ -193,14 +144,6 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck)
     return NULL;
 }
 
-/**
- * @brief Peeks the highest-priority task eligible to run on this core without removing it.
- *
- * Similar to taskQueueGet() but does not modify the queue.
- *
- * @param pTaskQueue Pointer to the task queue.
- * @return Pointer to the task handle, or NULL if no eligible task is found.
- */
 taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck)
 {
     if (!taskQueueEmpty(pTaskQueue))

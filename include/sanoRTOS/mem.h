@@ -36,10 +36,28 @@ extern "C"
 {
 #endif
 
+    /**
+     * @brief Allocate memory from heap.
+     *
+     * @param size Size in bytes.
+     * @return Pointer to allocated memory, or `NULL` on failure.
+     */
     void *memAlloc(size_t size);
 
+    /**
+     * @brief Free previously allocated memory.
+     *
+     * @param ptr Pointer to memory block.
+     */
     void memFree(void *ptr);
 
+    /**
+     * @brief Resize an allocated memory block.
+     *
+     * @param ptr Pointer to existing memory block.
+     * @param size New size in bytes.
+     * @return Pointer to resized block, or `NULL` on failure.
+     */
     void *memRealloc(void *ptr, size_t size);
 
 #ifdef __cplusplus

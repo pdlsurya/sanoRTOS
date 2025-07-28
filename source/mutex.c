@@ -32,15 +32,6 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/mutex.h"
 
-/**
- * @brief Lock/acquire the mutex. Because mutexes incorporate ownership control and
- * priority inheritance, calling this function from an ISR is not allowed.
- * @param pMutex Pointer to the mutex structure
- * @param waitTicks Number of ticks to wait if mutex is not available
- * @retval `RET_SUCCESS` if mutex locked successfully
- * @retval `RET_BUSY`  if mutex not available
- * @retval `RET_TIMEOUT` if timeout occured while waiting for mutex
- */
 int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
     assert(pMutex != NULL);
@@ -116,15 +107,6 @@ retry:
     return retCode;
 }
 
-/**
- * @brief Unlock/Release mutex.Because mutexes incorporate ownership control and
- * priority inheritance, calling this function from an ISR is not allowed.
- *
- * @param pMutex Pointer to the mutex structure
- * @retval `RET_SUCCESS` if mutex unlocked successfully
- * @retval `RET_NOTOWNER` if current owner doesnot owns the mutex
- * @retval `RET_NOTLOCKED` if mutex was not previously locked
- */
 int mutexUnlock(mutexHandleType *pMutex)
 {
 
