@@ -64,12 +64,12 @@ static void taskInitStack(uint32_t *stack, uint32_t stackSize, taskFunctionType 
 
 static inline void taskDestroyDynamicResources(taskHandleType *pTask)
 {
-    if ((pTask->internalFlags & TASK_INTERNAL_FLAG_OWN_NAME) && (pTask->name != NULL))
+    if ((pTask->flags & TASK_FLAG_OWN_NAME) && (pTask->name != NULL))
     {
         memFree((void *)pTask->name);
     }
 
-    if ((pTask->internalFlags & TASK_INTERNAL_FLAG_OWN_STACK) && (pTask->stack != NULL))
+    if ((pTask->flags & TASK_FLAG_OWN_STACK) && (pTask->stack != NULL))
     {
         memFree(pTask->stack);
     }
@@ -229,7 +229,7 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
 
     memset(pTask, 0, sizeof(taskHandleType));
     pTask->stackPointer = (uint32_t)(stack + (stackSize / sizeof(uint32_t)) - PORT_INITIAL_TASK_STACK_OFFSET);
-    pTask->userFlags = 0;
+    pTask->flags = 0;
     pTask->stack = stack;
     pTask->name = (taskName != NULL) ? taskName : "dynamicTask";
     pTask->params = taskParams;
@@ -240,11 +240,11 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
     pTask->wakeupReason = WAKEUP_REASON_NONE;
     pTask->coreAffinity = affinity;
     pTask->priority = taskPriority;
-    pTask->internalFlags = TASK_INTERNAL_FLAG_DYNAMIC | TASK_INTERNAL_FLAG_OWN_STACK;
+    pTask->flags = TASK_FLAG_DYNAMIC | TASK_FLAG_OWN_STACK;
 
     if (taskName != NULL)
     {
-        pTask->internalFlags |= TASK_INTERNAL_FLAG_OWN_NAME;
+        pTask->flags |= TASK_FLAG_OWN_NAME;
     }
 
     taskStart(pTask);
@@ -284,7 +284,7 @@ int taskDelete(taskHandleType *pTask)
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    isDynamicTask = ((pTask->internalFlags & TASK_INTERNAL_FLAG_DYNAMIC) != 0U);
+    isDynamicTask = ((pTask->flags & TASK_FLAG_DYNAMIC) != 0U);
 
     spinUnlock(&lock, irqState);
 

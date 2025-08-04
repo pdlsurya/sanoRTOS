@@ -45,9 +45,10 @@ extern "C"
 
 #define STACK_GUARD_WORDS 8
 
-#define TASK_INTERNAL_FLAG_DYNAMIC (1U << 0)
-#define TASK_INTERNAL_FLAG_OWN_STACK (1U << 1)
-#define TASK_INTERNAL_FLAG_OWN_NAME (1U << 2)
+#define TASK_FLAG_FPU_USED (1U << 0)
+#define TASK_FLAG_DYNAMIC (1U << 8)
+#define TASK_FLAG_OWN_STACK (1U << 9)
+#define TASK_FLAG_OWN_NAME (1U << 10)
 
     /**
      * @brief Internal function executed if a task entry returns.
@@ -77,7 +78,7 @@ extern "C"
     static taskHandleType _name = {                                                                               \
         .name = #_name,                                                                                           \
         .stackPointer = (uint32_t)(_name##Stack + stackSize / sizeof(uint32_t) - PORT_INITIAL_TASK_STACK_OFFSET), \
-        .userFlags = 0,                                                                                           \
+        .flags = 0,                                                                                               \
         .stack = _name##Stack,                                                                                    \
         .priority = taskPriority,                                                                                 \
         .coreAffinity = affinity,                                                                                 \
@@ -86,8 +87,7 @@ extern "C"
         .remainingSleepTicks = 0,                                                                                 \
         .status = TASK_STATUS_READY,                                                                              \
         .blockedReason = BLOCK_REASON_NONE,                                                                       \
-        .wakeupReason = WAKEUP_REASON_NONE,                                                                        \
-        .internalFlags = 0}
+        .wakeupReason = WAKEUP_REASON_NONE}
 
     typedef void (*taskFunctionType)(void *params);
 
@@ -133,7 +133,7 @@ extern "C"
     typedef struct taskHandle
     {
         uint32_t stackPointer;           ///< Current value of the task's stack pointer (used during context switches).
-        uint32_t userFlags;              ///< User-defined flags associated with the task.
+        uint32_t flags;                  ///< Task flags (e.g. FPU usage, dynamic-resource ownership).
         uint32_t *stack;                 ///< Pointer to the base of the task's stack memory.
         const char *name;                ///< Human-readable name of the task (for debugging or logging).
         void *params;                    ///< Pointer to parameters passed to the task function.
@@ -144,7 +144,6 @@ extern "C"
         wakeupReasonType wakeupReason;   ///< Reason the task was woken up (e.g., timeout, signal).
         coreAffinityType coreAffinity;   ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
         uint8_t priority;                ///< Priority level of the task (lower value indicate higher priority).
-        uint8_t internalFlags;           ///< Internal ownership flags used by dynamic task APIs.
     } taskHandleType;
 
     typedef struct

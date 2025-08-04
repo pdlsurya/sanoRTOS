@@ -33,6 +33,7 @@
 .equ GP_RES_CONTEXT_SIZE, (SAVE_GP_REGS*4)
 .equ FPU_RES_CONTEXT_SIZE, (SAVE_FPU_REGS*4)
 .equ MSIP_REG, 0x20000000
+.equ TASK_FLAG_FPU_USED, 0x1
 
 /* Macro which first allocates space on the stack to save general
  * purpose registers, and then save them. GP register is excluded.
@@ -251,20 +252,27 @@ m_software_interrupt_handler:
     add t0, t0, t3         // t0 = &currentTask[hartid]
     lw t1, 0(t0)           // t1 = currentTask[hartid]
     sw sp, 0(t1)           // Save SP to currentTask[hartid]->sp
-    sw t4, 4(t1)
+    lw t0, 4(t1)           // currentTask flags
+    beq x0, t4, 2f
+    ori t0, t0, TASK_FLAG_FPU_USED
+    j 3f
+  2:li t5, -2
+    and t0, t0, t5
+  3:sw t0, 4(t1)
 
     /* Load next task's stack pointer */
     la t0, nextTask        // t0 = &nextTask
     add t0, t0, t3         // t0 = &nextTask[hartid]
     lw t1, 0(t0)           // t1 = nextTask[hartid]
     lw sp, 0(t1)           // Load SP from nextTask[hartid]->sp
-    lw t4, 4(t1)
+    lw t0, 4(t1)
+    andi t4, t0, TASK_FLAG_FPU_USED
 
-    beq x0, t4, 2f
+    beq x0, t4, 4f
 
     restore_fpu_res
 
-  2:restore_mepc
+  4:restore_mepc
     restore_general_regs
     
     mret
