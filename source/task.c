@@ -229,7 +229,6 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
 
     memset(pTask, 0, sizeof(taskHandleType));
     pTask->stackPointer = (uint32_t)(stack + (stackSize / sizeof(uint32_t)) - PORT_INITIAL_TASK_STACK_OFFSET);
-    pTask->flags = 0;
     pTask->stack = stack;
     pTask->name = (taskName != NULL) ? taskName : "dynamicTask";
     pTask->params = taskParams;
