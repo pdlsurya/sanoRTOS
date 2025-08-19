@@ -154,6 +154,7 @@ target_sources(project_name PRIVATE ${SANORTOS_SRCS})
 // On single-core MCUs, this setting is safely ignored — all tasks will run on the only available core.
 TASK_DEFINE(task1, 1024, firstTask, NULL, 1, AFFINITY_CORE_ANY);
 TASK_DEFINE(task2, 1024, secondTask, NULL, 1, AFFINITY_CORE_ANY);
+taskHandleType *dynamicTask = NULL;
 
 
 // Task 1 function – user-defined logic inside this loop
@@ -170,6 +171,13 @@ void secondTask(void *args) {
     }
 }
 
+// Dynamically created task function
+void thirdTask(void *args) {
+    while (1) {
+        // Dynamic task code to run repeatedly
+    }
+}
+
 int main() {
     // Perform MCU-specific initializations here
     // Example: initialize GPIO, UART, peripherals, etc.
@@ -177,6 +185,20 @@ int main() {
     // Start tasks
     taskStart(&task1);
     taskStart(&task2);
+
+    // Create and start a dynamic task
+    int ret = taskCreate(&dynamicTask,
+                         "dynamicTask",
+                         1024,
+                         thirdTask,
+                         NULL,
+                         1,
+                         AFFINITY_CORE_ANY);
+    if (ret != RET_SUCCESS) {
+        // Handle task creation failure
+        while (1) {
+        }
+    }
 
     // Start the sanoRTOS scheduler (will not return)
     schedulerStart();
@@ -215,4 +237,3 @@ implementation closer to traditional embedded RTOS ports.
 
 # License
 This project is licensed under the MIT License-see the [LICENSE](LICENSE) file for details.
-
