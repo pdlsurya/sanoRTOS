@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include "sanoRTOS/retCodes.h"
@@ -77,10 +76,14 @@ static inline void taskDestroyDynamicResources(taskHandleType *pTask)
     memFree(pTask);
 }
 
-void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
+int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
-    assert(pTask != NULL);
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
 
+    int retCode = RET_SUCCESS;
     bool irqState = spinLock(&lock);
 
     if (pTask->status == TASK_STATUS_BLOCKED)
@@ -88,7 +91,12 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
         taskQueueType *pBlockedQueue = getBlockedQueue();
 
         /* Remove  task from the queue of blocked tasks*/
-        taskQueueRemove(pBlockedQueue, pTask);
+        retCode = taskQueueRemove(pBlockedQueue, pTask);
+        if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+        {
+            spinUnlock(&lock, irqState);
+            return retCode;
+        }
     }
     pTask->status = TASK_STATUS_READY;
     pTask->blockedReason = BLOCK_REASON_NONE;
@@ -98,15 +106,21 @@ void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
     taskQueueType *pReadyQueue = getReadyQueue();
 
     /* Add task to queue of ready tasks*/
-    taskQueueAdd(pReadyQueue, pTask);
+    retCode = taskQueueAdd(pReadyQueue, pTask);
 
     spinUnlock(&lock, irqState);
+
+    return retCode;
 }
 
-void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
+int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
 {
-    assert(pTask != NULL);
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
 
+    int retCode;
     bool irqState = spinLock(&lock);
 
     pTask->remainingSleepTicks = ticks;
@@ -117,31 +131,48 @@ void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t 
     taskQueueType *pBlockedQueue = getBlockedQueue();
 
     // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
-    taskQueueAddToFront(pBlockedQueue, pTask);
+    retCode = taskQueueAddToFront(pBlockedQueue, pTask);
 
     spinUnlock(&lock, irqState);
 
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
     // Give CPU to other tasks
     taskYield();
+
+    return RET_SUCCESS;
 }
 
-void taskSuspend(taskHandleType *pTask)
+int taskSuspend(taskHandleType *pTask)
 {
-    assert(pTask != NULL);
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
 
+    int retCode = RET_SUCCESS;
     bool irqState = spinLock(&lock);
 
     /* If task status is ready, remove it from the readyQueue*/
     if (pTask->status == TASK_STATUS_READY)
     {
         taskQueueType *pReadyQueue = getReadyQueue();
-        taskQueueRemove(pReadyQueue, pTask);
+        retCode = taskQueueRemove(pReadyQueue, pTask);
     }
     /*If task status is blocked, remove it from the blockedQueue*/
     else if (pTask->status == TASK_STATUS_BLOCKED)
     {
         taskQueueType *pBlockedQueue = getBlockedQueue();
-        taskQueueRemove(pBlockedQueue, pTask);
+        retCode = taskQueueRemove(pBlockedQueue, pTask);
+    }
+
+    if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+    {
+        spinUnlock(&lock, irqState);
+        return retCode;
     }
 
     pTask->remainingSleepTicks = 0;
@@ -156,32 +187,42 @@ void taskSuspend(taskHandleType *pTask)
     {
         taskYield();
     }
+
+    return RET_SUCCESS;
 }
 
 int taskResume(taskHandleType *pTask)
 {
-    assert(pTask != NULL);
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
 
     if (pTask->status == TASK_STATUS_SUSPENDED)
     {
-        taskSetReady(pTask, RESUME);
-        return RET_SUCCESS;
+        return taskSetReady(pTask, RESUME);
     }
 
     return RET_NOTSUSPENDED;
 }
 
-void taskStart(taskHandleType *pTask)
+int taskStart(taskHandleType *pTask)
 {
-    assert(pTask != NULL);
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
 
+    int retCode;
     bool irqState = spinLock(&lock);
 
     taskQueueType *pReadyQueue = getReadyQueue();
 
-    taskQueueAdd(pReadyQueue, pTask);
+    retCode = taskQueueAdd(pReadyQueue, pTask);
 
     spinUnlock(&lock, irqState);
+
+    return retCode;
 }
 
 int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
@@ -246,7 +287,12 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
         pTask->flags |= TASK_FLAG_OWN_NAME;
     }
 
-    taskStart(pTask);
+    int retCode = taskStart(pTask);
+    if (retCode != RET_SUCCESS)
+    {
+        taskDestroyDynamicResources(pTask);
+        return retCode;
+    }
     *ppTask = pTask;
 
     return RET_SUCCESS;
@@ -271,11 +317,21 @@ int taskDelete(taskHandleType *pTask)
 
     if (pTask->status == TASK_STATUS_READY)
     {
-        taskQueueRemove(getReadyQueue(), pTask);
+        int retCode = taskQueueRemove(getReadyQueue(), pTask);
+        if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+        {
+            spinUnlock(&lock, irqState);
+            return retCode;
+        }
     }
     else if (pTask->status == TASK_STATUS_BLOCKED)
     {
-        taskQueueRemove(getBlockedQueue(), pTask);
+        int retCode = taskQueueRemove(getBlockedQueue(), pTask);
+        if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+        {
+            spinUnlock(&lock, irqState);
+            return retCode;
+        }
     }
 
     pTask->remainingSleepTicks = 0;

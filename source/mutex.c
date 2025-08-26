@@ -23,7 +23,6 @@
  */
 
 #include <stdlib.h>
-#include <assert.h>
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/spinLock.h"
@@ -34,7 +33,10 @@
 
 int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
-    assert(pMutex != NULL);
+    if (pMutex == NULL)
+    {
+        return RET_INVAL;
+    }
 
     int retCode;
 
@@ -72,13 +74,25 @@ retry:
     else
     {
         /* Add the task waiting on mutex to the wait queue*/
-        taskQueueAdd(&pMutex->waitQueue, currentTask);
+        retCode = taskQueueAdd(&pMutex->waitQueue, currentTask);
+        if (retCode != RET_SUCCESS)
+        {
+            spinUnlock(&pMutex->lock, irqState);
+            return retCode;
+        }
 
         /*Release spinlock before blocking the task*/
         spinUnlock(&pMutex->lock, irqState);
 
         /* Block current task and give CPU to other tasks while waiting for mutex*/
-        taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
+        retCode = taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
+        if (retCode != RET_SUCCESS)
+        {
+            irqState = spinLock(&pMutex->lock);
+            (void)taskQueueRemove(&pMutex->waitQueue, currentTask);
+            spinUnlock(&pMutex->lock, irqState);
+            return retCode;
+        }
 
         /*Re-acquire spinlock section after being unblocked*/
         irqState = spinLock(&pMutex->lock);
@@ -90,9 +104,12 @@ retry:
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
             /*Wait timed out, remove task from  the waitQueue.*/
-            taskQueueRemove(&pMutex->waitQueue, currentTask);
+            retCode = taskQueueRemove(&pMutex->waitQueue, currentTask);
+            if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+            {
+                retCode = RET_TIMEOUT;
+            }
 
-            retCode = RET_TIMEOUT;
         }
         /*Task might have been suspended while waiting for mutex and later resumed.
           In this case, retry locking the mutex again */
@@ -109,8 +126,10 @@ retry:
 
 int mutexUnlock(mutexHandleType *pMutex)
 {
-
-    assert(pMutex != NULL);
+    if (pMutex == NULL)
+    {
+        return RET_INVAL;
+    }
 
     int retCode;
 
@@ -156,7 +175,11 @@ int mutexUnlock(mutexHandleType *pMutex)
                     goto getNextOwner;
                 }
 
-                taskSetReady(nextOwner, MUTEX_LOCKED);
+                retCode = taskSetReady(nextOwner, MUTEX_LOCKED);
+                if (retCode != RET_SUCCESS)
+                {
+                    return retCode;
+                }
 
                 /*Perform context switch if next owner task has equal or
                  *higher priority[lower priority value] than that of current task */

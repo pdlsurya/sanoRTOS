@@ -23,17 +23,24 @@
  */
 
 #include <stdint.h>
-#include <assert.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
-#include "sanoRTOS//task.h"
+#include "sanoRTOS/task.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/mem.h"
 
 static inline taskNodeType *newNode(taskHandleType *pTask)
 {
+    if (pTask == NULL)
+    {
+        return NULL;
+    }
+
     taskNodeType *newTaskNode = (taskNodeType *)memAlloc(sizeof(taskNodeType));
-    assert(newTaskNode != NULL);
+    if (newTaskNode == NULL)
+    {
+        return NULL;
+    }
 
     newTaskNode->pTask = pTask;
     newTaskNode->nextTaskNode = NULL;
@@ -41,54 +48,90 @@ static inline taskNodeType *newNode(taskHandleType *pTask)
     return newTaskNode;
 }
 
-static inline void taskQueueRemoveHead(taskQueueType *pTaskQueue)
+static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
 {
+    if ((pTaskQueue == NULL) || (pTaskQueue->head == NULL))
+    {
+        return RET_INVAL;
+    }
+
     taskNodeType *temp = pTaskQueue->head->nextTaskNode;
     memFree(pTaskQueue->head);
     pTaskQueue->head = temp;
+
+    return RET_SUCCESS;
 }
 
-void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
+int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    assert(pTaskQueue != NULL);
-    assert(pTask != NULL);
+    if ((pTaskQueue == NULL) || (pTask == NULL))
+    {
+        return RET_INVAL;
+    }
+
+    if (pTaskQueue->head == NULL)
+    {
+        return RET_NOTASK;
+    }
 
     if (pTask == pTaskQueue->head->pTask)
     {
-        taskQueueRemoveHead(pTaskQueue);
+        return taskQueueRemoveHead(pTaskQueue);
     }
     else
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
-        while (currentTaskNode->nextTaskNode->pTask != pTask)
+        while ((currentTaskNode->nextTaskNode != NULL) && (currentTaskNode->nextTaskNode->pTask != pTask))
         {
             currentTaskNode = currentTaskNode->nextTaskNode;
+        }
+
+        if (currentTaskNode->nextTaskNode == NULL)
+        {
+            return RET_NOTASK;
         }
 
         taskNodeType *temp = currentTaskNode->nextTaskNode->nextTaskNode;
         memFree(currentTaskNode->nextTaskNode);
         currentTaskNode->nextTaskNode = temp;
+
+        return RET_SUCCESS;
     }
 }
 
-void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
+int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    assert(pTaskQueue != NULL);
-    assert(pTask != NULL);
+    if ((pTaskQueue == NULL) || (pTask == NULL))
+    {
+        return RET_INVAL;
+    }
 
     taskNodeType *newTaskNode = newNode(pTask);
+    if (newTaskNode == NULL)
+    {
+        return RET_NOMEM;
+    }
+
     newTaskNode->nextTaskNode = pTaskQueue->head;
     pTaskQueue->head = newTaskNode;
+
+    return RET_SUCCESS;
 }
 
-void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
+int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
 {
-    assert(pTaskQueue != NULL);
-    assert(pTask != NULL);
+    if ((pTaskQueue == NULL) || (pTask == NULL))
+    {
+        return RET_INVAL;
+    }
 
     taskNodeType *newTaskNode = newNode(pTask);
+    if (newTaskNode == NULL)
+    {
+        return RET_NOMEM;
+    }
 
-    if (taskQueueEmpty(pTaskQueue))
+    if (taskQueueEmpty(pTaskQueue) == RET_EMPTY)
     {
         pTaskQueue->head = newTaskNode;
     }
@@ -109,22 +152,31 @@ void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
         newTaskNode->nextTaskNode = currentTaskNode->nextTaskNode;
         currentTaskNode->nextTaskNode = newTaskNode;
     }
+
+    return RET_SUCCESS;
 }
 
 taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck)
 {
-    assert(pTaskQueue != NULL);
+    if (pTaskQueue == NULL)
+    {
+        return NULL;
+    }
+
     taskHandleType *pTask;
 
-    if (!taskQueueEmpty(pTaskQueue))
+    if (taskQueueEmpty(pTaskQueue) != RET_EMPTY)
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
 
         if (!affinityCheck)
         {
             pTask = currentTaskNode->pTask;
-            taskQueueRemove(pTaskQueue, pTask);
-            return pTask;
+            if (taskQueueRemove(pTaskQueue, pTask) == RET_SUCCESS)
+            {
+                return pTask;
+            }
+            return NULL;
         }
 
         /* Check each task in the queue for a matching core affinity */
@@ -134,8 +186,11 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck)
                 currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
             {
                 pTask = currentTaskNode->pTask;
-                taskQueueRemove(pTaskQueue, pTask);
-                return pTask;
+                if (taskQueueRemove(pTaskQueue, pTask) == RET_SUCCESS)
+                {
+                    return pTask;
+                }
+                return NULL;
             }
             currentTaskNode = currentTaskNode->nextTaskNode;
         }
@@ -146,7 +201,12 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck)
 
 taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck)
 {
-    if (!taskQueueEmpty(pTaskQueue))
+    if (pTaskQueue == NULL)
+    {
+        return NULL;
+    }
+
+    if (taskQueueEmpty(pTaskQueue) != RET_EMPTY)
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
 

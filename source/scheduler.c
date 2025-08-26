@@ -48,11 +48,13 @@ void idleTaskHandler0(void *params)
     }
 }
 
-static bool selectNextTask(void)
+static int selectNextTask(void)
 {
     taskQueueType *const pReadyQueue = getReadyQueue();
 
-    if (!taskQueueEmpty(pReadyQueue))
+    int retCode = taskQueueEmpty(pReadyQueue);
+
+    if (retCode == RET_SUCCESS)
     {
         taskHandleType *const pCurrentTask = taskGetCurrent();
 
@@ -66,11 +68,15 @@ static bool selectNextTask(void)
             if (pNextReadyTask != NULL && pNextReadyTask->priority <= pCurrentTask->priority)
             {
                 pCurrentTask->status = TASK_STATUS_READY;
-                taskQueueAdd(pReadyQueue, pCurrentTask);
+                retCode = taskQueueAdd(pReadyQueue, pCurrentTask);
+                if (retCode != RET_SUCCESS)
+                {
+                    return retCode;
+                }
             }
             else
             {
-                return false; // No need to switch to a lower priority task
+                return RET_NOTASK; // No need to switch to a lower priority task
             }
         }
 
@@ -84,6 +90,10 @@ static bool selectNextTask(void)
 
         // Get the next task from the ready queue
         nextTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
+        if (nextTask[PORT_CORE_ID()] == NULL)
+        {
+            return RET_NOTASK;
+        }
 
         // Set the status of the next task to RUNNING
         nextTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
@@ -91,10 +101,15 @@ static bool selectNextTask(void)
         // Set the current task to the next task
         taskSetCurrent(nextTask[PORT_CORE_ID()]);
 
-        return true;
+        return RET_SUCCESS;
     }
 
-    return false;
+    if (retCode == RET_EMPTY)
+    {
+        return RET_NOTASK;
+    }
+
+    return retCode;
 }
 
 static void checkTimeout()
@@ -117,11 +132,11 @@ static void checkTimeout()
             {
                 if (currentTaskNode->pTask->blockedReason == SLEEP)
                 {
-                    taskSetReady(currentTaskNode->pTask, SLEEP_TIME_TIMEOUT);
+                    (void)taskSetReady(currentTaskNode->pTask, SLEEP_TIME_TIMEOUT);
                 }
                 else
                 {
-                    taskSetReady(currentTaskNode->pTask, WAIT_TIMEOUT);
+                    (void)taskSetReady(currentTaskNode->pTask, WAIT_TIMEOUT);
                 }
             }
         }
@@ -135,7 +150,7 @@ void taskYield()
 
     bool irqState = spinLock(&lock);
 
-    contextSwitchRequired = selectNextTask();
+    contextSwitchRequired = (selectNextTask() == RET_SUCCESS);
 
     if (contextSwitchRequired)
     {
@@ -169,14 +184,14 @@ void tickHandler()
         taskQueueType *pBlockedQueue = getBlockedQueue();
 
         /*Check for wait timeout of blocked tasks*/
-        if (!taskQueueEmpty(pBlockedQueue))
+        if (taskQueueEmpty(pBlockedQueue) == RET_SUCCESS)
         {
             checkTimeout();
         }
     }
 
     /*Perform context switch if required*/
-    contextSwitchRequired = selectNextTask();
+    contextSwitchRequired = (selectNextTask() == RET_SUCCESS);
 
     if (contextSwitchRequired)
     {
@@ -189,10 +204,10 @@ void tickHandler()
 void schedulerStart()
 {
     /*Start timerTask*/
-    timerTaskStart();
+    (void)timerTaskStart();
 
     /* Start the idle task0*/
-    taskStart(&idleTask0);
+    (void)taskStart(&idleTask0);
 
     portSchedulerStart();
 }

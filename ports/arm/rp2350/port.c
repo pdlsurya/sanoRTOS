@@ -99,7 +99,7 @@ static void core1_entry(void)
 void portSchedulerStart()
 {
 #if (CONFIG_SMP)
-    taskStart(&idleTask1);
+    (void)taskStart(&idleTask1);
 
     multicore_launch_core1(core1_entry);
 #endif

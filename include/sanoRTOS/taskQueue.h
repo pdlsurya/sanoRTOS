@@ -117,35 +117,41 @@ extern "C"
      *
      * @param pTaskQueue Pointer to task queue.
      * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    void taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
     /**
      * @brief Add a task to the front of queue.
      *
      * @param pTaskQueue Pointer to task queue.
      * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    void taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
     /**
      * @brief Remove a specific task from queue.
      *
      * @param pTaskQueue Pointer to task queue.
      * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, `RET_NOTASK` if not found, error code otherwise.
      */
-    void taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
 
     /**
-     * @brief Check if taskQueue is empty
+     * @brief Check whether taskQueue is empty.
      *
-     * @param pTaskQueue
-     * @retval `TRUE` if taskQueue is empty
-     * @retval `FALSE`, otherwise
+     * @param pTaskQueue Pointer to task queue.
+     * @return `RET_EMPTY` if empty, `RET_SUCCESS` if not empty, error code otherwise.
      */
-    static inline __attribute__((always_inline)) bool taskQueueEmpty(taskQueueType *pTaskQueue)
+    static inline __attribute__((always_inline)) int taskQueueEmpty(taskQueueType *pTaskQueue)
     {
-        return (pTaskQueue->head == NULL);
+        if (pTaskQueue == NULL)
+        {
+            return RET_INVAL;
+        }
+        return (pTaskQueue->head == NULL) ? RET_EMPTY : RET_SUCCESS;
     }
 
 #ifdef __cplusplus

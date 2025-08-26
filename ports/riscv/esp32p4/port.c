@@ -227,7 +227,7 @@ void core1_main(void)
 void portSchedulerStart()
 {
 #if (CONFIG_SMP)
-    taskStart(&idleTask1);
+    (void)taskStart(&idleTask1);
 
     core1_start(core1_main);
 #endif

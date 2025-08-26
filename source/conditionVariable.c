@@ -24,7 +24,6 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <assert.h>
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/task.h"
@@ -35,25 +34,44 @@
 
 int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 {
-    assert(pCondVar != NULL);
-    assert(pCondVar->pMutex != NULL);
+    if ((pCondVar == NULL) || (pCondVar->pMutex == NULL))
+    {
+        return RET_INVAL;
+    }
 
     int retCode;
 
     bool irqState = spinLock(&pCondVar->lock);
 
     /* Unlock previously acquired mutex;*/
-    mutexUnlock(pCondVar->pMutex);
+    retCode = mutexUnlock(pCondVar->pMutex);
+    if (retCode != RET_SUCCESS)
+    {
+        spinUnlock(&pCondVar->lock, irqState);
+        return retCode;
+    }
 
     taskHandleType *currentTask = taskGetCurrent();
 
 wait:
-    taskQueueAdd(&pCondVar->waitQueue, currentTask);
+    retCode = taskQueueAdd(&pCondVar->waitQueue, currentTask);
+    if (retCode != RET_SUCCESS)
+    {
+        spinUnlock(&pCondVar->lock, irqState);
+        return retCode;
+    }
 
     spinUnlock(&pCondVar->lock, irqState);
 
     /* Block current task and give CPU to other tasks while waiting on condition variable*/
-    taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
+    retCode = taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
+    if (retCode != RET_SUCCESS)
+    {
+        irqState = spinLock(&pCondVar->lock);
+        (void)taskQueueRemove(&pCondVar->waitQueue, currentTask);
+        spinUnlock(&pCondVar->lock, irqState);
+        return retCode;
+    }
 
     irqState = spinLock(&pCondVar->lock);
 
@@ -65,9 +83,11 @@ wait:
     else if (currentTask->wakeupReason == WAIT_TIMEOUT)
     {
         /*Wait timed out,remove task from  the waitQueue.*/
-        taskQueueRemove(&pCondVar->waitQueue, currentTask);
-
-        retCode = RET_TIMEOUT;
+        retCode = taskQueueRemove(&pCondVar->waitQueue, currentTask);
+        if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+        {
+            retCode = RET_TIMEOUT;
+        }
     }
     /*Task might have been suspended while waiting on condition variable and later resumed.
       In this case, retry waiting on condition variable again */
@@ -78,14 +98,24 @@ wait:
     spinUnlock(&pCondVar->lock, irqState);
 
     /*Re-acquire previously released mutex*/
-    mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
+    if ((retCode == RET_SUCCESS) || (retCode == RET_TIMEOUT))
+    {
+        int lockRetCode = mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
+        if (lockRetCode != RET_SUCCESS)
+        {
+            return lockRetCode;
+        }
+    }
 
     return retCode;
 }
 
 int condVarSignal(condVarHandleType *pCondVar)
 {
-    assert(pCondVar != NULL);
+    if (pCondVar == NULL)
+    {
+        return RET_INVAL;
+    }
 
     taskHandleType *nextSignalTask = NULL;
 
@@ -105,7 +135,11 @@ getNextSignalTask:
         }
         spinUnlock(&pCondVar->lock, irqState);
 
-        taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
+        int retCode = taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
+        if (retCode != RET_SUCCESS)
+        {
+            return retCode;
+        }
 
         taskHandleType *currentTask = taskGetCurrent();
 
@@ -124,13 +158,16 @@ getNextSignalTask:
 
 int condVarBroadcast(condVarHandleType *pCondVar)
 {
-    assert(pCondVar != NULL);
+    if (pCondVar == NULL)
+    {
+        return RET_INVAL;
+    }
 
     int retCode;
 
     bool irqState = spinLock(&pCondVar->lock);
 
-    if (!taskQueueEmpty(&pCondVar->waitQueue))
+    if (taskQueueEmpty(&pCondVar->waitQueue) != RET_EMPTY)
     {
         taskHandleType *pTask = NULL;
 
@@ -138,8 +175,12 @@ int condVarBroadcast(condVarHandleType *pCondVar)
         {
             if (pTask->status != TASK_STATUS_SUSPENDED)
             {
-
-                taskSetReady(pTask, COND_VAR_SIGNALLED);
+                retCode = taskSetReady(pTask, COND_VAR_SIGNALLED);
+                if (retCode != RET_SUCCESS)
+                {
+                    spinUnlock(&pCondVar->lock, irqState);
+                    return retCode;
+                }
             }
         }
 
