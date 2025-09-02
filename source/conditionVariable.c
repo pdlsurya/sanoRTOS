@@ -167,7 +167,7 @@ int condVarBroadcast(condVarHandleType *pCondVar)
 
     bool irqState = spinLock(&pCondVar->lock);
 
-    if (taskQueueEmpty(&pCondVar->waitQueue) != RET_EMPTY)
+    if (!taskQueueEmpty(&pCondVar->waitQueue))
     {
         taskHandleType *pTask = NULL;
 

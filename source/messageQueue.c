@@ -43,15 +43,8 @@ static int msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
     bool contextSwitchRequired = false;
 
     taskHandleType *pConsumerTask = NULL;
-    int queueState = msgQueueFull(pQueueHandle);
-    if (queueState != RET_FULL)
+    if (!msgQueueFull(pQueueHandle))
     {
-        if (queueState != RET_SUCCESS)
-        {
-            spinUnlock(&pQueueHandle->lock, irqState);
-            return queueState;
-        }
-
         memcpy(&pQueueHandle->buffer[pQueueHandle->writeIndex], pItem, pQueueHandle->itemSize);
         pQueueHandle->writeIndex = (pQueueHandle->writeIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
         pQueueHandle->itemCount++;
@@ -107,16 +100,8 @@ static int msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
 
     taskHandleType *pProducerTask = NULL;
 
-    int queueState = msgQueueEmpty(pQueueHandle);
-    if (queueState != RET_EMPTY)
+    if (!msgQueueEmpty(pQueueHandle))
     {
-        if (queueState != RET_SUCCESS)
-        {
-            spinUnlock(&pQueueHandle->lock, irqState);
-            return queueState;
-        }
-
-
         memcpy(pItem, &pQueueHandle->buffer[pQueueHandle->readIndex], pQueueHandle->itemSize);
         pQueueHandle->readIndex = (pQueueHandle->readIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
         pQueueHandle->itemCount--;
