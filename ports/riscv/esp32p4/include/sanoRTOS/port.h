@@ -228,6 +228,19 @@ extern "C"
     }
 
     /**
+     * @brief Check whether the current execution context is interrupt/exception handler mode.
+     *
+     * @retval `true` Current context is ISR/handler context.
+     * @retval `false` Current context is normal task/thread context.
+     */
+    static inline bool portIsInISRContext()
+    {
+        uint32_t mstatus = RV_READ_CSR(mstatus);
+        uint32_t mcause = RV_READ_CSR(mcause);
+        return (((mstatus & MSTATUS_MIE) == 0U) && (((mcause >> 31U) & 0x1U) != 0U));
+    }
+
+    /**
      * @brief Disable interrupts and return previous irq status
      *
      * @retval `true`, if interrupts were enabled previously

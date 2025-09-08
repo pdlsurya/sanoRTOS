@@ -69,10 +69,11 @@ extern "C"
      * @brief Take (acquire) a semaphore.
      *
      * If count is zero, the caller waits up to `waitTicks`.
+     * If called from ISR, `waitTicks` must be `TASK_NO_WAIT`.
      *
      * @param pSem Pointer to semaphore handle.
      * @param waitTicks Maximum ticks to wait when unavailable.
-     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, `RET_INVAL` for invalid ISR wait usage, error code otherwise.
      */
     int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks);
 

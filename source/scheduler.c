@@ -149,8 +149,16 @@ void taskYield()
     {
 
 #if (CONFIG_TASK_USER_MODE)
-        /*We need to be in privileged mode to perform context switch.*/
-        PORT_SYSCALL(SWITCH_CONTEXT);
+        if (portIsInISRContext())
+        {
+            /*ISR context cannot use syscall path; request switch directly.*/
+            PORT_TRIGGER_CONTEXT_SWITCH();
+        }
+        else
+        {
+            /*Thread context in user mode requests switch via syscall.*/
+            PORT_SYSCALL(SWITCH_CONTEXT);
+        }
 
 #else
         /*Trigger platform specific context switch mechanism*/
