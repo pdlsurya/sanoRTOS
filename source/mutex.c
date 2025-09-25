@@ -31,9 +31,51 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/mutex.h"
 
+#if CONFIG_MUTEX_USE_PRIORITY_INHERITANCE
+static inline void mutexApplyPriorityInheritance(mutexHandleType *pMutex, taskHandleType *pCurrentTask)
+{
+    if ((pMutex == NULL) || (pCurrentTask == NULL))
+    {
+        return;
+    }
+
+    if ((pMutex->ownerTask != NULL) && (pCurrentTask->priority < pMutex->ownerTask->priority))
+    {
+        /* Save owner task's default priority if not saved before */
+        if (pMutex->ownerDefaultPriority == -1)
+        {
+            pMutex->ownerDefaultPriority = pMutex->ownerTask->priority;
+        }
+
+        pMutex->ownerTask->priority = pCurrentTask->priority;
+    }
+}
+
+static inline void mutexRestorePriorityInheritance(mutexHandleType *pMutex)
+{
+    if ((pMutex == NULL) || (pMutex->ownerTask == NULL))
+    {
+        return;
+    }
+
+    /* Restore owner task's default priority if priority inheritance was applied while locking the mutex */
+    if (pMutex->ownerDefaultPriority != -1)
+    {
+        pMutex->ownerTask->priority = pMutex->ownerDefaultPriority;
+
+        /* Reset owner default priority of mutex */
+        pMutex->ownerDefaultPriority = -1;
+    }
+}
+#endif
+
 int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
 {
     if (pMutex == NULL)
+    {
+        return RET_INVAL;
+    }
+    if (portIsInISRContext())
     {
         return RET_INVAL;
     }
@@ -45,17 +87,8 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
     taskHandleType *currentTask = taskGetCurrent();
 
 retry:
-#if MUTEX_USE_PRIORITY_INHERITANCE
-    /* Priority inheritance*/
-    if (pMutex->ownerTask && currentTask->priority < pMutex->ownerTask->priority)
-    {
-        /* Save owner task's default priority if not saved before */
-        if (pMutex->ownerDefaultPriority == -1)
-        {
-            pMutex->ownerDefaultPriority = pMutex->ownerTask->priority;
-        }
-        pMutex->ownerTask->priority = currentTask->priority;
-    }
+#if CONFIG_MUTEX_USE_PRIORITY_INHERITANCE
+    mutexApplyPriorityInheritance(pMutex, currentTask);
 #endif
     /* Check if mutex is free and no owner has been assigned. If so, lock mutex immediately.*/
     if (!pMutex->locked)
@@ -109,7 +142,6 @@ retry:
             {
                 retCode = RET_TIMEOUT;
             }
-
         }
         /*Task might have been suspended while waiting for mutex and later resumed.
           In this case, retry locking the mutex again */
@@ -127,6 +159,10 @@ retry:
 int mutexUnlock(mutexHandleType *pMutex)
 {
     if (pMutex == NULL)
+    {
+        return RET_INVAL;
+    }
+    if (portIsInISRContext())
     {
         return RET_INVAL;
     }
@@ -148,15 +184,8 @@ int mutexUnlock(mutexHandleType *pMutex)
         if (pMutex->locked)
         {
 
-#if MUTEX_USE_PRIORITY_INHERITANCE
-            /* Assign owner task its default priority if priority inheritance was perforemd while locking the mutex*/
-            if (pMutex->ownerDefaultPriority != -1)
-            {
-                pMutex->ownerTask->priority = pMutex->ownerDefaultPriority;
-
-                /* Reset owner defalult priority of mutex*/
-                pMutex->ownerDefaultPriority = -1;
-            }
+#if CONFIG_MUTEX_USE_PRIORITY_INHERITANCE
+            mutexRestorePriorityInheritance(pMutex);
 #endif
             /* Get next owner of the mutex*/
         getNextOwner:

@@ -68,26 +68,34 @@ extern "C"
      *
      * The current task blocks until the condition variable is signaled,
      * broadcast, or the timeout expires.
+     * This API must not be called from ISR context.
      *
      * @param pCondVar Pointer to condition variable handle.
      * @param waitTicks Maximum ticks to wait (`TASK_MAX_WAIT` for infinite wait).
-     * @return `RET_SUCCESS` if signaled, `RET_TIMEOUT` on timeout, error code otherwise.
+     * @return `RET_SUCCESS` if signaled, `RET_TIMEOUT` on timeout, `RET_INVAL` if called
+     *         from ISR context or arguments are invalid, error code otherwise.
      */
     int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks);
 
-    /**
+     /**
      * @brief Signal a condition variable and wake one waiting task.
      *
+     * This API must not be called from ISR context.
+     *
      * @param pCondVar Pointer to condition variable handle.
-     * @return `RET_SUCCESS` on success, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_INVAL` if called from ISR context or arguments
+     *         are invalid, error code otherwise.
      */
     int condVarSignal(condVarHandleType *pCondVar);
 
-    /**
+     /**
      * @brief Broadcast a condition variable and wake all waiting tasks.
      *
+     * This API must not be called from ISR context.
+     *
      * @param pCondVar Pointer to condition variable handle.
-     * @return `RET_SUCCESS` on success, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_INVAL` if called from ISR context or arguments
+     *         are invalid, error code otherwise.
      */
     int condVarBroadcast(condVarHandleType *pCondVar);
 

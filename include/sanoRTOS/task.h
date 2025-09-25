@@ -107,6 +107,7 @@ extern "C"
         WAIT_FOR_MSG_QUEUE_DATA,
         WAIT_FOR_MSG_QUEUE_SPACE,
         WAIT_FOR_COND_VAR,
+        WAIT_FOR_EVENT,
         WAIT_FOR_TIMER_TIMEOUT,
 
     } blockedReasonType;
@@ -121,10 +122,22 @@ extern "C"
         MSG_QUEUE_DATA_AVAILABLE,
         MSG_QUEUE_SPACE_AVAILABE,
         COND_VAR_SIGNALLED,
+        EVENT_MATCHED,
         TIMER_TIMEOUT,
         RESUME
 
     } wakeupReasonType;
+
+    /**
+     * @brief Per-task state used by the event object wait APIs.
+     */
+    typedef struct
+    {
+        uint32_t waitMask;       ///< Event bits the task is currently waiting for.
+        uint32_t matchedEvents;  ///< Event bits that matched when the task was woken.
+        uint8_t waitAll;         ///< Non-zero if all bits in waitMask must be present.
+        uint8_t clearOnExit;     ///< Non-zero if matched event bits should be cleared before wake-up.
+    } taskEventStateType;
 
     /**
      * @brief Task Control Block (TCB) structure used to manage a task in the system.
@@ -143,6 +156,7 @@ extern "C"
         wakeupReasonType wakeupReason;   ///< Reason the task was woken up (e.g., timeout, signal).
         coreAffinityType coreAffinity;   ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
         uint8_t priority;                ///< Priority level of the task (lower value indicate higher priority).
+        taskEventStateType eventState;   ///< Event wait state used by the event kernel object.
     } taskHandleType;
 
     typedef struct

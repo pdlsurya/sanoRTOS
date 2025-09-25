@@ -24,7 +24,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
   Easily adjustable tick frequency to match application-specific timing and power requirements.
 
 - **Task Synchronization Primitives**  
-  Includes mutexes, semaphores, and condition variables for safe and efficient coordination between tasks.
+  Includes mutexes, semaphores, condition variables, and event objects for safe and efficient coordination between tasks.
 
 - **Inter-Task Communication**  
   Enables message passing between tasks using message queue.
@@ -35,52 +35,62 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 
 # API Functions
 
-
 ## Task Management
 
-- **TASK_DEFINE**: Macro to statically define and initialize a task.
-- **taskCreate**: Dynamically create and start a task.
-- **taskDelete**: Delete a task. Dynamically created task resources are freed.
-- **taskStart** : Start the task.
-- **taskYield**: Yield the processor to allow other tasks to run.
-- **taskSleepMS**: Delay a task for a specified number of milliseconds.
-- **taskSleepUS**: Delay a task for a specified number of microseconds.
-- **schedulerStart**: Start the RTOS scheduler.
+- `TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)`: Macro to statically define and initialize a task.
+- `taskCreate(ppTask, name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)`: Dynamically create and start a task.
+- `taskDelete(pTask)`: Delete a task. Dynamically created task resources are freed.
+- `taskStart(pTask)`: Start a task that has already been defined.
+- `taskYield()`: Yield the processor to allow other ready tasks to run.
+- `taskSleepMS(sleepTimeMS)`: Delay the current task for a specified number of milliseconds.
+- `taskSleepUS(sleepTimeUS)`: Delay the current task for a specified number of microseconds.
+- `schedulerStart()`: Start the RTOS scheduler.
 
 ## Spin Lock
-- **spinLock**: Acquire a spin lock
-- **spinUnlock**: Release a spin lock
+
+- `spinLock(pLock)`: Acquire a spin lock and return the previous interrupt state.
+- `spinUnlock(pLock, irqState)`: Release a spin lock and restore the saved interrupt state.
 
 ## Mutex
 
-- **MUTEX_DEFINE**: Macro to statically define and initialize a mutex.
-- **mutexLock**: Acquire a mutex, blocking if necessary.
-- **mutexUnlock**: Release a mutex.
+- `MUTEX_DEFINE(name)`: Macro to statically define and initialize a mutex.
+- `mutexLock(pMutex, waitTicks)`: Acquire a mutex, blocking up to `waitTicks` if necessary. This API must not be called from ISR context.
+- `mutexUnlock(pMutex)`: Release a mutex. This API must not be called from ISR context.
 
 ## Semaphore
 
-- **SEMAPHORE_DEFINE**: Macro to statically define and initialize a semaphore.
-- **semaphoreTake**: Take the semaphore.
-- **semaphoreGive**: Release a semaphore.
+- `SEMAPHORE_DEFINE(name, initialCount, maxCount)`: Macro to statically define and initialize a semaphore.
+- `semaphoreTake(pSem, waitTicks)`: Take the semaphore, optionally waiting up to `waitTicks` if unavailable.
+- `semaphoreGive(pSem)`: Release a semaphore.
 
 ## Message Queue
 
-- **MSG_QUEUE_DEFINE**: Macro to statically define and initialize a message queue.
-- **msgQueueSend**: Send a message to a queue.
-- **msgQueueReceive**: Receive a message from a queue.
+- `MSG_QUEUE_DEFINE(name, length, itemSize)`: Macro to statically define and initialize a message queue.
+- `msgQueueSend(pQueueHandle, pItem, waitTicks)`: Send a message to a queue, optionally waiting up to `waitTicks` for free space.
+- `msgQueueReceive(pQueueHandle, pItem, waitTicks)`: Receive a message from a queue, optionally waiting up to `waitTicks` for data.
 
 ## Condition Variable
 
-- **CONDVAR_DEFINE**: Macro to statically define and initialize a conditon variable.
-- **condVarWait**: Wait on a condition variable.
-- **condVarSignal**: Signal a condition variable, waking one waiting task.
-- **condVarBroadcast**: Broadcast a condition variable, waking all waiting tasks.
+- `CONDVAR_DEFINE(name, pMutex)`: Macro to statically define and initialize a condition variable.
+- `condVarWait(pCondVar, waitTicks)`: Wait on a condition variable for up to `waitTicks`. This API must not be called from ISR context.
+- `condVarSignal(pCondVar)`: Signal a condition variable and wake one waiting task. This API must not be called from ISR context.
+- `condVarBroadcast(pCondVar)`: Broadcast a condition variable and wake all waiting tasks. This API must not be called from ISR context.
+
+## Event Object
+
+- `EVENT_DEFINE(name)`: Macro to statically define and initialize an event object.
+- `eventSet(pEvent, events)`: Set one or more event bits and wake matching waiters.
+- `eventClear(pEvent, events)`: Clear one or more event bits.
+- `eventGet(pEvent, pEvents)`: Read the current event bits.
+- `eventWaitAny(pEvent, events, clearOnExit, pMatchedEvents, waitTicks)`: Wait until any bit in `events` becomes set.
+- `eventWaitAll(pEvent, events, clearOnExit, pMatchedEvents, waitTicks)`: Wait until all bits in `events` become set.
+- `eventSync(pEvent, setEvents, waitEvents, pMatchedEvents, waitTicks)`: Atomically set `setEvents`, then wait until all bits in `waitEvents` are set.
 
 ## Software Timer
 
-- **TIMER_DEFINE**: Macro to statically define and initialize a timer
-- **timerStart**: Start a timer with a specified timeout.
-- **timerStop**: Stop a running timer.
+- `TIMER_DEFINE(name, timeoutHandler, timerMode)`: Macro to statically define and initialize a timer.
+- `timerStart(pTimerNode, interval)`: Start a timer with a specified timeout in RTOS ticks.
+- `timerStop(pTimerNode)`: Stop a running timer.
 
 # Building and Running
 ## Example for STM32Cube IDE
