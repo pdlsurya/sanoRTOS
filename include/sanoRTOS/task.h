@@ -29,6 +29,7 @@
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
 #include "sanoRTOS/taskQueue.h"
+#include "sanoRTOS/mailbox.h"
 #include "sanoRTOS/scheduler.h"
 
 #ifdef __cplusplus
@@ -108,6 +109,8 @@ extern "C"
         WAIT_FOR_MSG_QUEUE_SPACE,
         WAIT_FOR_COND_VAR,
         WAIT_FOR_EVENT,
+        WAIT_FOR_MAILBOX_SEND,
+        WAIT_FOR_MAILBOX_RECEIVE,
         WAIT_FOR_TIMER_TIMEOUT,
 
     } blockedReasonType;
@@ -123,10 +126,20 @@ extern "C"
         MSG_QUEUE_SPACE_AVAILABE,
         COND_VAR_SIGNALLED,
         EVENT_MATCHED,
+        MAILBOX_TRANSFER_DONE,
         TIMER_TIMEOUT,
         RESUME
 
     } wakeupReasonType;
+
+    /**
+     * @brief Per-task mailbox exchange state used while waiting on a mailbox object.
+     */
+    typedef struct
+    {
+        mailboxMsgType msg; ///< Mailbox message descriptor saved while the task is waiting.
+        void *pRxBuffer;    ///< Receiver buffer used by mailboxReceive().
+    } taskMailboxStateType;
 
     /**
      * @brief Per-task state used by the event object wait APIs.
@@ -157,6 +170,7 @@ extern "C"
         coreAffinityType coreAffinity;   ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
         uint8_t priority;                ///< Priority level of the task (lower value indicate higher priority).
         taskEventStateType eventState;   ///< Event wait state used by the event kernel object.
+        taskMailboxStateType mailboxState; ///< Mailbox wait state used by the mailbox kernel object.
     } taskHandleType;
 
     typedef struct

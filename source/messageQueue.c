@@ -54,8 +54,9 @@ static int msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
         pConsumerTask = TASK_GET_FROM_WAIT_QUEUE(&pQueueHandle->consumerWaitQueue);
         if (pConsumerTask != NULL)
         {
-            /*If task was suspended while waiting for Queue data, skipt the task and get another waiting task from the waitQueue*/
-            if (pConsumerTask->status == TASK_STATUS_SUSPENDED)
+            /*Skip stale tasks that are no longer blocked waiting for queue data.*/
+            if ((pConsumerTask->status != TASK_STATUS_BLOCKED) ||
+                (pConsumerTask->blockedReason != WAIT_FOR_MSG_QUEUE_DATA))
             {
                 goto getNextConsumer;
             }
@@ -111,8 +112,9 @@ static int msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
         pProducerTask = TASK_GET_FROM_WAIT_QUEUE(&pQueueHandle->producerWaitQueue);
         if (pProducerTask != NULL)
         {
-            /*If task was suspended while waiting for Queue space, skip the task and get another waiting task from the wait Queue*/
-            if (pProducerTask->status == TASK_STATUS_SUSPENDED)
+            /*Skip stale tasks that are no longer blocked waiting for queue space.*/
+            if ((pProducerTask->status != TASK_STATUS_BLOCKED) ||
+                (pProducerTask->blockedReason != WAIT_FOR_MSG_QUEUE_SPACE))
             {
                 goto getNextProducer;
             }

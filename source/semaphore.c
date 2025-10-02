@@ -135,8 +135,9 @@ int semaphoreGive(semaphoreHandleType *pSem)
 
         if (nextTask != NULL)
         {
-            /*If task was suspended while waiting for Semaphore, skip the task and get another waiting task from the waitQueue.*/
-            if (nextTask->status == TASK_STATUS_SUSPENDED)
+            /*Skip stale tasks that are no longer blocked waiting for this semaphore.*/
+            if ((nextTask->status != TASK_STATUS_BLOCKED) ||
+                (nextTask->blockedReason != WAIT_FOR_SEMAPHORE))
             {
                 goto getNextTask;
             }
