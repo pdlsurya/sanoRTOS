@@ -118,8 +118,7 @@ static int eventWakeMatchingTasks(eventHandleType *pEvent, bool *pContextSwitchR
                 return retCode;
             }
 
-            taskHandleType *currentTask = taskGetCurrent();
-            if ((currentTask != NULL) && (pTask->priority <= currentTask->priority))
+            if (taskCanPreemptCurrentCore(pTask))
             {
                 *pContextSwitchRequired = true;
             }

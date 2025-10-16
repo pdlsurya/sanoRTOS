@@ -153,11 +153,9 @@ getNextSignalTask:
             return retCode;
         }
 
-        taskHandleType *currentTask = taskGetCurrent();
-
         /*Perform context switch if unblocked task has equal or
          *higher priority[lower priority value] than that of current task */
-        if (nextSignalTask->priority <= currentTask->priority)
+        if (taskCanPreemptCurrentCore(nextSignalTask))
         {
             contextSwitchRequired = true;
         }

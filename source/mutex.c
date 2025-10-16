@@ -210,7 +210,7 @@ int mutexUnlock(mutexHandleType *pMutex)
 
                 /*Perform context switch if next owner task has equal or
                  *higher priority[lower priority value] than that of current task */
-                if (nextOwner->priority <= currentTask->priority)
+                if (taskCanPreemptCurrentCore(nextOwner))
                 {
                     contextSwitchRequired = true;
                 }

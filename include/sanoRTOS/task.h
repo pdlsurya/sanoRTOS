@@ -318,6 +318,36 @@ extern "C"
     }
 
     /**
+     * @brief Check whether a task can preempt the current core immediately.
+     *
+     * A task can preempt the current core only when it is eligible to run on this
+     * core and has an equal or higher priority than the currently running task.
+     *
+     * @param pTask Pointer to the task being evaluated.
+     * @retval `true` if a local yield can switch to this task on the current core.
+     * @retval `false` otherwise.
+     */
+    static inline __attribute__((always_inline)) bool taskCanPreemptCurrentCore(taskHandleType *pTask)
+    {
+        taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
+
+        if ((pTask == NULL) || (currentTask == NULL))
+        {
+            return false;
+        }
+
+#if CONFIG_SMP
+        if ((pTask->coreAffinity != AFFINITY_CORE_ANY) &&
+            (pTask->coreAffinity != PORT_CORE_ID()))
+        {
+            return false;
+        }
+#endif
+
+        return (pTask->priority <= currentTask->priority);
+    }
+
+    /**
      * @brief Set the current task for the core.
      *
      * @param pTask Pointer to the task handle to set as current
