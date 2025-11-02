@@ -99,8 +99,6 @@ int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
         }
     }
 
-    pTask->coreAffinity = taskNormalizeCoreAffinity(pTask->coreAffinity);
-
     pTask->status = TASK_STATUS_READY;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = wakeupReason;
