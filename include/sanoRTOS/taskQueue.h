@@ -85,7 +85,6 @@ extern "C"
         taskHandleType *pTask;         ///< Pointer to the task represented by this node.
         struct taskNode *nextTaskNode; ///< Pointer to the next node in the task queue.
     } taskNodeType;
-
     /**
      * @brief Task queue structure used to manage a list of tasks (e.g., for ready, waiting, or blocked states).
      */

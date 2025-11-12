@@ -76,15 +76,9 @@ static inline void taskDestroyDynamicResources(taskHandleType *pTask)
     memFree(pTask);
 }
 
-int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
+static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
-    if (pTask == NULL)
-    {
-        return RET_INVAL;
-    }
-
     int retCode = RET_SUCCESS;
-    bool irqState = spinLock(&lock);
 
     if (pTask->status == TASK_STATUS_BLOCKED)
     {
@@ -94,7 +88,6 @@ int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
         retCode = taskQueueRemove(pBlockedQueue, pTask);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
-            spinUnlock(&lock, irqState);
             return retCode;
         }
     }
@@ -109,6 +102,31 @@ int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
     /* Add task to queue of ready tasks*/
     retCode = taskQueueAdd(pReadyQueue, pTask);
 
+    return retCode;
+}
+
+static int taskBlockLocked(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
+{
+    pTask->remainingSleepTicks = ticks;
+    pTask->status = TASK_STATUS_BLOCKED;
+    pTask->blockedReason = blockedReason;
+    pTask->wakeupReason = WAKEUP_REASON_NONE;
+
+    taskQueueType *pBlockedQueue = getBlockedQueue();
+
+    // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
+    return taskQueueAddToFront(pBlockedQueue, pTask);
+}
+
+int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
+{
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    bool irqState = spinLock(&lock);
+    int retCode = taskSetReadyLocked(pTask, wakeupReason);
     spinUnlock(&lock, irqState);
 
     return retCode;
@@ -121,19 +139,8 @@ int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t t
         return RET_INVAL;
     }
 
-    int retCode;
     bool irqState = spinLock(&lock);
-
-    pTask->remainingSleepTicks = ticks;
-    pTask->status = TASK_STATUS_BLOCKED;
-    pTask->blockedReason = blockedReason;
-    pTask->wakeupReason = WAKEUP_REASON_NONE;
-
-    taskQueueType *pBlockedQueue = getBlockedQueue();
-
-    // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
-    retCode = taskQueueAddToFront(pBlockedQueue, pTask);
-
+    int retCode = taskBlockLocked(pTask, blockedReason, ticks);
     spinUnlock(&lock, irqState);
 
     if (retCode != RET_SUCCESS)
@@ -205,6 +212,252 @@ int taskResume(taskHandleType *pTask)
     }
 
     return RET_NOTSUSPENDED;
+}
+
+int taskNotify(taskHandleType *pTask, uint32_t value, taskNotifyActionType action)
+{
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    int retCode = RET_SUCCESS;
+    bool contextSwitchRequired = false;
+    bool irqState = spinLock(&lock);
+
+    /* Reject no-overwrite updates when a previous notification is still pending. */
+    if ((action == TASK_NOTIFY_SET_VALUE_WITHOUT_OVERWRITE) &&
+        (pTask->notification.state == TASK_NOTIFY_STATE_RECEIVED))
+    {
+        retCode = RET_BUSY;
+    }
+    else
+    {
+        switch (action)
+        {
+        case TASK_NOTIFY_NO_ACTION:
+            break;
+
+        case TASK_NOTIFY_SET_BITS:
+            pTask->notification.value |= value;
+            break;
+
+        case TASK_NOTIFY_INCREMENT:
+            pTask->notification.value++;
+            break;
+
+        case TASK_NOTIFY_SET_VALUE_WITH_OVERWRITE:
+        case TASK_NOTIFY_SET_VALUE_WITHOUT_OVERWRITE:
+            pTask->notification.value = value;
+            break;
+
+        default:
+            retCode = RET_INVAL;
+            break;
+        }
+
+        if (retCode == RET_SUCCESS)
+        {
+            pTask->notification.state = TASK_NOTIFY_STATE_RECEIVED;
+
+            /* Wake the task immediately if it is blocked in a notification wait API. */
+            if ((pTask->status == TASK_STATUS_BLOCKED) &&
+                (pTask->blockedReason == WAIT_FOR_NOTIFICATION))
+            {
+                retCode = taskSetReadyLocked(pTask, TASK_NOTIFIED);
+                if ((retCode == RET_SUCCESS) && taskCanPreemptCurrentCore(pTask))
+                {
+                    contextSwitchRequired = true;
+                }
+            }
+        }
+    }
+
+    spinUnlock(&lock, irqState);
+
+    if (contextSwitchRequired)
+    {
+        taskYield();
+    }
+
+    return retCode;
+}
+
+int taskNotifyWait(uint32_t clearMaskOnEntry, uint32_t clearMaskOnExit,
+                   uint32_t *pValue, uint32_t waitTicks)
+{
+    if (pValue == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    if (portIsInISRContext())
+    {
+        return RET_INVAL;
+    }
+
+    taskHandleType *currentTask = taskGetCurrent();
+
+retry:
+    bool irqState = spinLock(&lock);
+    int retCode;
+
+    /* Clear requested bits before checking whether a notification is pending. */
+    currentTask->notification.value &= ~clearMaskOnEntry;
+
+    if (currentTask->notification.state == TASK_NOTIFY_STATE_RECEIVED)
+    {
+        *pValue = currentTask->notification.value;
+        currentTask->notification.value &= ~clearMaskOnExit;
+        currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+        retCode = RET_SUCCESS;
+    }
+    else if (waitTicks == TASK_NO_WAIT)
+    {
+        retCode = RET_BUSY;
+    }
+    else
+    {
+        /* Mark the task as waiting and block it while still holding the task lock. */
+        currentTask->notification.state = TASK_NOTIFY_STATE_WAITING;
+
+        retCode = taskBlockLocked(currentTask, WAIT_FOR_NOTIFICATION, waitTicks);
+        if (retCode != RET_SUCCESS)
+        {
+            currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+            spinUnlock(&lock, irqState);
+            return retCode;
+        }
+
+        spinUnlock(&lock, irqState);
+
+        taskYield();
+
+        irqState = spinLock(&lock);
+
+        if (currentTask->notification.state == TASK_NOTIFY_STATE_RECEIVED)
+        {
+            *pValue = currentTask->notification.value;
+            currentTask->notification.value &= ~clearMaskOnExit;
+            currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+            retCode = RET_SUCCESS;
+        }
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
+        {
+            currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+            retCode = RET_TIMEOUT;
+        }
+        else
+        {
+            currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+            spinUnlock(&lock, irqState);
+
+            /* The task may have been resumed while waiting. Retry the notification wait. */
+            goto retry;
+        }
+    }
+
+    spinUnlock(&lock, irqState);
+
+    return retCode;
+}
+
+int taskNotifyTake(bool clearCountOnExit, uint32_t *pPreviousValue, uint32_t waitTicks)
+{
+    if (portIsInISRContext())
+    {
+        return RET_INVAL;
+    }
+
+    taskHandleType *currentTask = taskGetCurrent();
+
+retry:
+    bool irqState = spinLock(&lock);
+    int retCode;
+
+    if (currentTask->notification.value != 0U)
+    {
+        if (pPreviousValue != NULL)
+        {
+            *pPreviousValue = currentTask->notification.value;
+        }
+
+        if (clearCountOnExit)
+        {
+            currentTask->notification.value = 0U;
+            currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+        }
+        else
+        {
+            currentTask->notification.value--;
+            currentTask->notification.state = (currentTask->notification.value != 0U) ?
+                                                 TASK_NOTIFY_STATE_RECEIVED :
+                                                 TASK_NOTIFY_STATE_NOT_WAITING;
+        }
+        retCode = RET_SUCCESS;
+    }
+    else if (waitTicks == TASK_NO_WAIT)
+    {
+        retCode = RET_BUSY;
+    }
+    else
+    {
+        /* Block until any notification becomes pending for the current task. */
+        currentTask->notification.state = TASK_NOTIFY_STATE_WAITING;
+
+        retCode = taskBlockLocked(currentTask, WAIT_FOR_NOTIFICATION, waitTicks);
+        if (retCode != RET_SUCCESS)
+        {
+            currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+            spinUnlock(&lock, irqState);
+            return retCode;
+        }
+
+        spinUnlock(&lock, irqState);
+
+        taskYield();
+
+        irqState = spinLock(&lock);
+
+        if (currentTask->notification.value != 0U)
+        {
+            if (pPreviousValue != NULL)
+            {
+                *pPreviousValue = currentTask->notification.value;
+            }
+
+            if (clearCountOnExit)
+            {
+                currentTask->notification.value = 0U;
+                currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+            }
+            else
+            {
+                currentTask->notification.value--;
+                currentTask->notification.state = (currentTask->notification.value != 0U) ?
+                                                     TASK_NOTIFY_STATE_RECEIVED :
+                                                     TASK_NOTIFY_STATE_NOT_WAITING;
+            }
+            retCode = RET_SUCCESS;
+        }
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
+        {
+            currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+            retCode = RET_TIMEOUT;
+        }
+        else
+        {
+            currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+            spinUnlock(&lock, irqState);
+
+            /* The task may have been resumed while waiting. Retry the notification take. */
+            goto retry;
+        }
+    }
+
+    spinUnlock(&lock, irqState);
+
+    return retCode;
 }
 
 int taskStart(taskHandleType *pTask)
