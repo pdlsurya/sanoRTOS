@@ -50,17 +50,18 @@ extern "C"
  *
  */
 #define TIMER_DEFINE(_name, timeout_handler, timer_mode) \
-    void timeout_handler(void);                          \
+    void timeout_handler(void *);                        \
     timerNodeType _name = {                              \
         .name = #_name,                                  \
         .isRunning = false,                              \
         .mode = timer_mode,                              \
         .timeoutHandler = timeout_handler,               \
+        .pArg = NULL,                                    \
         .ticksToExpire = 0,                              \
         .intervalTicks = 0,                              \
         .nextNode = NULL}
 
-    typedef void (*timeoutHandlerType)(void); // Timeout handler function type definition
+    typedef void (*timeoutHandlerType)(void *pArg); // Timeout handler function type definition
 
     /**
      * @brief Structure representing a timer node in the system timer list.
@@ -69,6 +70,7 @@ extern "C"
     {
         const char *name;                  ///< Name of the timer.
         timeoutHandlerType timeoutHandler; ///< Function to call when the timer expires.
+        void *pArg;                        ///< Application argument passed to the timeout handler.
         uint32_t intervalTicks;            ///< Timer interval in ticks (used for periodic timers).
         uint32_t ticksToExpire;            ///< Remaining ticks before the timer expires.
         struct timerNode *nextNode;        ///< Pointer to the next timer node in the list.
@@ -82,6 +84,7 @@ extern "C"
     typedef struct timeoutHandlerNode
     {
         timeoutHandlerType timeoutHandler;   ///< Function pointer to be invoked on timeout.
+        void *pArg;                          ///< Application argument passed to the timeout handler.
         struct timeoutHandlerNode *nextNode; ///< Pointer to the next handler in the queue.
     } timeoutHandlerNodeType;
 
