@@ -72,7 +72,6 @@ extern "C"
         timerNodeType timer;             ///< One-shot timer used to delay work submission.
         workQueueHandleType *pWorkQueue; ///< Target work queue used when the timer expires.
         bool scheduled;                  ///< Non-zero while delay timeout is still pending.
-        atomic_t lock;                   ///< Spinlock protecting delayed work state.
     } delayedWorkType;
 
     /**
@@ -145,8 +144,7 @@ extern "C"
             .mode = TIMER_MODE_SINGLE_SHOT,                 \
             .isRunning = false},                            \
         .pWorkQueue = NULL,                                 \
-        .scheduled = false,                                 \
-        .lock = 0}
+        .scheduled = false}
 
     /**
      * @brief Initialize a work item at runtime.
@@ -209,7 +207,6 @@ extern "C"
         pDelayedWork->timer.isRunning = false;
         pDelayedWork->pWorkQueue = NULL;
         pDelayedWork->scheduled = false;
-        pDelayedWork->lock = 0;
 
         return RET_SUCCESS;
     }
