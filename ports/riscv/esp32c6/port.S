@@ -33,12 +33,13 @@
 .equ MSIP_REG, 0x20001800
 
 /* Macro which first allocates space on the stack to save general
- * purpose registers, and then save them. GP register is excluded.
+ * purpose registers, and then saves them.
  * The default size allocated on the stack is CONTEXT_SIZE, but it
  * can be overridden. */
 .macro save_general_regs cxt_size=CONTEXT_SIZE
     addi sp, sp, -\cxt_size
     sw   ra, RV_STK_RA(sp)
+    sw   gp, RV_STK_GP(sp)
     sw   tp, RV_STK_TP(sp)
     sw   t0, RV_STK_T0(sp)
     sw   t1, RV_STK_T1(sp)
@@ -74,11 +75,12 @@
     sw   t0, RV_STK_MEPC(sp)
 .endm
 
-/* Restore the general purpose registers (excluding gp) from the context on
+/* Restore the general purpose registers from the context on
  * the stack. The context is then deallocated. The default size is CONTEXT_SIZE
  * but it can be overridden. */
 .macro restore_general_regs cxt_size=CONTEXT_SIZE
     lw   ra, RV_STK_RA(sp)
+    lw   gp, RV_STK_GP(sp)
     lw   tp, RV_STK_TP(sp)
     lw   t0, RV_STK_T0(sp)
     lw   t1, RV_STK_T1(sp)

@@ -433,7 +433,6 @@ extern "C"
         {
             return false;
         }
-
 #if CONFIG_SMP
         if ((pTask->coreAffinity != AFFINITY_CORE_ANY) &&
             (pTask->coreAffinity != PORT_CORE_ID()))
