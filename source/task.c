@@ -490,7 +490,7 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
     char *taskName = NULL;
 
     if ((ppTask == NULL) || (taskEntryFunction == NULL) ||
-        (stackSize < (PORT_INITIAL_TASK_STACK_OFFSET * sizeof(uint32_t))) ||
+        (stackSize < ((PORT_INITIAL_TASK_STACK_OFFSET + STACK_GUARD_WORDS) * sizeof(uint32_t))) ||
         ((stackSize % sizeof(uint32_t)) != 0))
     {
         return RET_INVAL;
@@ -610,10 +610,25 @@ int taskDelete(taskHandleType *pTask)
 void taskCheckStackOverflow(void)
 {
     taskHandleType *pCurrentTask = taskGetCurrent();
+    uint32_t stackPointer;
+    uint32_t liveStackPointer;
 
-    if (pCurrentTask->stackPointer <= (uint32_t)(pCurrentTask->stack + STACK_GUARD_WORDS))
+    if ((pCurrentTask == NULL) || (pCurrentTask->stack == NULL))
     {
-        LOG_ERROR("%s stack overflow at address: %p", pCurrentTask->name, (void *)pCurrentTask->stackPointer);
+        return;
+    }
+
+    stackPointer = pCurrentTask->stackPointer;
+    liveStackPointer = portGetCurrentStackPointer();
+
+    if (liveStackPointer < stackPointer)
+    {
+        stackPointer = liveStackPointer;
+    }
+
+    if (stackPointer < (uint32_t)(pCurrentTask->stack + STACK_GUARD_WORDS))
+    {
+        LOG_ERROR("%s stack overflow at address: %p", pCurrentTask->name, (void *)stackPointer);
 
         while (1)
             ;

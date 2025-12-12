@@ -73,6 +73,9 @@ extern "C"
  * @param taskPriority Task priority.
  */
 #define TASK_DEFINE(_name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                      \
+    _Static_assert(((stackSize) % sizeof(uint32_t)) == 0U, "Task stack size must be word aligned.");             \
+    _Static_assert((stackSize) >= ((PORT_INITIAL_TASK_STACK_OFFSET + STACK_GUARD_WORDS) * sizeof(uint32_t)),     \
+                   "Task stack too small for initial frame and stack guard.");                                    \
     void taskEntryFunction(void *);                                                                               \
     PORT_TASK_STACK_DEFINE(_name, stackSize, taskEntryFunction, taskExitFunction, taskParams);                    \
     static taskHandleType _name = {                                                                               \
@@ -337,7 +340,7 @@ extern "C"
     int taskDelete(taskHandleType *pTask);
 
     /**
-     * @brief Check current task stack-overflow guard.
+     * @brief Check current task stack-overflow guard using the lowest known saved/live stack pointer.
      */
     void taskCheckStackOverflow();
 

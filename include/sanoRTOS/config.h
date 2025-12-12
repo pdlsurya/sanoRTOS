@@ -46,7 +46,7 @@ extern "C"
 
 #define CONFIG_TASK_USER_MODE 0///< Configure task user mode: Defines whether tasks should run in privileged mode (0 = Privileged, 1 = User mode).
 
-#define CONFIG_CHECK_STACK_OVERFLOW 0 ///< Configure stack overflow check
+#define CONFIG_CHECK_STACK_OVERFLOW 1 ///< Configure stack overflow check
 
 #define CONFIG_TICK_INTERVAL_US 1000 ///< Configure Tick interval to generate interrupt every TICK_INTERVAL_US (in microseconds): Sets the interrupt frequency for the system tick.
 

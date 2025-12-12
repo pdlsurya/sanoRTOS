@@ -53,6 +53,10 @@ static int selectNextTask(void)
     taskQueueType *const pReadyQueue = getReadyQueue();
     taskHandleType *const pCurrentTask = taskGetCurrent();
 
+#if CONFIG_CHECK_STACK_OVERFLOW
+    taskCheckStackOverflow();
+#endif
+
     // If the current task is running, add it to the ready queue
     if (pCurrentTask->status == TASK_STATUS_RUNNING)
     {
@@ -77,11 +81,6 @@ static int selectNextTask(void)
 
     // Set the current task to the next ready task
     currentTask[PORT_CORE_ID()] = pCurrentTask;
-
-#if CONFIG_CHECK_STACK_OVERFLOW
-    // Check for stack overflow
-    taskCheckStackOverflow();
-#endif
 
     // Get the next task from the ready queue
     nextTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
