@@ -239,6 +239,12 @@ extern "C"
      */
     static inline bool portIsInISRContext()
     {
+#if CONFIG_TASK_USER_MODE
+        if (!PORT_IS_PRIVILEGED())
+        {
+            return false;
+        }
+#endif
         uint32_t mstatus = RV_READ_CSR(mstatus);
         uint32_t mcause = RV_READ_CSR(mcause);
         return (((mstatus & MSTATUS_MIE) == 0U) && (((mcause >> 31U) & 0x1U) != 0U));

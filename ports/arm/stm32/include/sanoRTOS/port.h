@@ -161,16 +161,36 @@ extern "C"
      * @retval `true`, if interrupts were enabled previously
      * @retval `false`, if interrupts were disabled previously
      */
+    static inline bool portIrqEnabled()
+    {
+#if CONFIG_TASK_USER_MODE
+        bool privileged = PORT_IS_PRIVILEGED();
+
+        if (!privileged)
+        {
+            PORT_ENTER_PRIVILEGED_MODE();
+        }
+
+        bool irqState = (__get_BASEPRI() == 0U);
+
+        if (!privileged)
+        {
+            PORT_EXIT_PRIVILEGED_MODE();
+        }
+
+        return irqState;
+#else
+        return (__get_PRIMASK() == 0U);
+#endif
+    }
+
     static inline bool portIrqLock()
     {
-        bool irqState;
+        bool irqState = portIrqEnabled();
+
 #if CONFIG_TASK_USER_MODE
-
-        irqState = (__get_BASEPRI() == 0);
-
         if (irqState)
         {
-
             if (PORT_IS_PRIVILEGED())
             {
                 PORT_DISABLE_INTERRUPTS();
@@ -182,13 +202,10 @@ extern "C"
         }
 
 #else
-    irqState = (__get_PRIMASK() == 0);
-    if (irqState)
-    {
-
-        PORT_DISABLE_INTERRUPTS();
-    }
-
+        if (irqState)
+        {
+            PORT_DISABLE_INTERRUPTS();
+        }
 #endif
 
         return irqState;
