@@ -55,18 +55,9 @@ extern "C"
                         return false;
                 }
 
-#if (CONFIG_SMP)
-#if CONFIG_TASK_USER_MODE
-
-                bool privileged = PORT_IS_PRIVILEGED(); ///< Check if the CPU core is in privileged mode.
-
-                if (!privileged)
-                {
-                        PORT_ENTER_PRIVILEGED_MODE(); ///< If in unprivileged mode, enter privileged mode to perform the lock operation.
-                }
-#endif
-
                 bool irqState = portIrqLock(); ///< Save the interrupt status (whether interrupts are enabled or disabled).
+
+#if (CONFIG_SMP)
 
                 // Try to atomically acquire the lock using CAS (Compare-And-Swap).
                 // It will keep retrying until the lock is successfully acquired.
@@ -76,18 +67,6 @@ extern "C"
                 }
 
                 PORT_MEM_FENCE(); ///< Ensure memory operations (like lock acquisition) are visible to other processors.
-
-#if CONFIG_TASK_USER_MODE
-
-                if (!privileged) ///< If the core was not in privileged mode, exit privileged mode.
-                {
-                        PORT_EXIT_PRIVILEGED_MODE();
-                }
-
-#endif
-
-#else
-        bool irqState = portIrqLock(); ///< Save the interrupt status for non-SMP systems.
 
 #endif
 
