@@ -31,18 +31,6 @@
 #include "sanoRTOS/log.h"
 #include "pico/stdlib.h"
 
-// PMP config bits
-#define PMP_R (1 << 0)
-#define PMP_W (1 << 1)
-#define PMP_X (1 << 2)
-#define PMP_TOR (1 << 3)
-#define PMP_NA4 (2 << 3)
-#define PMP_NAPOT (3 << 3)
-#define PMP_L (1 << 7)
-
-// Helper to encode NAPOT address
-#define PMPADDR_NAPOT(base, size) (((base) >> 2) | (((size) - 1) >> 3))
-
 #if (CONFIG_SMP)
 
 TASK_DEFINE(idleTask1, 512, idleTaskHandler1, NULL, TASK_LOWEST_PRIORITY, AFFINITY_CORE_1);
@@ -52,7 +40,7 @@ void idleTaskHandler1(void *params)
     (void)params;
     while (1)
     {
-        PORT_ENTER_SLEEP_MODE();
+        // PORT_ENTER_SLEEP_MODE();
     }
 }
 #endif
@@ -60,46 +48,9 @@ void idleTaskHandler1(void *params)
 /*RTOS tick handler function*/
 extern void tickHandler(void);
 
-volatile privilegeModesType privilegeMode = MACHINE_MODE;
-
 static uint64_t mtimer_period_ticks;
 
 static atomic_t lock;
-
-void syscallHandler(uint32_t sysCode)
-{
-    switch (sysCode)
-    {
-    case SWITCH_CONTEXT:
-        PORT_TRIGGER_CONTEXT_SWITCH();
-        break;
-
-    case DISABLE_INTERRUPTS:
-        /* Syscalls return with mret, which restores the thread interrupt state
-         * from MPIE rather than the live MIE bit inside the handler. */
-        riscv_clear_csr(mstatus, RVCSR_MSTATUS_MPIE_BITS);
-        break;
-
-    case ENABLE_INTERRUPTS:
-        riscv_set_csr(mstatus, RVCSR_MSTATUS_MPIE_BITS);
-        break;
-
-    case ENTER_PRIVILEGED_MODE:
-        riscv_set_csr(mstatus, RVCSR_MSTATUS_MPP_BITS);
-        break;
-
-    case EXIT_PRIVILEGED_MODE:
-        riscv_clear_csr(mstatus, RVCSR_MSTATUS_MPP_BITS);
-        break;
-
-    case GET_PRIVILEGE_MODE:
-        privilegeMode = ((riscv_read_csr(mstatus) & RVCSR_MSTATUS_MPP_BITS) != 0) ? MACHINE_MODE : USER_MODE;
-        break;
-
-    default:
-        break;
-    }
-}
 
 static inline void portTickConfig()
 {
@@ -123,46 +74,6 @@ static inline void portConfig()
     riscv_set_csr(mstatus, RVCSR_MSTATUS_MIE_BITS);
     /*initialize mtimer to generate interrupt every 1 ms*/
     portTickConfig();
-}
-
-
-void pmpConfigure(void)
-{
-    // Dynamic PMP regions (only 5 needed)
-    uint32_t pmpaddr0 = PMPADDR_NAPOT(0x10000000, 64 * 1024 * 1024); // XIP Cached
-    uint8_t pmp0cfg = PMP_R | PMP_X | PMP_NAPOT | PMP_L;             // XIP Cached
-
-    uint32_t pmpaddr1 = PMPADDR_NAPOT(0x14000000, 64 * 1024 * 1024); // XIP Uncached
-    uint8_t pmp1cfg = PMP_R | PMP_X | PMP_NAPOT | PMP_L;             // XIP Uncached
-
-    uint32_t pmpaddr2 = PMPADDR_NAPOT(0x18000000, 64 * 1024 * 1024); // XIP Cache Maint.
-    uint8_t pmp2cfg = PMP_W | PMP_NAPOT | PMP_L;                     // XIP Cache Maint.
-
-    uint32_t pmpaddr3 = PMPADDR_NAPOT(0x1C000000, 64 * 1024 * 1024); // XIP Untranslated
-    uint8_t pmp3cfg = PMP_R | PMP_X | PMP_NAPOT | PMP_L;             // XIP Untranslated
-
-    uint32_t pmpaddr4 = PMPADDR_NAPOT(0x20000000, 512 * 1024);   // Main SRAM(first 512KB)
-    uint8_t pmp4cfg = PMP_R | PMP_W | PMP_X | PMP_NAPOT | PMP_L; // Main SRAM(first 512KB)
-
-    uint32_t pmpaddr5 = PMPADDR_NAPOT(0x20080000, 8 * 1024);     // Main SRAM(second 8KB)
-    uint8_t pmp5cfg = PMP_R | PMP_W | PMP_X | PMP_NAPOT | PMP_L; // Main SRAM(second 8KB)
-
-    // PMP config bytes (8-bit each)
-
-    // Write PMPADDR registers
-    riscv_write_csr(pmpaddr0, pmpaddr0);
-    riscv_write_csr(pmpaddr1, pmpaddr1);
-    riscv_write_csr(pmpaddr2, pmpaddr2);
-    riscv_write_csr(pmpaddr3, pmpaddr3);
-    riscv_write_csr(pmpaddr4, pmpaddr4);
-    riscv_write_csr(pmpaddr5, pmpaddr5);
-
-    // Pack config bytes into PMPCFG0 and PMPCFG1
-    uint32_t pmpcfg_reg0 = (pmp3cfg << 24) | (pmp2cfg << 16) | (pmp1cfg << 8) | pmp0cfg;
-    uint32_t pmpcfg_reg1 = pmp4cfg | (pmp5cfg << 8);
-
-    riscv_write_csr(pmpcfg0, pmpcfg_reg0);
-    riscv_write_csr(pmpcfg1, pmpcfg_reg1);
 }
 
 void portRunFirstTask()
@@ -194,39 +105,8 @@ void portRunFirstTask()
     taskHandleType *pCurrentTask = currentTask[coreId];
 
     __asm__ volatile(" mv sp, %0" ::"r"(pCurrentTask->stackPointer));
-
-/*If user mode is enabled, Physical Memory Protection(PMP) and Access Permission Management(APM)
-  should be configured to allow user mode access to memory and peripheral regions */
-#if (CONFIG_TASK_USER_MODE)
-
-    pmpConfigure();
-
-    /* Clear MPP bits of mstatus to switch to user mode(U-mode)*/
-    riscv_clear_csr(mstatus, RVCSR_MSTATUS_MPP_BITS);
-
-    /* MPIE is set to 1 to restore interrupt enable state after the transition.*/
-    riscv_set_csr(mstatus, RVCSR_MSTATUS_MPIE_BITS);
-
-    uint32_t taskEntry = (uint32_t)pCurrentTask->entry;
-    uint32_t taskParams = (uint32_t)pCurrentTask->params;
-    uint32_t taskExit = (uint32_t)taskExitFunction;
-
-    /* Set up the first user task context without any further calls that could clobber mepc. */
-    __asm__ volatile(
-        "csrw mepc, %0\n"
-        "mv a0, %1\n"
-        "mv ra, %2\n"
-        "mret\n"
-        :
-        : "r"(taskEntry), "r"(taskParams), "r"(taskExit)
-        : "a0", "memory");
-    __builtin_unreachable();
-
-#else
-
-    /*If user mode not enabled, jump directly to the first task*/
+    /*Jump directly to the first task*/
     pCurrentTask->entry(pCurrentTask->params);
-#endif
 }
 
 static void core1_entry(void)
@@ -270,30 +150,4 @@ __attribute__((interrupt)) __attribute__((section(".time_critical"))) void isr_r
     /*Load sp with thread  mode stack pointer stored in mscratch and store current isr/handler mode sp to mscratch*/
     __asm__ volatile("csrrw sp,mscratch,sp");
 #endif
-}
-
-__attribute__((section(".time_critical"))) void isr_riscv_machine_ecall_mmode_exception()
-{
-    uint32_t mepc = riscv_read_csr(mepc);
-    mepc += 4;
-    riscv_write_csr(mepc, mepc);
-
-    uint32_t arg;
-    asm volatile("mv %0,a0" : "=r"(arg));
-    // Invoke the RTOS syscall handler
-    syscallHandler(arg);
-}
-
-__attribute__((section(".time_critical"))) void isr_riscv_machine_ecall_umode_exception()
-{
-
-    uint32_t mepc = riscv_read_csr(mepc);
-    mepc += 4;
-    riscv_write_csr(mepc, mepc);
-
-    uint32_t arg;
-    asm volatile("mv %0,a0" : "=r"(arg));
-    // LOG_DEBUG("eCALL\n");
-    // Invoke the RTOS syscall handler
-    syscallHandler(arg);
 }

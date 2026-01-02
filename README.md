@@ -6,11 +6,6 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - **Priority-Based Preemptive Scheduling**  
   Efficient task management with support for preemptive scheduling based on task priority levels.
 
-- **Optional Privileged and User-Level Tasks**
-  Supports the differentiation between privileged (kernel) tasks and user-level tasks. Privileged tasks have access to critical system resources and can execute sensitive operations, 
-  while user-level tasks operate with restricted permissions to enhance system security and stability. This separation allows for better isolation and protection between tasks of 
-  different trust levels, ensuring that critical system operations are secure from user-level task interference.
-
 - **Optional Priority Inheritance**  
   Prevents priority inversion during mutex acquisition by temporarily elevating the priority of lower-priority tasks.
 
@@ -121,8 +116,8 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
    - STM32 initializes the SysTick timer during its clock initialization process and defines the `SysTick_Handler` ISR function for the implementation of the delay function in the 
    **Core > Src > stm32xxxx_it.c** file. Hence, the `SysTick_Handler` ISR function cannot be redefined inside the sanoRTOS. Instead, we need to call the function `osSysTick_Handler` from the `SysTick_Handler` ISR function.
     
-   - Moreover, **sanoRTOS** includes definition for `PendSV_Handler` and `SVC_Handler` ISRs used for task scheduling and context switching. STM32 also 
-   defines these ISRs in **stm32xxxx_it.c** file; Hence, we need to remove the definition of these ISRs from the **stm32xxxx_it.c** file to avoid multiple definition error. 
+   - Moreover, **sanoRTOS** includes definition for `PendSV_Handler` used for task scheduling and context switching. STM32 also
+   defines this ISR in **stm32xxxx_it.c** file; Hence, we need to remove the definition of this ISR from the **stm32xxxx_it.c** file to avoid multiple definition error.
 
 ## Example for RP2350(Raspberry Pi pico 2) using pico-sdk
 1. Clone the Repository:
