@@ -22,7 +22,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
   Includes mutexes, semaphores, condition variables, and event objects for safe and efficient coordination between tasks.
 
 - **Inter-Task Communication**  
-  Enables message passing between tasks using message queues, message buffers, and mailboxes.
+  Enables message passing between tasks using message queues, stream buffers, message buffers, and mailboxes.
 
 - **Minimalistic and Lightweight Design**  
   Designed for embedded systems with limited resources — small footprint, fast context switches, and no unnecessary bloat.
@@ -64,8 +64,17 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - `msgQueueSend(pQueueHandle, pItem, waitTicks)`: Send a message to a queue, optionally waiting up to `waitTicks` for free space.
 - `msgQueueReceive(pQueueHandle, pItem, waitTicks)`: Receive a message from a queue, optionally waiting up to `waitTicks` for data.
 
+## Stream Buffer
+
+- Raw byte stream with no message boundaries. Receives can return partial data.
+- `STREAM_BUFFER_DEFINE(name, bufferSize)`: Macro to statically define and initialize a stream buffer.
+- `streamBufferSend(pStreamBuffer, pData, length, waitTicks)`: Send raw bytes to the stream buffer.
+- `streamBufferReceive(pStreamBuffer, pData, pLength, waitTicks)`: Receive up to `*pLength` bytes from the stream buffer.
+- `streamBufferPeek(pStreamBuffer, pData, pLength)`: Peek up to `*pLength` bytes without consuming them.
+
 ## Message Buffer
 
+- Variable-length discrete messages built on top of the stream buffer internals.
 - `MSG_BUFFER_DEFINE(name, bufferSize)`: Macro to statically define and initialize a message buffer.
 - `msgBufferSend(pMsgBuffer, pData, length, waitTicks)`: Send one variable-length message to the buffer.
 - `msgBufferReceive(pMsgBuffer, pData, pLength, waitTicks)`: Receive one queued message into the supplied buffer.
