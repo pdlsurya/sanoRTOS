@@ -22,8 +22,8 @@
  * SOFTWARE.
  */
 
-#ifndef __SANO_RTOS_MEM_H
-#define __SANO_RTOS_MEM_H
+#ifndef __SANO_RTOS_MEM_HEAP_H
+#define __SANO_RTOS_MEM_HEAP_H
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -42,14 +42,14 @@ extern "C"
      * @param size Size in bytes.
      * @return Pointer to allocated memory, or `NULL` on failure.
      */
-    void *memAlloc(size_t size);
+    void *memHeapAlloc(size_t size);
 
     /**
      * @brief Free previously allocated memory.
      *
      * @param ptr Pointer to memory block.
      */
-    void memFree(void *ptr);
+    void memHeapFree(void *ptr);
 
     /**
      * @brief Resize an allocated memory block.
@@ -58,10 +58,10 @@ extern "C"
      * @param size New size in bytes.
      * @return Pointer to resized block, or `NULL` on failure.
      */
-    void *memRealloc(void *ptr, size_t size);
+    void *memHeapRealloc(void *ptr, size_t size);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // __SANO_RTOS_MEM_H
+#endif // __SANO_RTOS_MEM_HEAP_H

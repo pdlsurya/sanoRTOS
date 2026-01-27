@@ -25,12 +25,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "sanoRTOS/mem.h"
+#include "sanoRTOS/memHeap.h"
 #include "sanoRTOS/spinLock.h"
 
 static atomic_t lock;
 
-void *memAlloc(size_t size)
+void *memHeapAlloc(size_t size)
 {
     void *ptr = NULL;
 
@@ -43,7 +43,7 @@ void *memAlloc(size_t size)
     return ptr;
 }
 
-void memFree(void *ptr)
+void memHeapFree(void *ptr)
 {
     bool irqState = spinLock(&lock);
 
@@ -52,7 +52,7 @@ void memFree(void *ptr)
     spinUnlock(&lock, irqState);
 }
 
-void *memRealloc(void *ptr, size_t size)
+void *memHeapRealloc(void *ptr, size_t size)
 {
     void *new_ptr = NULL;
 

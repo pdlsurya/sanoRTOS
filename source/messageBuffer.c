@@ -35,7 +35,7 @@ static inline uint32_t msgBufferRequiredBytes(uint32_t length)
     return (uint32_t)sizeof(uint32_t) + length;
 }
 
-static int msgBufferPeekLength(msgBufferHandleType *pMsgBuffer, uint32_t *pLength)
+static int msgBufferPeekLengthLocked(msgBufferHandleType *pMsgBuffer, uint32_t *pLength)
 {
     if ((pMsgBuffer == NULL) || (pLength == NULL))
     {
@@ -120,7 +120,7 @@ static int msgBufferRead(msgBufferHandleType *pMsgBuffer, void *pData, uint32_t 
     bool contextSwitchRequired = false;
     uint32_t messageLength = 0U;
 
-    retCode = msgBufferPeekLength(pMsgBuffer, &messageLength);
+    retCode = msgBufferPeekLengthLocked(pMsgBuffer, &messageLength);
     if (retCode == RET_SUCCESS)
     {
         if (messageLength > bufferCapacity)
@@ -327,7 +327,7 @@ int msgBufferNextLength(msgBufferHandleType *pMsgBuffer, uint32_t *pLength)
     }
 
     bool irqState = spinLock(&pMsgBuffer->streamBuffer.lock);
-    int retCode = msgBufferPeekLength(pMsgBuffer, pLength);
+    int retCode = msgBufferPeekLengthLocked(pMsgBuffer, pLength);
     spinUnlock(&pMsgBuffer->streamBuffer.lock, irqState);
 
     return retCode;

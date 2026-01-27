@@ -28,7 +28,7 @@
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/timer.h"
-#include "sanoRTOS/mem.h"
+#include "sanoRTOS/memSlab.h"
 #include "sanoRTOS/spinLock.h"
 
 #define TIMER_TASK_PRIORITY TASK_HIGHEST_PRIORITY // timer task has the highest possible priority [lower the value, higher the priority]
@@ -39,14 +39,16 @@ static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout ha
 
 static atomic_t lock; // Protects timer list and timeout handler queue
 
+MEM_SLAB_DEFINE(timeoutHandlerNodeSlab, sizeof(timeoutHandlerNodeType), CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS);
+
 /*Define timer task with highest possible priority*/
 TASK_DEFINE(timerTask, 4096, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, AFFINITY_CORE_0);
 
 static int timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue,
                                    timeoutHandlerType timeoutHandler, void *pArg)
 {
-    timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)memAlloc(sizeof(timeoutHandlerNodeType));
-    if (newNode == NULL)
+    timeoutHandlerNodeType *newNode = NULL;
+    if (memSlabAlloc(&timeoutHandlerNodeSlab, (void **)&newNode, TASK_NO_WAIT) != RET_SUCCESS)
     {
         return RET_NOMEM;
     }
@@ -82,19 +84,20 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
 
     timeoutHandlerNodeType *temp = pTimeoutHandlerQueue->head->nextNode;
 
-    timeoutHandlerType timeoutHandler = pTimeoutHandlerQueue->head->timeoutHandler;
+    timeoutHandlerNodeType *pNode = pTimeoutHandlerQueue->head;
+    timeoutHandlerType timeoutHandler = pNode->timeoutHandler;
     if (ppArg != NULL)
     {
-        *ppArg = pTimeoutHandlerQueue->head->pArg;
+        *ppArg = pNode->pArg;
     }
-
-    memFree(pTimeoutHandlerQueue->head);
 
     pTimeoutHandlerQueue->head = temp;
     if (pTimeoutHandlerQueue->head == NULL)
     {
         pTimeoutHandlerQueue->tail = NULL;
     }
+
+    (void)memSlabFree(&timeoutHandlerNodeSlab, pNode);
 
     return timeoutHandler;
 }

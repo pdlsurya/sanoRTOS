@@ -31,7 +31,8 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/timer.h"
-#include "sanoRTOS/mem.h"
+#include "sanoRTOS/memHeap.h"
+#include "sanoRTOS/memSlab.h"
 #include "sanoRTOS/log.h"
 
 LOG_MODULE_DEFINE(task);
@@ -45,6 +46,8 @@ taskHandleType *currentTask[PORT_CORE_COUNT];
 taskHandleType *nextTask[PORT_CORE_COUNT];
 
 static atomic_t lock;
+
+MEM_SLAB_DEFINE(dynamicTaskTcbSlab, sizeof(taskHandleType), CONFIG_DYNAMIC_TASK_TCB_SLAB_BLOCKS);
 
 void taskExitFunction()
 {
@@ -63,17 +66,22 @@ static void taskInitStack(uint32_t *stack, uint32_t stackSize, taskFunctionType 
 
 static inline void taskDestroyDynamicResources(taskHandleType *pTask)
 {
+    if (pTask == NULL)
+    {
+        return;
+    }
+
     if ((pTask->flags & TASK_FLAG_OWN_NAME) && (pTask->name != NULL))
     {
-        memFree((void *)pTask->name);
+        memHeapFree((void *)pTask->name);
     }
 
     if ((pTask->flags & TASK_FLAG_OWN_STACK) && (pTask->stack != NULL))
     {
-        memFree(pTask->stack);
+        memHeapFree(pTask->stack);
     }
 
-    memFree(pTask);
+    (void)memSlabFree(&dynamicTaskTcbSlab, pTask);
 }
 
 static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReason)
@@ -496,27 +504,26 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
         return RET_INVAL;
     }
 
-    pTask = (taskHandleType *)memAlloc(sizeof(taskHandleType));
-    if (pTask == NULL)
+    if (memSlabAlloc(&dynamicTaskTcbSlab, (void **)&pTask, TASK_NO_WAIT) != RET_SUCCESS)
     {
         return RET_NOMEM;
     }
 
-    stack = (uint32_t *)memAlloc(stackSize);
+    stack = (uint32_t *)memHeapAlloc(stackSize);
     if (stack == NULL)
     {
-        memFree(pTask);
+        (void)memSlabFree(&dynamicTaskTcbSlab, pTask);
         return RET_NOMEM;
     }
 
     if (name != NULL)
     {
         size_t nameLen = strlen(name) + 1U;
-        taskName = (char *)memAlloc(nameLen);
+        taskName = (char *)memHeapAlloc(nameLen);
         if (taskName == NULL)
         {
-            memFree(stack);
-            memFree(pTask);
+            memHeapFree(stack);
+            (void)memSlabFree(&dynamicTaskTcbSlab, pTask);
             return RET_NOMEM;
         }
         memcpy(taskName, name, nameLen);

@@ -27,7 +27,9 @@
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/taskQueue.h"
-#include "sanoRTOS/mem.h"
+#include "sanoRTOS/memSlab.h"
+
+MEM_SLAB_DEFINE(taskQueueNodeSlab, sizeof(taskNodeType), CONFIG_TASK_QUEUE_NODE_SLAB_BLOCKS);
 
 static inline taskNodeType *newNode(taskHandleType *pTask)
 {
@@ -36,8 +38,8 @@ static inline taskNodeType *newNode(taskHandleType *pTask)
         return NULL;
     }
 
-    taskNodeType *newTaskNode = (taskNodeType *)memAlloc(sizeof(taskNodeType));
-    if (newTaskNode == NULL)
+    taskNodeType *newTaskNode = NULL;
+    if (memSlabAlloc(&taskQueueNodeSlab, (void **)&newTaskNode, TASK_NO_WAIT) != RET_SUCCESS)
     {
         return NULL;
     }
@@ -55,11 +57,11 @@ static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
         return RET_INVAL;
     }
 
-    taskNodeType *temp = pTaskQueue->head->nextTaskNode;
-    memFree(pTaskQueue->head);
+    taskNodeType *pNode = pTaskQueue->head;
+    taskNodeType *temp = pNode->nextTaskNode;
     pTaskQueue->head = temp;
 
-    return RET_SUCCESS;
+    return memSlabFree(&taskQueueNodeSlab, pNode);
 }
 
 int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
@@ -91,11 +93,11 @@ int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
             return RET_NOTASK;
         }
 
-        taskNodeType *temp = currentTaskNode->nextTaskNode->nextTaskNode;
-        memFree(currentTaskNode->nextTaskNode);
+        taskNodeType *pNode = currentTaskNode->nextTaskNode;
+        taskNodeType *temp = pNode->nextTaskNode;
         currentTaskNode->nextTaskNode = temp;
 
-        return RET_SUCCESS;
+        return memSlabFree(&taskQueueNodeSlab, pNode);
     }
 }
 
