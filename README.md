@@ -28,93 +28,9 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
   Designed for embedded systems with limited resources — small footprint, fast context switches, and no unnecessary bloat.
 
 
-# API Functions
+## API Reference
 
-## Task Management
-
-- `TASK_DEFINE(name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)`: Macro to statically define and initialize a task.
-- `taskCreate(ppTask, name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)`: Dynamically create and start a task.
-- `taskDelete(pTask)`: Delete a task. Dynamically created task resources are freed.
-- `taskStart(pTask)`: Start a task that has already been defined.
-- `taskYield()`: Yield the processor to allow other ready tasks to run.
-- `taskSleepMS(sleepTimeMS)`: Delay the current task for a specified number of milliseconds.
-- `taskSleepUS(sleepTimeUS)`: Delay the current task for a specified number of microseconds.
-- `schedulerStart()`: Start the RTOS scheduler.
-
-## Spin Lock
-
-- `spinLock(pLock)`: Acquire a spin lock and return the previous interrupt state.
-- `spinUnlock(pLock, irqState)`: Release a spin lock and restore the saved interrupt state.
-
-## Mutex
-
-- `MUTEX_DEFINE(name)`: Macro to statically define and initialize a mutex.
-- `mutexLock(pMutex, waitTicks)`: Acquire a mutex, blocking up to `waitTicks` if necessary. This API must not be called from ISR context.
-- `mutexUnlock(pMutex)`: Release a mutex. This API must not be called from ISR context.
-
-## Semaphore
-
-- `SEMAPHORE_DEFINE(name, initialCount, maxCount)`: Macro to statically define and initialize a semaphore.
-- `semaphoreTake(pSem, waitTicks)`: Take the semaphore, optionally waiting up to `waitTicks` if unavailable.
-- `semaphoreGive(pSem)`: Release a semaphore.
-
-## Message Queue
-
-- `MSG_QUEUE_DEFINE(name, length, itemSize)`: Macro to statically define and initialize a message queue.
-- `msgQueueSend(pQueueHandle, pItem, waitTicks)`: Send a message to a queue, optionally waiting up to `waitTicks` for free space.
-- `msgQueueReceive(pQueueHandle, pItem, waitTicks)`: Receive a message from a queue, optionally waiting up to `waitTicks` for data.
-
-## Stream Buffer
-
-- Raw byte stream with no message boundaries. Receives can return partial data.
-- `STREAM_BUFFER_DEFINE(name, bufferSize)`: Macro to statically define and initialize a stream buffer.
-- `streamBufferSend(pStreamBuffer, pData, length, waitTicks)`: Send raw bytes to the stream buffer.
-- `streamBufferReceive(pStreamBuffer, pData, pLength, waitTicks)`: Receive up to `*pLength` bytes from the stream buffer.
-- `streamBufferPeek(pStreamBuffer, pData, pLength)`: Peek up to `*pLength` bytes without consuming them.
-
-## Memory Slab
-
-- Fixed-size block allocator with deterministic allocation and free paths.
-- `MEM_SLAB_DEFINE(name, blockSize, numBlocks)`: Macro to statically define and initialize a memory slab.
-- `memSlabAlloc(pMemSlab, ppBlock, waitTicks)`: Allocate one block from the slab.
-- `memSlabFree(pMemSlab, pBlock)`: Return one block to the slab.
-
-## Message Buffer
-
-- Variable-length discrete messages built on top of the stream buffer internals.
-- `MSG_BUFFER_DEFINE(name, bufferSize)`: Macro to statically define and initialize a message buffer.
-- `msgBufferSend(pMsgBuffer, pData, length, waitTicks)`: Send one variable-length message to the buffer.
-- `msgBufferReceive(pMsgBuffer, pData, pLength, waitTicks)`: Receive one queued message into the supplied buffer.
-- `msgBufferNextLength(pMsgBuffer, pLength)`: Get the length of the next queued message without removing it.
-
-## Mailbox
-
-- `MAILBOX_DEFINE(name)`: Macro to statically define and initialize a mailbox.
-- `mailboxSend(pMailbox, pMsg, waitTicks)`: Send a mailbox message descriptor and wait for a compatible receiver.
-- `mailboxReceive(pMailbox, pMsg, pBuffer, waitTicks)`: Receive a mailbox message into `pBuffer`, optionally waiting for a compatible sender.
-
-## Condition Variable
-
-- `CONDVAR_DEFINE(name, pMutex)`: Macro to statically define and initialize a condition variable.
-- `condVarWait(pCondVar, waitTicks)`: Wait on a condition variable for up to `waitTicks`. This API must not be called from ISR context.
-- `condVarSignal(pCondVar)`: Signal a condition variable and wake one waiting task. This API must not be called from ISR context.
-- `condVarBroadcast(pCondVar)`: Broadcast a condition variable and wake all waiting tasks. This API must not be called from ISR context.
-
-## Event Object
-
-- `EVENT_DEFINE(name)`: Macro to statically define and initialize an event object.
-- `eventSet(pEvent, events)`: Set one or more event bits and wake matching waiters.
-- `eventClear(pEvent, events)`: Clear one or more event bits.
-- `eventGet(pEvent, pEvents)`: Read the current event bits.
-- `eventWaitAny(pEvent, events, clearOnExit, pMatchedEvents, waitTicks)`: Wait until any bit in `events` becomes set.
-- `eventWaitAll(pEvent, events, clearOnExit, pMatchedEvents, waitTicks)`: Wait until all bits in `events` become set.
-- `eventSync(pEvent, setEvents, waitEvents, pMatchedEvents, waitTicks)`: Atomically set `setEvents`, then wait until all bits in `waitEvents` are set.
-
-## Software Timer
-
-- `TIMER_DEFINE(name, timeoutHandler, timerMode)`: Macro to statically define and initialize a timer.
-- `timerStart(pTimerNode, interval)`: Start a timer with a specified timeout in RTOS ticks.
-- `timerStop(pTimerNode)`: Stop a running timer.
+The detailed API reference, including example code for each kernel object, lives in [API_REFERENCE.md](API_REFERENCE.md).
 
 # Building and Running
 ## Example for STM32Cube IDE
