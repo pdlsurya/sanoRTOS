@@ -95,6 +95,7 @@ extern "C"
  * @param _arg Application argument passed to the work handler.
  */
 #define WORK_DEFINE(_name, _handler, _arg) \
+    void _handler(void *);                 \
     workItemType _name = {                 \
         .name = #_name,                    \
         .handler = _handler,               \
@@ -126,6 +127,7 @@ extern "C"
  * @param _arg Application argument passed to the work handler.
  */
 #define DELAYED_WORK_DEFINE(_name, _handler, _arg)          \
+    void _handler(void *);                                  \
     delayedWorkType _name = {                               \
         .work = {                                           \
             .name = #_name,                                 \

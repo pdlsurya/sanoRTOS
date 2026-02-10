@@ -56,8 +56,8 @@ extern "C"
         uint32_t info;               ///< Application-defined mailbox metadata.
         uint32_t size;               ///< Message size, or receive buffer capacity on input.
         const void *pTxData;         ///< Sender data buffer. Ignored by mailboxReceive().
-        taskHandleType *pTargetTask; ///< Receiver requested by the sender, or NULL for any.
-        taskHandleType *pSourceTask; ///< Sender requested by the receiver, or NULL for any.
+        taskHandleType *pTargetTask; ///< Receiver requested by the sender, or NULL for any. Ignored by mailboxReceive().
+        taskHandleType *pSourceTask; ///< Sender requested by the receiver, or NULL for any. Ignored by mailboxSend().
     } mailboxMsgType;
 
     /**
@@ -76,6 +76,7 @@ extern "C"
      *
      * The caller blocks until a compatible receiver consumes the message or the timeout expires.
      * Mailboxes are thread-only objects and cannot be used from ISR context.
+     * `pMsg->pSourceTask` is ignored by mailboxSend().
      *
      * @param pMailbox Pointer to mailbox handle.
      * @param pMsg Pointer to mailbox message descriptor.
@@ -91,6 +92,7 @@ extern "C"
      *
      * The caller blocks until a compatible sender is available or the timeout expires.
      * Mailboxes are thread-only objects and cannot be used from ISR context.
+     * `pMsg->pTargetTask` is ignored by mailboxReceive().
      *
      * @param pMailbox Pointer to mailbox handle.
      * @param pMsg Pointer to mailbox message descriptor.
