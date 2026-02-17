@@ -77,7 +77,8 @@ static void streamBufferRingRead(streamBufferHandleType *pStreamBuffer, uint32_t
 static int streamBufferWakeWaitingTask(taskQueueType *pWaitQueue,
                                        blockedReasonType blockedReason,
                                        wakeupReasonType wakeupReason,
-                                       bool *pContextSwitchRequired)
+                                       bool *pContextSwitchRequired,
+                                       bool wakeAll)
 {
     if ((pWaitQueue == NULL) || (pContextSwitchRequired == NULL))
     {
@@ -106,6 +107,11 @@ getNextWaitingTask:
         if (taskCanPreemptCurrentCore(pTask))
         {
             *pContextSwitchRequired = true;
+        }
+
+        if (wakeAll)
+        {
+            goto getNextWaitingTask;
         }
     }
 
@@ -184,7 +190,8 @@ int streamBufferWakeDataAvailableLocked(streamBufferHandleType *pStreamBuffer,
     return streamBufferWakeWaitingTask(&pStreamBuffer->consumerWaitQueue,
                                        WAIT_FOR_STREAM_BUFFER_DATA,
                                        STREAM_BUFFER_DATA_AVAILABLE,
-                                       pContextSwitchRequired);
+                                       pContextSwitchRequired,
+                                       false);
 }
 
 int streamBufferWakeSpaceAvailableLocked(streamBufferHandleType *pStreamBuffer,
@@ -198,7 +205,8 @@ int streamBufferWakeSpaceAvailableLocked(streamBufferHandleType *pStreamBuffer,
     return streamBufferWakeWaitingTask(&pStreamBuffer->producerWaitQueue,
                                        WAIT_FOR_STREAM_BUFFER_SPACE,
                                        STREAM_BUFFER_SPACE_AVAILABLE,
-                                       pContextSwitchRequired);
+                                       pContextSwitchRequired,
+                                       false);
 }
 
 int streamBufferPeekLocked(streamBufferHandleType *pStreamBuffer,
@@ -446,6 +454,36 @@ int streamBufferPeek(streamBufferHandleType *pStreamBuffer, void *pData, uint32_
     if (retCode == RET_SUCCESS)
     {
         *pLength = bytesRead;
+    }
+
+    return retCode;
+}
+
+int streamBufferReset(streamBufferHandleType *pStreamBuffer)
+{
+    if (pStreamBuffer == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    bool irqState = spinLock(&pStreamBuffer->lock);
+    bool contextSwitchRequired = false;
+
+    pStreamBuffer->usedBytes = 0U;
+    pStreamBuffer->readIndex = 0U;
+    pStreamBuffer->writeIndex = 0U;
+
+    int retCode = streamBufferWakeWaitingTask(&pStreamBuffer->producerWaitQueue,
+                                              WAIT_FOR_STREAM_BUFFER_SPACE,
+                                              STREAM_BUFFER_SPACE_AVAILABLE,
+                                              &contextSwitchRequired,
+                                              true);
+
+    spinUnlock(&pStreamBuffer->lock, irqState);
+
+    if (contextSwitchRequired)
+    {
+        taskYield();
     }
 
     return retCode;

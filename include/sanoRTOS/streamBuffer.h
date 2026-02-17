@@ -150,6 +150,17 @@ extern "C"
      */
     int streamBufferPeek(streamBufferHandleType *pStreamBuffer, void *pData, uint32_t *pLength);
 
+    /**
+     * @brief Reset a stream buffer to the empty state.
+     *
+     * Stored bytes are discarded. Producers waiting only for free space are
+     * woken so they can retry immediately.
+     *
+     * @param pStreamBuffer Pointer to stream buffer handle.
+     * @return `RET_SUCCESS` on success, `RET_INVAL` for invalid arguments, or another error code.
+     */
+    int streamBufferReset(streamBufferHandleType *pStreamBuffer);
+
 #ifdef __cplusplus
 }
 #endif

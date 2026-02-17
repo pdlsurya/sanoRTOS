@@ -140,6 +140,17 @@ extern "C"
      */
     int msgBufferNextLength(msgBufferHandleType *pMsgBuffer, uint32_t *pLength);
 
+    /**
+     * @brief Reset a message buffer to the empty state.
+     *
+     * Stored messages are discarded. Producers waiting only for free space are
+     * woken so they can retry immediately.
+     *
+     * @param pMsgBuffer Pointer to message buffer handle.
+     * @return `RET_SUCCESS` on success, `RET_INVAL` for invalid arguments, or another error code.
+     */
+    int msgBufferReset(msgBufferHandleType *pMsgBuffer);
+
 #ifdef __cplusplus
 }
 #endif

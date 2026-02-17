@@ -31,6 +31,49 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 
+static int msgQueueWakeWaitingTasks(taskQueueType *pWaitQueue,
+                                    blockedReasonType blockedReason,
+                                    wakeupReasonType wakeupReason,
+                                    bool *pContextSwitchRequired,
+                                    bool wakeAll)
+{
+    if ((pWaitQueue == NULL) || (pContextSwitchRequired == NULL))
+    {
+        return RET_INVAL;
+    }
+
+    taskHandleType *pTask = NULL;
+
+getNextWaitingTask:
+    pTask = TASK_GET_FROM_WAIT_QUEUE(pWaitQueue);
+    if (pTask != NULL)
+    {
+        if ((pTask->status != TASK_STATUS_BLOCKED) ||
+            (pTask->blockedReason != blockedReason))
+        {
+            goto getNextWaitingTask;
+        }
+
+        int retCode = taskSetReady(pTask, wakeupReason);
+        if (retCode != RET_SUCCESS)
+        {
+            return retCode;
+        }
+
+        if (taskCanPreemptCurrentCore(pTask))
+        {
+            *pContextSwitchRequired = true;
+        }
+
+        if (wakeAll)
+        {
+            goto getNextWaitingTask;
+        }
+    }
+
+    return RET_SUCCESS;
+}
+
 static int msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
 {
     if ((pQueueHandle == NULL) || (pItem == NULL))
@@ -41,7 +84,6 @@ static int msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
     int retCode = RET_SUCCESS;
     bool irqState = spinLock(&pQueueHandle->lock);
     bool contextSwitchRequired = false;
-    taskHandleType *pConsumerTask = NULL;
 
     if (!msgQueueFull(pQueueHandle))
     {
@@ -49,28 +91,11 @@ static int msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
         pQueueHandle->writeIndex = (pQueueHandle->writeIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
         pQueueHandle->itemCount++;
 
-        // Get next waiting pConsumerTask task to unblock
-    getNextConsumer:
-        pConsumerTask = TASK_GET_FROM_WAIT_QUEUE(&pQueueHandle->consumerWaitQueue);
-        if (pConsumerTask != NULL)
-        {
-            /*Skip stale tasks that are no longer blocked waiting for queue data.*/
-            if ((pConsumerTask->status != TASK_STATUS_BLOCKED) ||
-                (pConsumerTask->blockedReason != WAIT_FOR_MSG_QUEUE_DATA))
-            {
-                goto getNextConsumer;
-            }
-            retCode = taskSetReady(pConsumerTask, MSG_QUEUE_DATA_AVAILABLE);
-            if (retCode == RET_SUCCESS)
-            {
-                /*Perform context switch if  unblocked pConsumerTask task has equal or
-                 *higher priority[lower priority value] than that of current task */
-                if (taskCanPreemptCurrentCore(pConsumerTask))
-                {
-                    contextSwitchRequired = true;
-                }
-            }
-        }
+        retCode = msgQueueWakeWaitingTasks(&pQueueHandle->consumerWaitQueue,
+                                           WAIT_FOR_MSG_QUEUE_DATA,
+                                           MSG_QUEUE_DATA_AVAILABLE,
+                                           &contextSwitchRequired,
+                                           false);
     }
     else
     {
@@ -97,7 +122,6 @@ static int msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
     int retCode = RET_SUCCESS;
     bool irqState = spinLock(&pQueueHandle->lock);
     bool contextSwitchRequired = false;
-    taskHandleType *pProducerTask = NULL;
 
     if (!msgQueueEmpty(pQueueHandle))
     {
@@ -105,33 +129,46 @@ static int msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
         pQueueHandle->readIndex = (pQueueHandle->readIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
         pQueueHandle->itemCount--;
 
-        // Get next waiting pProducerTask task to unblock
-    getNextProducer:
-        pProducerTask = TASK_GET_FROM_WAIT_QUEUE(&pQueueHandle->producerWaitQueue);
-        if (pProducerTask != NULL)
-        {
-            /*Skip stale tasks that are no longer blocked waiting for queue space.*/
-            if ((pProducerTask->status != TASK_STATUS_BLOCKED) ||
-                (pProducerTask->blockedReason != WAIT_FOR_MSG_QUEUE_SPACE))
-            {
-                goto getNextProducer;
-            }
-            retCode = taskSetReady(pProducerTask, MSG_QUEUE_SPACE_AVAILABE);
-            if (retCode == RET_SUCCESS)
-            {
-                /*Perform context switch if unblocked pProducerTask task has equal or
-                 *higher priority[lower priority value] than that of current task */
-                if (taskCanPreemptCurrentCore(pProducerTask))
-                {
-                    contextSwitchRequired = true;
-                }
-            }
-        }
+        retCode = msgQueueWakeWaitingTasks(&pQueueHandle->producerWaitQueue,
+                                           WAIT_FOR_MSG_QUEUE_SPACE,
+                                           MSG_QUEUE_SPACE_AVAILABE,
+                                           &contextSwitchRequired,
+                                           false);
     }
     else
     {
         retCode = RET_EMPTY;
     }
+
+    spinUnlock(&pQueueHandle->lock, irqState);
+
+    if (contextSwitchRequired)
+    {
+        taskYield();
+    }
+
+    return retCode;
+}
+
+int msgQueueReset(msgQueueHandleType *pQueueHandle)
+{
+    if (pQueueHandle == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    bool irqState = spinLock(&pQueueHandle->lock);
+    bool contextSwitchRequired = false;
+
+    pQueueHandle->itemCount = 0U;
+    pQueueHandle->readIndex = 0U;
+    pQueueHandle->writeIndex = 0U;
+
+    int retCode = msgQueueWakeWaitingTasks(&pQueueHandle->producerWaitQueue,
+                                           WAIT_FOR_MSG_QUEUE_SPACE,
+                                           MSG_QUEUE_SPACE_AVAILABE,
+                                           &contextSwitchRequired,
+                                           true);
 
     spinUnlock(&pQueueHandle->lock, irqState);
 

@@ -49,11 +49,17 @@ extern "C"
 #define TASK_FLAG_DYNAMIC (1U << 8)
 #define TASK_FLAG_OWN_STACK (1U << 9)
 #define TASK_FLAG_OWN_NAME (1U << 10)
+#define TASK_FLAG_EXIT_PENDING (1U << 11)
+#define TASK_FLAG_TERMINATED (1U << 12)
 
     /**
-     * @brief Internal function executed if a task entry returns.
+     * @brief Exit the current task.
+     *
+     * Dynamic tasks are deleted asynchronously after the current core has
+     * switched away from their stack. Static tasks transition to a terminal
+     * suspended state and are not restarted automatically.
      */
-    void taskExitFunction();
+    void taskExit(void);
 
     typedef enum
     {
@@ -73,11 +79,11 @@ extern "C"
  * @param taskPriority Task priority.
  */
 #define TASK_DEFINE(_name, stackSize, taskEntryFunction, taskParams, taskPriority, affinity)                      \
-    _Static_assert(((stackSize) % sizeof(uint32_t)) == 0U, "Task stack size must be word aligned.");             \
-    _Static_assert((stackSize) >= ((PORT_INITIAL_TASK_STACK_OFFSET + STACK_GUARD_WORDS) * sizeof(uint32_t)),     \
+    _Static_assert(((stackSize) % sizeof(uint32_t)) == 0U, "Task stack size must be word aligned.");              \
+    _Static_assert((stackSize) >= ((PORT_INITIAL_TASK_STACK_OFFSET + STACK_GUARD_WORDS) * sizeof(uint32_t)),      \
                    "Task stack too small for initial frame and stack guard.");                                    \
     void taskEntryFunction(void *);                                                                               \
-    PORT_TASK_STACK_DEFINE(_name, stackSize, taskEntryFunction, taskExitFunction, taskParams);                    \
+    PORT_TASK_STACK_DEFINE(_name, stackSize, taskEntryFunction, taskExit, taskParams);                            \
     static taskHandleType _name = {                                                                               \
         .name = #_name,                                                                                           \
         .stackPointer = (uint32_t)(_name##Stack + stackSize / sizeof(uint32_t) - PORT_INITIAL_TASK_STACK_OFFSET), \
@@ -179,10 +185,10 @@ extern "C"
      */
     typedef struct
     {
-        uint32_t waitMask;       ///< Event bits the task is currently waiting for.
-        uint32_t matchedEvents;  ///< Event bits that matched when the task was woken.
-        uint8_t waitAll;         ///< Non-zero if all bits in waitMask must be present.
-        uint8_t clearOnExit;     ///< Non-zero if matched event bits should be cleared before wake-up.
+        uint32_t waitMask;      ///< Event bits the task is currently waiting for.
+        uint32_t matchedEvents; ///< Event bits that matched when the task was woken.
+        uint8_t waitAll;        ///< Non-zero if all bits in waitMask must be present.
+        uint8_t clearOnExit;    ///< Non-zero if matched event bits should be cleared before wake-up.
     } taskEventStateType;
 
     /**
@@ -199,19 +205,19 @@ extern "C"
      */
     typedef struct taskHandle
     {
-        uint32_t stackPointer;           ///< Current value of the task's stack pointer (used during context switches).
-        uint32_t flags;                  ///< Task flags (e.g. FPU usage, dynamic-resource ownership).
-        uint32_t *stack;                 ///< Pointer to the base of the task's stack memory.
-        const char *name;                ///< Human-readable name of the task (for debugging or logging).
-        void *params;                    ///< Pointer to parameters passed to the task function.
-        taskFunctionType entry;          ///< Function pointer to the task's entry function.
-        uint32_t remainingSleepTicks;    ///< Number of ticks remaining for which the task is sleeping or being blocked.
-        taskStatusType status;           ///< Current status of the task (e.g., running, ready, blocked).
-        blockedReasonType blockedReason; ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
-        wakeupReasonType wakeupReason;   ///< Reason the task was woken up (e.g., timeout, signal).
-        coreAffinityType coreAffinity;   ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
-        uint8_t priority;                ///< Priority level of the task (lower value indicate higher priority).
-        taskEventStateType eventState;   ///< Event wait state used by the event kernel object.
+        uint32_t stackPointer;             ///< Current value of the task's stack pointer (used during context switches).
+        uint32_t flags;                    ///< Task flags (e.g. FPU usage, dynamic-resource ownership).
+        uint32_t *stack;                   ///< Pointer to the base of the task's stack memory.
+        const char *name;                  ///< Human-readable name of the task (for debugging or logging).
+        void *params;                      ///< Pointer to parameters passed to the task function.
+        taskFunctionType entry;            ///< Function pointer to the task's entry function.
+        uint32_t remainingSleepTicks;      ///< Number of ticks remaining for which the task is sleeping or being blocked.
+        taskStatusType status;             ///< Current status of the task (e.g., running, ready, blocked).
+        blockedReasonType blockedReason;   ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
+        wakeupReasonType wakeupReason;     ///< Reason the task was woken up (e.g., timeout, signal).
+        coreAffinityType coreAffinity;     ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
+        uint8_t priority;                  ///< Priority level of the task (lower value indicate higher priority).
+        taskEventStateType eventState;     ///< Event wait state used by the event kernel object.
         taskMailboxStateType mailboxState; ///< Mailbox wait state used by the mailbox kernel object.
         taskNotificationType notification; ///< Direct task notification state stored in the task itself.
     } taskHandleType;
@@ -264,7 +270,8 @@ extern "C"
      * @brief Resume a suspended task.
      *
      * @param pTask Pointer to task handle.
-     * @return `RET_SUCCESS` on success, `RET_NOTSUSPENDED` otherwise.
+     * @return `RET_SUCCESS` on success, `RET_NOTSUSPENDED` if the task is not
+     *         suspended, or `RET_INVAL` if the task has already terminated.
      */
     int taskResume(taskHandleType *pTask);
 
@@ -272,7 +279,8 @@ extern "C"
      * @brief Enqueue a task to ready queue.
      *
      * @param pTask Pointer to task handle.
-     * @return `RET_SUCCESS` on success, error code otherwise.
+     * @return `RET_SUCCESS` on success, or `RET_INVAL` if the task has already
+     *         terminated.
      */
     int taskStart(taskHandleType *pTask);
 
@@ -344,6 +352,24 @@ extern "C"
      * @return `RET_SUCCESS` on success, error code otherwise.
      */
     int taskDelete(taskHandleType *pTask);
+
+    /**
+     * @brief Delete the current task.
+     *
+     * This is an alias for `taskExit()` and is intended for clearer self-delete
+     * call sites.
+     */
+    static inline __attribute__((always_inline)) void taskDeleteSelf(void)
+    {
+        taskExit();
+    }
+
+    /**
+     * @brief Reclaim dynamic tasks that have exited and are pending deferred cleanup.
+     *
+     * Internal scheduler/idle path API.
+     */
+    void taskCleanupExited();
 
     /**
      * @brief Check current task stack-overflow guard using the lowest known saved/live stack pointer.
