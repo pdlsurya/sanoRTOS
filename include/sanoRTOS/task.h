@@ -50,14 +50,13 @@ extern "C"
 #define TASK_FLAG_OWN_STACK (1U << 9)
 #define TASK_FLAG_OWN_NAME (1U << 10)
 #define TASK_FLAG_EXIT_PENDING (1U << 11)
-#define TASK_FLAG_TERMINATED (1U << 12)
 
     /**
      * @brief Exit the current task.
      *
      * Dynamic tasks are deleted asynchronously after the current core has
      * switched away from their stack. Static tasks transition to a terminal
-     * suspended state and are not restarted automatically.
+     * terminated state and are not restarted automatically.
      */
     void taskExit(void);
 
@@ -105,7 +104,8 @@ extern "C"
         TASK_STATUS_READY,
         TASK_STATUS_RUNNING,
         TASK_STATUS_BLOCKED,
-        TASK_STATUS_SUSPENDED
+        TASK_STATUS_SUSPENDED,
+        TASK_STATUS_TERMINATED
     } taskStatusType;
 
     typedef enum
@@ -346,7 +346,8 @@ extern "C"
     /**
      * @brief Delete a task.
      *
-     * Dynamically-created task resources are freed by this API.
+     * The task transitions to the terminated state. Dynamically-created task
+     * resources are freed by this API.
      *
      * @param pTask Pointer to task handle.
      * @return `RET_SUCCESS` on success, error code otherwise.
