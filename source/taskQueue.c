@@ -214,8 +214,8 @@ taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck)
 
         while (currentTaskNode != NULL)
         {
-            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() ||
-                currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
+            if (currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY ||
+                currentTaskNode->pTask->coreAffinity == PORT_CORE_ID())
             {
                 return currentTaskNode->pTask;
             }

@@ -130,6 +130,4 @@
 
 #endif // CONFIG_LOG
 
-int PORT_PRINTF(const char *format, ...);
-
 #endif // __SANORTOS_LOG_H

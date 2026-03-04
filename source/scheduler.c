@@ -30,6 +30,9 @@
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/timer.h"
 #include "sanoRTOS/taskQueue.h"
+#include "sanoRTOS/log.h"
+
+LOG_MODULE_DEFINE(scheduler);
 
 TASK_DEFINE(idleTask0, 1024, idleTaskHandler0, NULL, TASK_LOWEST_PRIORITY, AFFINITY_CORE_0);
 
@@ -77,9 +80,9 @@ static bool selectNextTask(void)
         {
             taskHandleType *pNextReadyTask = TASK_PEEK_FROM_READY_QUEUE(pReadyQueue);
 
-            // If the next ready task has a higher priority than the current task,
+            //If next ready task exists and has an equal or higher priority than current task,
             // add the current task to the ready queue.
-            if (pNextReadyTask->priority <= pCurrentTask->priority)
+            if (pNextReadyTask != NULL && pNextReadyTask->priority <= pCurrentTask->priority)
             {
                 pCurrentTask->status = TASK_STATUS_READY;
                 taskQueueAdd(pReadyQueue, pCurrentTask);

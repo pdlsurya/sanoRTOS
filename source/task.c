@@ -206,7 +206,7 @@ void taskCheckStackOverflow(void)
 
     if (pCurrentTask->stackPointer <= (uint32_t)(pCurrentTask->stack + STACK_GUARD_WORDS))
     {
-        LOG_ERROR("%s stack overflow at address: %p", pCurrentTask->name, pCurrentTask->stackPointer);
+        LOG_ERROR("%s stack overflow at address: %p", pCurrentTask->name,(void*) pCurrentTask->stackPointer);
 
         while (1)
             ;

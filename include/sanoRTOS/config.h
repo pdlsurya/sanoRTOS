@@ -40,13 +40,13 @@ extern "C"
 #define CONFIG_LOG_COLOR 1 ///< Configure log color: Enables or disables colored output in logs when logging is enabled.
 #endif
 
-#define CONFIG_SMP 0 ///< Configure Symmetric Multiprocessing (SMP): Enables or disables SMP support (0 = Disabled, 1 = Enabled).
+#define CONFIG_SMP 1///< Configure Symmetric Multiprocessing (SMP): Enables or disables SMP support (0 = Disabled, 1 = Enabled).
 
 #define CONFIG_MUTEX_USE_PRIORITY_INHERITANCE 1 ///< Configure mutex priority inheritance: Enables priority inheritance for mutexes to avoid priority inversion.
 
 #define CONFIG_TASK_USER_MODE 0 ///< Configure task user mode: Defines whether tasks should run in privileged mode (0 = Privileged, 1 = User mode).
 
-#define CONFIG_CHECK_STACK_OVERFLOW 1 ///< Configure stack overflow check
+#define CONFIG_CHECK_STACK_OVERFLOW 0 ///< Configure stack overflow check
 
 #define CONFIG_TICK_INTERVAL_US 1000 ///< Configure Tick interval to generate interrupt every TICK_INTERVAL_US (in microseconds): Sets the interrupt frequency for the system tick.
 
