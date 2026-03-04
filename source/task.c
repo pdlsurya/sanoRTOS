@@ -351,6 +351,10 @@ int taskNotify(taskHandleType *pTask, uint32_t value, taskNotifyActionType actio
 int taskNotifyWait(uint32_t clearMaskOnEntry, uint32_t clearMaskOnExit,
                    uint32_t *pValue, uint32_t waitTicks)
 {
+    taskHandleType *currentTask;
+    bool irqState;
+    int retCode;
+
     if (pValue == NULL)
     {
         return RET_INVAL;
@@ -361,11 +365,10 @@ int taskNotifyWait(uint32_t clearMaskOnEntry, uint32_t clearMaskOnExit,
         return RET_INVAL;
     }
 
-    taskHandleType *currentTask = taskGetCurrent();
+    currentTask = taskGetCurrent();
 
 retry:
-    bool irqState = spinLock(&lock);
-    int retCode;
+    irqState = spinLock(&lock);
 
     /* Clear requested bits before checking whether a notification is pending. */
     currentTask->notification.value &= ~clearMaskOnEntry;
@@ -429,16 +432,19 @@ retry:
 
 int taskNotifyTake(bool clearCountOnExit, uint32_t *pPreviousValue, uint32_t waitTicks)
 {
+    taskHandleType *currentTask;
+    bool irqState;
+    int retCode;
+
     if (portIsInISRContext())
     {
         return RET_INVAL;
     }
 
-    taskHandleType *currentTask = taskGetCurrent();
+    currentTask = taskGetCurrent();
 
 retry:
-    bool irqState = spinLock(&lock);
-    int retCode;
+    irqState = spinLock(&lock);
 
     if (currentTask->notification.value != 0U)
     {
