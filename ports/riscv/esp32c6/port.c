@@ -97,11 +97,11 @@ static inline void portConfig()
  */
 static inline void apmConfigure()
 {
-    apm_ll_apm_ctrl_set_region_start_address(HP_APM_CTRL, 0, SOC_PERIPHERAL_LOW);
-    apm_ll_apm_ctrl_set_region_end_address(HP_APM_CTRL, 0, SOC_PERIPHERAL_HIGH);
+    apm_ll_hp_apm_set_region_start_addr(0, SOC_PERIPHERAL_LOW);
+    apm_ll_hp_apm_set_region_end_addr(0, SOC_PERIPHERAL_HIGH);
 
-    apm_ll_apm_ctrl_sec_mode_region_attr_config(HP_APM_CTRL, 0, APM_LL_SECURE_MODE_REE0, (HP_APM_REGION0_R0_PMS_W | HP_APM_REGION0_R0_PMS_R));
-    apm_ll_apm_ctrl_region_filter_enable(HP_APM_CTRL, 0, true);
+    apm_ll_hp_apm_set_sec_mode_region_attr(0, APM_SEC_MODE_REE0, (HP_APM_REGION0_R0_PMS_W | HP_APM_REGION0_R0_PMS_R));
+    apm_ll_hp_apm_enable_region_filter(0, true);
 }
 
 /**
