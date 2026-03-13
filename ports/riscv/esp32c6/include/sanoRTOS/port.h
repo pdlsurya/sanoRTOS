@@ -33,7 +33,6 @@
 #include "riscv/rv_utils.h"
 #include "interrupts.h"
 #include "mtimer.h"
-#include "usb_serial.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -120,7 +119,7 @@ extern "C"
 
 #define PORT_ENTER_SLEEP_MODE() asm volatile("wfi");
 
-#define PORT_PRINTF serial_printf
+#define PORT_PRINTF printf
 
     /**
      * @brief Get current hart id

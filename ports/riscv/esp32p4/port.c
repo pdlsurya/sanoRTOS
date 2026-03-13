@@ -30,7 +30,6 @@
 #include "sanoRTOS/spinLock.h"
 #include "interrupts.h"
 #include "startup.h"
-#include "usb_serial.h"
 
 /*RTOS tick handler function*/
 extern void tickHandler(void);

@@ -28,7 +28,6 @@
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/task.h"
 #include "interrupts.h"
-#include "usb_serial.h"
 
 /*RTOS tick handler function*/
 extern void tickHandler(void);
