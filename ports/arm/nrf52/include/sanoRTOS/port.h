@@ -36,16 +36,13 @@
 #if __has_include("usb_log.h")
 #include "usb_log.h"
 #define PORT_PRINTF log_printf
-#elif __has_include("debug_log.h")
-#include "debug_log.h"
-#define PORT_PRINTF debug_log_print
 #else
-#include <stdio.h>
-#define PORT_PRINTF printf
+#include "nrf_log.h"
+#define PORT_PRINTF NRF_LOG_RAW_INFO
 #endif
 #else
-#include <stdio.h>
-#define PORT_PRINTF printf
+#include "nrf_log.h"
+#define PORT_PRINTF NRF_LOG_RAW_INFO
 #endif
 
 #ifdef __cplusplus
