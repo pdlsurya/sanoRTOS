@@ -143,15 +143,12 @@ extern "C"
      * @brief Check whether taskQueue is empty.
      *
      * @param pTaskQueue Pointer to task queue.
-     * @return `RET_EMPTY` if empty, `RET_SUCCESS` if not empty, error code otherwise.
+     * @retval `true` if queue is empty.
+     * @retval `false` otherwise.
      */
-    static inline __attribute__((always_inline)) int taskQueueEmpty(taskQueueType *pTaskQueue)
+    static inline __attribute__((always_inline)) bool taskQueueEmpty(taskQueueType *pTaskQueue)
     {
-        if (pTaskQueue == NULL)
-        {
-            return RET_INVAL;
-        }
-        return (pTaskQueue->head == NULL) ? RET_EMPTY : RET_SUCCESS;
+        return (pTaskQueue == NULL) || (pTaskQueue->head == NULL);
     }
 
 #ifdef __cplusplus

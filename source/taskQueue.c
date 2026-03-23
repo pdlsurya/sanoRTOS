@@ -131,7 +131,7 @@ int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
         return RET_NOMEM;
     }
 
-    if (taskQueueEmpty(pTaskQueue) == RET_EMPTY)
+    if (taskQueueEmpty(pTaskQueue))
     {
         pTaskQueue->head = newTaskNode;
     }
@@ -165,7 +165,7 @@ taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck)
 
     taskHandleType *pTask;
 
-    if (taskQueueEmpty(pTaskQueue) != RET_EMPTY)
+    if (!taskQueueEmpty(pTaskQueue))
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
 
@@ -206,7 +206,7 @@ taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck)
         return NULL;
     }
 
-    if (taskQueueEmpty(pTaskQueue) != RET_EMPTY)
+    if (!taskQueueEmpty(pTaskQueue))
     {
         taskNodeType *currentTaskNode = pTaskQueue->head;
 

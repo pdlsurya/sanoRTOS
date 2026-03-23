@@ -52,9 +52,7 @@ static int selectNextTask(void)
 {
     taskQueueType *const pReadyQueue = getReadyQueue();
 
-    int retCode = taskQueueEmpty(pReadyQueue);
-
-    if (retCode == RET_SUCCESS)
+    if (!taskQueueEmpty(pReadyQueue))
     {
         taskHandleType *const pCurrentTask = taskGetCurrent();
 
@@ -68,7 +66,7 @@ static int selectNextTask(void)
             if (pNextReadyTask != NULL && pNextReadyTask->priority <= pCurrentTask->priority)
             {
                 pCurrentTask->status = TASK_STATUS_READY;
-                retCode = taskQueueAdd(pReadyQueue, pCurrentTask);
+                int retCode = taskQueueAdd(pReadyQueue, pCurrentTask);
                 if (retCode != RET_SUCCESS)
                 {
                     return retCode;
@@ -104,12 +102,7 @@ static int selectNextTask(void)
         return RET_SUCCESS;
     }
 
-    if (retCode == RET_EMPTY)
-    {
-        return RET_NOTASK;
-    }
-
-    return retCode;
+    return RET_NOTASK;
 }
 
 static void checkTimeout()
@@ -184,7 +177,7 @@ void tickHandler()
         taskQueueType *pBlockedQueue = getBlockedQueue();
 
         /*Check for wait timeout of blocked tasks*/
-        if (taskQueueEmpty(pBlockedQueue) == RET_SUCCESS)
+        if (!taskQueueEmpty(pBlockedQueue))
         {
             checkTimeout();
         }
