@@ -104,11 +104,12 @@ extern "C"
      * @brief Send an item to a message queue.
      *
      * If the queue is full, the caller waits up to `waitTicks` for space.
+     * If called from ISR, `waitTicks` must be `TASK_NO_WAIT`.
      *
      * @param pQueueHandle Pointer to queue handle.
      * @param pItem Pointer to item buffer to send.
      * @param waitTicks Maximum ticks to wait when queue is full.
-     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, `RET_INVAL` for invalid ISR wait usage, error code otherwise.
      */
     int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
 
@@ -116,11 +117,12 @@ extern "C"
      * @brief Receive an item from a message queue.
      *
      * If the queue is empty, the caller waits up to `waitTicks` for data.
+     * If called from ISR, `waitTicks` must be `TASK_NO_WAIT`.
      *
      * @param pQueueHandle Pointer to queue handle.
      * @param pItem Pointer to destination buffer.
      * @param waitTicks Maximum ticks to wait when queue is empty.
-     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, `RET_INVAL` for invalid ISR wait usage, error code otherwise.
      */
     int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
 

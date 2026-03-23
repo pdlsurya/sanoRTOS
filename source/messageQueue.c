@@ -152,6 +152,10 @@ int msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTic
     {
         return RET_INVAL;
     }
+    if (portIsInISRContext() && (waitTicks != TASK_NO_WAIT))
+    {
+        return RET_INVAL;
+    }
 
     int retCode;
 
@@ -226,6 +230,10 @@ retry:
 int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)
 {
     if ((pQueueHandle == NULL) || (pItem == NULL))
+    {
+        return RET_INVAL;
+    }
+    if (portIsInISRContext() && (waitTicks != TASK_NO_WAIT))
     {
         return RET_INVAL;
     }
