@@ -27,7 +27,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <assert.h>
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
 
@@ -51,7 +50,10 @@ extern "C"
          */
         static inline __attribute__((always_inline)) bool spinLock(atomic_t *pLock)
         {
-                assert(pLock != NULL); ///< Ensure the lock pointer is not NULL.
+                if (pLock == NULL)
+                {
+                        return false;
+                }
 
 #if (CONFIG_SMP)
 #if CONFIG_TASK_USER_MODE
@@ -103,7 +105,10 @@ extern "C"
          */
         static inline __attribute__((always_inline)) void spinUnlock(atomic_t *pLock, bool irqState)
         {
-                assert(pLock != NULL); ///< Ensure the lock pointer is not NULL.
+                if (pLock == NULL)
+                {
+                        return;
+                }
 
 #if (CONFIG_SMP)
                 *pLock = 0; ///< In SMP systems, clear the lock to release it. This ensures that the lock is released atomically.

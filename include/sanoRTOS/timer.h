@@ -128,8 +128,10 @@ extern "C"
 
     /**
      * @brief Start internal timer service task.
+     *
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    void timerTaskStart();
+    int timerTaskStart();
 
 #ifdef __cplusplus
 }

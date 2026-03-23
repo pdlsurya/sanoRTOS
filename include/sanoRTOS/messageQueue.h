@@ -26,7 +26,6 @@
 #define __SANO_RTOS_MSG_QUEUE_H
 
 #include <stdint.h>
-#include <stdbool.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/mutex.h"
 #include "sanoRTOS/taskQueue.h"
@@ -77,27 +76,35 @@ extern "C"
     } msgQueueHandleType;
 
     /**
-     * @brief Check if message queue is full
+     * @brief Check whether message queue is full.
      *
-     * @param pQueueHandle
-     * @retval true if msgQueue is full
-     * @retval false otherwise
+     * @param pQueueHandle Pointer to queue handle.
+     * @return `RET_FULL` if full, `RET_SUCCESS` if not full, error code otherwise.
      */
-    static inline __attribute__((always_inline)) bool msgQueueFull(msgQueueHandleType *pQueueHandle)
+    static inline __attribute__((always_inline)) int msgQueueFull(msgQueueHandleType *pQueueHandle)
     {
-        return pQueueHandle->itemCount == pQueueHandle->queueLength;
+        if (pQueueHandle == NULL)
+        {
+            return RET_INVAL;
+        }
+
+        return (pQueueHandle->itemCount == pQueueHandle->queueLength) ? RET_FULL : RET_SUCCESS;
     }
 
     /**
-     * @brief Check if message queue is empty
+     * @brief Check whether message queue is empty.
      *
-     * @param pQueueHandle
-     * @retval true if msgQueue is empty
-     * @return false otherwise
+     * @param pQueueHandle Pointer to queue handle.
+     * @return `RET_EMPTY` if empty, `RET_SUCCESS` if not empty, error code otherwise.
      */
-    static inline __attribute__((always_inline)) bool msgQueueEmpty(msgQueueHandleType *pQueueHandle)
+    static inline __attribute__((always_inline)) int msgQueueEmpty(msgQueueHandleType *pQueueHandle)
     {
-        return (pQueueHandle->itemCount == 0);
+        if (pQueueHandle == NULL)
+        {
+            return RET_INVAL;
+        }
+
+        return (pQueueHandle->itemCount == 0) ? RET_EMPTY : RET_SUCCESS;
     }
 
     /**

@@ -23,7 +23,6 @@
  */
 
 #include <stdbool.h>
-#include <assert.h>
 #include <stdint.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/scheduler.h"
@@ -40,11 +39,13 @@ static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout ha
 /*Define timer task with highest possible priority*/
 TASK_DEFINE(timerTask, 4096, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, AFFINITY_CORE_0);
 
-static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue, timeoutHandlerType timeoutHandler)
+static int timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue, timeoutHandlerType timeoutHandler)
 {
     timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)memAlloc(sizeof(timeoutHandlerNodeType));
-
-    assert(newNode != NULL);
+    if (newNode == NULL)
+    {
+        return RET_NOMEM;
+    }
 
     newNode->timeoutHandler = timeoutHandler;
     newNode->nextNode = NULL;
@@ -59,6 +60,8 @@ static void timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueu
         pTimeoutHandlerQueue->tail->nextNode = newNode;
         pTimeoutHandlerQueue->tail = newNode;
     }
+
+    return RET_SUCCESS;
 }
 
 static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeoutHandlerQueue)
@@ -122,7 +125,10 @@ static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerN
 
 int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
 {
-    assert(pTimerNode != NULL);
+    if (pTimerNode == NULL)
+    {
+        return RET_INVAL;
+    }
 
     /* check if the timer is already in running state. If so, abort re-starting the timer.*/
     if (pTimerNode->isRunning)
@@ -143,7 +149,10 @@ int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
 
 int timerStop(timerNodeType *pTimerNode)
 {
-    assert(pTimerNode != NULL);
+    if (pTimerNode == NULL)
+    {
+        return RET_INVAL;
+    }
 
     if (pTimerNode->isRunning)
     {
@@ -173,15 +182,16 @@ void processTimers()
                 {
 
                     /*Add timeout handler to the timeoutHandlerQueue*/
-                    timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler);
-
-                    /* Check if timer task is BLOCKED. If so, change status to ready to allow execution.*/
-                    if (timerTask.status == TASK_STATUS_BLOCKED)
+                    if (timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler) == RET_SUCCESS)
                     {
-                        taskSetReady(&timerTask, TIMER_TIMEOUT);
-                    }
+                        /* Check if timer task is BLOCKED. If so, change status to ready to allow execution.*/
+                        if (timerTask.status == TASK_STATUS_BLOCKED)
+                        {
+                            (void)taskSetReady(&timerTask, TIMER_TIMEOUT);
+                        }
 
-                    currentNode->ticksToExpire = currentNode->intervalTicks;
+                        currentNode->ticksToExpire = currentNode->intervalTicks;
+                    }
 
                     /* Check if the timer mode is SINGLE_SHOT. If true, stop the correponding timer*/
                     if (currentNode->mode == TIMER_MODE_SINGLE_SHOT)
@@ -195,10 +205,9 @@ void processTimers()
     }
 }
 
-void timerTaskStart()
+int timerTaskStart()
 {
-
-    taskStart(&timerTask);
+    return taskStart(&timerTask);
 }
 
 void timerTaskFunction(void *args)
@@ -215,7 +224,7 @@ void timerTaskFunction(void *args)
         else
         {
             /* Block timer task and give cpu to other tasks while waiting for timeout*/
-            taskBlock(&timerTask, WAIT_FOR_TIMER_TIMEOUT, 0);
+            (void)taskBlock(&timerTask, WAIT_FOR_TIMER_TIMEOUT, 0);
         }
     }
 }

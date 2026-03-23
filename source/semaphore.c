@@ -23,7 +23,6 @@
  */
 
 #include <stdlib.h>
-#include <assert.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/scheduler.h"
@@ -33,7 +32,10 @@
 
 int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
-    assert(pSem != NULL);
+    if (pSem == NULL)
+    {
+        return RET_INVAL;
+    }
 
     int retCode;
 
@@ -58,12 +60,24 @@ retry:
 
         /*Put current task in semaphore's wait queue*/
 
-        taskQueueAdd(&pSem->waitQueue, currentTask);
+        retCode = taskQueueAdd(&pSem->waitQueue, currentTask);
+        if (retCode != RET_SUCCESS)
+        {
+            spinUnlock(&pSem->lock, irqState);
+            return retCode;
+        }
 
         spinUnlock(&pSem->lock, irqState);
 
         /* Block current task and give CPU to other tasks while waiting for semaphore*/
-        taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
+        retCode = taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
+        if (retCode != RET_SUCCESS)
+        {
+            irqState = spinLock(&pSem->lock);
+            (void)taskQueueRemove(&pSem->waitQueue, currentTask);
+            spinUnlock(&pSem->lock, irqState);
+            return retCode;
+        }
 
         /*Re-acquire spinlock after being unblocked*/
         irqState = spinLock(&pSem->lock);
@@ -75,10 +89,12 @@ retry:
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
             /*Wait timed out,remove task from  the waitQueue.*/
-            taskQueueRemove(&pSem->waitQueue, currentTask);
+            retCode = taskQueueRemove(&pSem->waitQueue, currentTask);
+            if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+            {
+                retCode = RET_TIMEOUT;
+            }
 
-            /*Wait timed out*/
-            retCode = RET_TIMEOUT;
         }
         /*Task might have been suspended while waiting for semaphore and later resumed.
           In this case, retry taking the semaphore again */
@@ -94,7 +110,10 @@ retry:
 
 int semaphoreGive(semaphoreHandleType *pSem)
 {
-    assert(pSem != NULL);
+    if (pSem == NULL)
+    {
+        return RET_INVAL;
+    }
 
     int retCode;
 
@@ -117,7 +136,12 @@ int semaphoreGive(semaphoreHandleType *pSem)
             {
                 goto getNextTask;
             }
-            taskSetReady(nextTask, SEMAPHORE_TAKEN);
+            retCode = taskSetReady(nextTask, SEMAPHORE_TAKEN);
+            if (retCode != RET_SUCCESS)
+            {
+                spinUnlock(&pSem->lock, irqState);
+                return retCode;
+            }
 
             taskHandleType *currentTask = taskGetCurrent();
 

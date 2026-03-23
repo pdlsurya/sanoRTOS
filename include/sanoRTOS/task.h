@@ -25,7 +25,6 @@
 #ifndef __SANO_RTOS_TASK_H
 #define __SANO_RTOS_TASK_H
 
-#include <assert.h>
 #include "sanoRTOS/retCodes.h"
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
@@ -168,8 +167,9 @@ extern "C"
      *
      * @param pTask Pointer to task handle.
      * @param wakeupReason Reason for waking the task.
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    void taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
+    int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
 
     /**
      * @brief Block a task with a reason and timeout.
@@ -177,15 +177,17 @@ extern "C"
      * @param pTask Pointer to task handle.
      * @param blockedReason Reason why task is blocked.
      * @param ticks Ticks to remain blocked.
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    void taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
+    int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
 
     /**
      * @brief Suspend a task.
      *
      * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    void taskSuspend(taskHandleType *pTask);
+    int taskSuspend(taskHandleType *pTask);
 
     /**
      * @brief Resume a suspended task.
@@ -199,8 +201,9 @@ extern "C"
      * @brief Enqueue a task to ready queue.
      *
      * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    void taskStart(taskHandleType *pTask);
+    int taskStart(taskHandleType *pTask);
 
     /**
      * @brief Dynamically create and start a task.
@@ -237,30 +240,33 @@ extern "C"
      * @brief Block the current task for a specified number of RTOS ticks.
      *
      * @param sleepTicks Number of RTOS ticks to sleep
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    static inline __attribute__((always_inline)) void taskSleep(uint32_t sleepTicks)
+    static inline __attribute__((always_inline)) int taskSleep(uint32_t sleepTicks)
     {
-        taskBlock(taskPool.currentTask[PORT_CORE_ID()], SLEEP, sleepTicks);
+        return taskBlock(taskPool.currentTask[PORT_CORE_ID()], SLEEP, sleepTicks);
     }
 
     /**
      * @brief Block the current task for a specified number of milliseconds.
      *
      * @param sleepTimeMS Sleep duration in milliseconds
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    static inline __attribute__((always_inline)) void taskSleepMS(uint32_t sleepTimeMS)
+    static inline __attribute__((always_inline)) int taskSleepMS(uint32_t sleepTimeMS)
     {
-        taskSleep(MS_TO_RTOS_TICKS(sleepTimeMS));
+        return taskSleep(MS_TO_RTOS_TICKS(sleepTimeMS));
     }
 
     /**
      * @brief Block the current task for a specified number of microseconds.
      *
      * @param sleepTimeUS Sleep duration in microseconds
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    static inline __attribute__((always_inline)) void taskSleepUS(uint32_t sleepTimeUS)
+    static inline __attribute__((always_inline)) int taskSleepUS(uint32_t sleepTimeUS)
     {
-        taskSleep(US_TO_RTOS_TICKS(sleepTimeUS));
+        return taskSleep(US_TO_RTOS_TICKS(sleepTimeUS));
     }
 
     /**
