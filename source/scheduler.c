@@ -139,6 +139,14 @@ static void checkTimeout()
 
 void taskYield()
 {
+    /*Do not trigger context-switch interrupt from ISR context.
+      The current port's software-switch handler saves task context and is not safe to invoke
+      while running inside a C ISR handler frame. Preemption will occur on the next tick. */
+    if (portIsInISRContext())
+    {
+        return;
+    }
+
     bool contextSwitchRequired = false;
 
     bool irqState = spinLock(&lock);
@@ -149,16 +157,8 @@ void taskYield()
     {
 
 #if (CONFIG_TASK_USER_MODE)
-        if (portIsInISRContext())
-        {
-            /*ISR context cannot use syscall path; request switch directly.*/
-            PORT_TRIGGER_CONTEXT_SWITCH();
-        }
-        else
-        {
-            /*Thread context in user mode requests switch via syscall.*/
-            PORT_SYSCALL(SWITCH_CONTEXT);
-        }
+        /*Thread context in user mode requests switch via syscall.*/
+        PORT_SYSCALL(SWITCH_CONTEXT);
 
 #else
         /*Trigger platform specific context switch mechanism*/
