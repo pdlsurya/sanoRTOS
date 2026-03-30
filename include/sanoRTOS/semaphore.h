@@ -49,7 +49,7 @@ extern "C"
     semaphoreHandleType _name = {                     \
         .name = #_name,                               \
         .lock = 0,                                    \
-        .waitQueue = {0},                             \
+        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER,     \
         .count = initialCount,                        \
         .maxCount = maxCnt}
 

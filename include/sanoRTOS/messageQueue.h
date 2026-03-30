@@ -49,8 +49,8 @@ extern "C"
     uint8_t _name##Buffer[length * item_size];     \
     msgQueueHandleType _name = {                   \
         .name = #_name,                            \
-        .producerWaitQueue = {0},                  \
-        .consumerWaitQueue = {0},                  \
+        .producerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
+        .consumerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .buffer = _name##Buffer,                    \
         .queueLength = length,                     \
         .itemSize = item_size,                     \

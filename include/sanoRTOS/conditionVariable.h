@@ -48,7 +48,7 @@ extern "C"
 #define CONDVAR_DEFINE(_name, p_mutex) \
     condVarHandleType _name = {        \
         .name = #_name,                \
-        .waitQueue = {0},              \
+        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .pMutex = p_mutex,             \
         .lock = 0}
 

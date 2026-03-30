@@ -58,7 +58,7 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
     taskHandleType *currentTask = taskGetCurrent();
 
 wait:
-    retCode = taskQueueAdd(&pCondVar->waitQueue, currentTask);
+    retCode = waitQueueAdd(&pCondVar->waitQueue, currentTask);
     if (retCode != RET_SUCCESS)
     {
         spinUnlock(&pCondVar->lock, irqState);
@@ -68,11 +68,11 @@ wait:
     spinUnlock(&pCondVar->lock, irqState);
 
     /* Block current task and give CPU to other tasks while waiting on condition variable*/
-    retCode = taskBlock(currentTask, WAIT_FOR_COND_VAR, waitTicks);
+    retCode = taskBlock(WAIT_FOR_COND_VAR, waitTicks);
     if (retCode != RET_SUCCESS)
     {
         irqState = spinLock(&pCondVar->lock);
-        (void)taskQueueRemove(&pCondVar->waitQueue, currentTask);
+        (void)waitQueueRemove(&pCondVar->waitQueue, currentTask);
         spinUnlock(&pCondVar->lock, irqState);
         return retCode;
     }
@@ -87,7 +87,7 @@ wait:
     else if (currentTask->wakeupReason == WAIT_TIMEOUT)
     {
         /*Wait timed out,remove task from  the waitQueue.*/
-        retCode = taskQueueRemove(&pCondVar->waitQueue, currentTask);
+        retCode = waitQueueRemove(&pCondVar->waitQueue, currentTask);
         if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
         {
             retCode = RET_TIMEOUT;
@@ -136,12 +136,12 @@ int condVarSignal(condVarHandleType *pCondVar)
     /*Get next highest priority waiting task to unblock*/
 getNextSignalTask:
 
-    nextSignalTask = TASK_GET_FROM_WAIT_QUEUE(&pCondVar->waitQueue);
+    nextSignalTask = waitQueuePop(&pCondVar->waitQueue);
 
     if (nextSignalTask != NULL)
     {
         /*Skip stale tasks that are no longer blocked waiting on this condition variable.*/
-        if ((nextSignalTask->status != TASK_STATUS_BLOCKED) ||
+        if ((nextSignalTask->state != TASK_STATE_BLOCKED) ||
             (nextSignalTask->blockedReason != WAIT_FOR_COND_VAR))
         {
             goto getNextSignalTask;
@@ -195,9 +195,9 @@ int condVarBroadcast(condVarHandleType *pCondVar)
     {
         taskHandleType *pTask = NULL;
 
-        while ((pTask = TASK_GET_FROM_WAIT_QUEUE(&pCondVar->waitQueue)) != NULL)
+        while ((pTask = waitQueuePop(&pCondVar->waitQueue)) != NULL)
         {
-            if ((pTask->status == TASK_STATUS_BLOCKED) &&
+            if ((pTask->state == TASK_STATE_BLOCKED) &&
                 (pTask->blockedReason == WAIT_FOR_COND_VAR))
             {
                 retCode = taskSetReady(pTask, COND_VAR_SIGNALLED);

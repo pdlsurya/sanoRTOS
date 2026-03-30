@@ -93,7 +93,7 @@ extern "C"
         .entry = taskEntryFunction,                                                                               \
         .params = taskParams,                                                                                     \
         .remainingSleepTicks = 0,                                                                                 \
-        .status = TASK_STATUS_READY,                                                                              \
+        .state = TASK_STATE_READY,                                                                                \
         .blockedReason = BLOCK_REASON_NONE,                                                                       \
         .wakeupReason = WAKEUP_REASON_NONE}
 
@@ -101,12 +101,12 @@ extern "C"
 
     typedef enum
     {
-        TASK_STATUS_READY,
-        TASK_STATUS_RUNNING,
-        TASK_STATUS_BLOCKED,
-        TASK_STATUS_SUSPENDED,
-        TASK_STATUS_TERMINATED
-    } taskStatusType;
+        TASK_STATE_READY,
+        TASK_STATE_RUNNING,
+        TASK_STATE_BLOCKED,
+        TASK_STATE_SUSPENDED,
+        TASK_STATE_TERMINATED
+    } taskStateType;
 
     typedef enum
     {
@@ -212,11 +212,13 @@ extern "C"
         void *params;                      ///< Pointer to parameters passed to the task function.
         taskFunctionType entry;            ///< Function pointer to the task's entry function.
         uint32_t remainingSleepTicks;      ///< Number of ticks remaining for which the task is sleeping or being blocked.
-        taskStatusType status;             ///< Current status of the task (e.g., running, ready, blocked).
+        taskStateType state;               ///< Current lifecycle state of the task (e.g., running, ready, blocked).
         blockedReasonType blockedReason;   ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
         wakeupReasonType wakeupReason;     ///< Reason the task was woken up (e.g., timeout, signal).
         coreAffinityType coreAffinity;     ///< Core affinity for SMP systems (which core the task prefers or is pinned to).
         uint8_t priority;                  ///< Priority level of the task (lower value indicate higher priority).
+        taskQueueLinkType stateQueueLink;  ///< Intrusive queue link used by ready and blocked state queues.
+        taskQueueLinkType waitQueueLink;   ///< Intrusive queue link used by kernel-object wait queues.
         taskEventStateType eventState;     ///< Event wait state used by the event kernel object.
         taskMailboxStateType mailboxState; ///< Mailbox wait state used by the mailbox kernel object.
         taskNotificationType notification; ///< Direct task notification state stored in the task itself.
@@ -249,14 +251,13 @@ extern "C"
     int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
 
     /**
-     * @brief Block a task with a reason and timeout.
+     * @brief Block the current task with a reason and timeout.
      *
-     * @param pTask Pointer to task handle.
-     * @param blockedReason Reason why task is blocked.
+     * @param blockedReason Reason why the current task is blocked.
      * @param ticks Ticks to remain blocked.
      * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    int taskBlock(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks);
+    int taskBlock(blockedReasonType blockedReason, uint32_t ticks);
 
     /**
      * @brief Suspend a task.
@@ -385,7 +386,7 @@ extern "C"
      */
     static inline __attribute__((always_inline)) int taskSleep(uint32_t sleepTicks)
     {
-        return taskBlock(taskPool.currentTask[PORT_CORE_ID()], SLEEP, sleepTicks);
+        return taskBlock(SLEEP, sleepTicks);
     }
 
     /**
@@ -532,32 +533,6 @@ extern "C"
     static inline __attribute__((always_inline)) uint8_t taskGetPriority(taskHandleType *pTask)
     {
         return pTask->priority;
-    }
-
-    /**
-     * @brief Get a pointer to the ready queue.
-     *
-     * This function returns a pointer to the ready queue in the task pool,
-     * which contains tasks that are ready to run.
-     *
-     * @return Pointer to the ready queue (taskQueueType *)
-     */
-    static inline __attribute__((always_inline)) taskQueueType *getReadyQueue()
-    {
-        return &taskPool.readyQueue;
-    }
-
-    /**
-     * @brief Get a pointer to the blocked queue.
-     *
-     * This function returns a pointer to the blocked queue in the task pool,
-     * which contains tasks that are currently waiting (e.g., sleeping or blocked on a resource).
-     *
-     * @return Pointer to the blocked queue (taskQueueType *)
-     */
-    static inline __attribute__((always_inline)) taskQueueType *getBlockedQueue()
-    {
-        return &taskPool.blockedQueue;
     }
 
 #ifdef __cplusplus

@@ -59,7 +59,8 @@ extern "C"
         .pArg = NULL,                                    \
         .ticksToExpire = 0,                              \
         .intervalTicks = 0,                              \
-        .nextNode = NULL}
+        .nextNode = NULL,                                \
+        .prevNode = NULL}
 
     typedef void (*timeoutHandlerType)(void *pArg); // Timeout handler function type definition
 
@@ -74,6 +75,7 @@ extern "C"
         uint32_t intervalTicks;            ///< Timer interval in ticks (used for periodic timers).
         uint32_t ticksToExpire;            ///< Remaining ticks before the timer expires.
         struct timerNode *nextNode;        ///< Pointer to the next timer node in the list.
+        struct timerNode *prevNode;        ///< Pointer to the previous timer node in the list.
         timerModeType mode;                ///< Timer mode (e.g., one-shot or periodic).
         bool isRunning;                    ///< Indicates whether the timer is currently running.
     } timerNodeType;

@@ -24,209 +24,309 @@
 
 #include <stdint.h>
 #include "sanoRTOS/retCodes.h"
-#include "sanoRTOS/config.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/taskQueue.h"
-#include "sanoRTOS/memSlab.h"
 
-MEM_SLAB_DEFINE(taskQueueNodeSlab, sizeof(taskNodeType), CONFIG_TASK_QUEUE_NODE_SLAB_BLOCKS);
+/* Selects which intrusive queue link inside a task a helper should operate on. */
+typedef taskQueueLinkType *(*taskQueueLinkAccessorType)(taskHandleType *pTask);
 
-static inline taskNodeType *newNode(taskHandleType *pTask)
+static inline taskQueueLinkType *taskStateQueueLink(taskHandleType *pTask)
 {
-    if (pTask == NULL)
-    {
-        return NULL;
-    }
-
-    taskNodeType *newTaskNode = NULL;
-    if (memSlabAlloc(&taskQueueNodeSlab, (void **)&newTaskNode, TASK_NO_WAIT) != RET_SUCCESS)
-    {
-        return NULL;
-    }
-
-    newTaskNode->pTask = pTask;
-    newTaskNode->nextTaskNode = NULL;
-
-    return newTaskNode;
+    return (pTask == NULL) ? NULL : &pTask->stateQueueLink;
 }
 
-static inline int taskQueueRemoveHead(taskQueueType *pTaskQueue)
+static inline taskQueueLinkType *taskWaitQueueLink(taskHandleType *pTask)
 {
-    if ((pTaskQueue == NULL) || (pTaskQueue->head == NULL))
+    return (pTask == NULL) ? NULL : &pTask->waitQueueLink;
+}
+
+static int taskQueueInsertBetween(taskQueueType *pQueue,
+                                  taskHandleType *pPrevTask,
+                                  taskHandleType *pNextTask,
+                                  taskHandleType *pTask,
+                                  taskQueueLinkAccessorType linkOf)
+{
+    taskQueueLinkType *pLink = NULL;
+
+    if ((pQueue == NULL) || (pTask == NULL) || (linkOf == NULL))
     {
         return RET_INVAL;
     }
 
-    taskNodeType *pNode = pTaskQueue->head;
-    taskNodeType *temp = pNode->nextTaskNode;
-    pTaskQueue->head = temp;
-
-    return memSlabFree(&taskQueueNodeSlab, pNode);
-}
-
-int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask)
-{
-    if ((pTaskQueue == NULL) || (pTask == NULL))
+    pLink = linkOf(pTask);
+    if ((pLink == NULL) || (pLink->pOwnerQueue != NULL))
     {
         return RET_INVAL;
     }
 
-    if (pTaskQueue->head == NULL)
+    pLink->pPrevTask = pPrevTask;
+    pLink->pNextTask = pNextTask;
+    pLink->pOwnerQueue = pQueue;
+
+    if (pPrevTask != NULL)
+    {
+        linkOf(pPrevTask)->pNextTask = pTask;
+    }
+    else
+    {
+        pQueue->head = pTask;
+    }
+
+    if (pNextTask != NULL)
+    {
+        linkOf(pNextTask)->pPrevTask = pTask;
+    }
+
+    return RET_SUCCESS;
+}
+
+static int taskQueueDetach(taskQueueType *pQueue,
+                           taskHandleType *pTask,
+                           taskQueueLinkAccessorType linkOf)
+{
+    taskQueueLinkType *pLink = NULL;
+
+    if ((pQueue == NULL) || (pTask == NULL) || (linkOf == NULL))
+    {
+        return RET_INVAL;
+    }
+
+    pLink = linkOf(pTask);
+    if ((pLink == NULL) || (pLink->pOwnerQueue != pQueue))
     {
         return RET_NOTASK;
     }
 
-    if (pTask == pTaskQueue->head->pTask)
+    if (pLink->pPrevTask != NULL)
     {
-        return taskQueueRemoveHead(pTaskQueue);
+        linkOf(pLink->pPrevTask)->pNextTask = pLink->pNextTask;
     }
     else
     {
-        taskNodeType *currentTaskNode = pTaskQueue->head;
-        while ((currentTaskNode->nextTaskNode != NULL) && (currentTaskNode->nextTaskNode->pTask != pTask))
-        {
-            currentTaskNode = currentTaskNode->nextTaskNode;
-        }
-
-        if (currentTaskNode->nextTaskNode == NULL)
-        {
-            return RET_NOTASK;
-        }
-
-        taskNodeType *pNode = currentTaskNode->nextTaskNode;
-        taskNodeType *temp = pNode->nextTaskNode;
-        currentTaskNode->nextTaskNode = temp;
-
-        return memSlabFree(&taskQueueNodeSlab, pNode);
+        pQueue->head = pLink->pNextTask;
     }
-}
 
-int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask)
-{
-    if ((pTaskQueue == NULL) || (pTask == NULL))
+    if (pLink->pNextTask != NULL)
     {
-        return RET_INVAL;
+        linkOf(pLink->pNextTask)->pPrevTask = pLink->pPrevTask;
     }
 
-    taskNodeType *newTaskNode = newNode(pTask);
-    if (newTaskNode == NULL)
-    {
-        return RET_NOMEM;
-    }
-
-    newTaskNode->nextTaskNode = pTaskQueue->head;
-    pTaskQueue->head = newTaskNode;
+    pLink->pPrevTask = NULL;
+    pLink->pNextTask = NULL;
+    pLink->pOwnerQueue = NULL;
 
     return RET_SUCCESS;
 }
 
-int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask)
+static int taskQueueDetachOwned(taskHandleType *pTask, taskQueueLinkAccessorType linkOf)
 {
-    if ((pTaskQueue == NULL) || (pTask == NULL))
+    taskQueueLinkType *pLink = NULL;
+
+    if ((pTask == NULL) || (linkOf == NULL))
     {
         return RET_INVAL;
     }
 
-    taskNodeType *newTaskNode = newNode(pTask);
-    if (newTaskNode == NULL)
+    pLink = linkOf(pTask);
+    if ((pLink == NULL) || (pLink->pOwnerQueue == NULL))
     {
-        return RET_NOMEM;
+        return RET_NOTASK;
     }
 
-    if (taskQueueEmpty(pTaskQueue))
-    {
-        pTaskQueue->head = newTaskNode;
-    }
-    else if (pTaskQueue->head->pTask->priority > pTask->priority)
-    {
-        newTaskNode->nextTaskNode = pTaskQueue->head;
-        pTaskQueue->head = newTaskNode;
-    }
-    else
-    {
-        taskNodeType *currentTaskNode = pTaskQueue->head;
-        while (currentTaskNode->nextTaskNode &&
-               currentTaskNode->nextTaskNode->pTask->priority <= pTask->priority)
-        {
-            currentTaskNode = currentTaskNode->nextTaskNode;
-        }
-
-        newTaskNode->nextTaskNode = currentTaskNode->nextTaskNode;
-        currentTaskNode->nextTaskNode = newTaskNode;
-    }
-
-    return RET_SUCCESS;
+    return taskQueueDetach(pLink->pOwnerQueue, pTask, linkOf);
 }
 
-taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck)
+static taskHandleType *taskQueueNextTask(taskQueueType *pQueue,
+                                         taskHandleType *pTask,
+                                         taskQueueLinkAccessorType linkOf)
 {
-    if (pTaskQueue == NULL)
+    taskQueueLinkType *pLink = NULL;
+
+    if ((pQueue == NULL) || (pTask == NULL) || (linkOf == NULL))
     {
         return NULL;
     }
 
-    taskHandleType *pTask;
-
-    if (!taskQueueEmpty(pTaskQueue))
+    pLink = linkOf(pTask);
+    if ((pLink == NULL) || (pLink->pOwnerQueue != pQueue))
     {
-        taskNodeType *currentTaskNode = pTaskQueue->head;
+        return NULL;
+    }
 
-        if (!affinityCheck)
+    return pLink->pNextTask;
+}
+
+static int taskQueueAddSorted(taskQueueType *pQueue,
+                              taskHandleType *pTask,
+                              taskQueueLinkAccessorType linkOf)
+{
+    taskHandleType *currentTask = NULL;
+    taskHandleType *nextTask = NULL;
+
+    if ((pQueue == NULL) || (pTask == NULL) || (linkOf == NULL))
+    {
+        return RET_INVAL;
+    }
+
+    if (taskQueueEmpty(pQueue))
+    {
+        return taskQueueInsertBetween(pQueue, NULL, NULL, pTask, linkOf);
+    }
+
+    if (pQueue->head->priority > pTask->priority)
+    {
+        return taskQueueInsertBetween(pQueue, NULL, pQueue->head, pTask, linkOf);
+    }
+
+    currentTask = pQueue->head;
+    nextTask = taskQueueNextTask(pQueue, currentTask, linkOf);
+
+    while ((nextTask != NULL) && (nextTask->priority <= pTask->priority))
+    {
+        currentTask = nextTask;
+        nextTask = taskQueueNextTask(pQueue, currentTask, linkOf);
+    }
+
+    return taskQueueInsertBetween(pQueue, currentTask, nextTask, pTask, linkOf);
+}
+
+static taskHandleType *taskQueuePop(taskQueueType *pQueue,
+                                    bool affinityCheck,
+                                    taskQueueLinkAccessorType linkOf)
+{
+    taskHandleType *currentTask = NULL;
+
+    if ((pQueue == NULL) || (linkOf == NULL) || taskQueueEmpty(pQueue))
+    {
+        return NULL;
+    }
+
+    if (!affinityCheck)
+    {
+        taskHandleType *pTask = pQueue->head;
+        return (taskQueueDetach(pQueue, pTask, linkOf) == RET_SUCCESS) ? pTask : NULL;
+    }
+
+    currentTask = pQueue->head;
+    while (currentTask != NULL)
+    {
+        taskHandleType *nextTask = taskQueueNextTask(pQueue, currentTask, linkOf);
+
+        if ((currentTask->coreAffinity == PORT_CORE_ID()) ||
+            (currentTask->coreAffinity == AFFINITY_CORE_ANY))
         {
-            pTask = currentTaskNode->pTask;
-            if (taskQueueRemove(pTaskQueue, pTask) == RET_SUCCESS)
-            {
-                return pTask;
-            }
-            return NULL;
+            return (taskQueueDetach(pQueue, currentTask, linkOf) == RET_SUCCESS) ? currentTask : NULL;
         }
 
-        /* Check each task in the queue for a matching core affinity */
-        while (currentTaskNode != NULL)
-        {
-            if (currentTaskNode->pTask->coreAffinity == PORT_CORE_ID() ||
-                currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY)
-            {
-                pTask = currentTaskNode->pTask;
-                if (taskQueueRemove(pTaskQueue, pTask) == RET_SUCCESS)
-                {
-                    return pTask;
-                }
-                return NULL;
-            }
-            currentTaskNode = currentTaskNode->nextTaskNode;
-        }
+        currentTask = nextTask;
     }
 
     return NULL;
 }
 
-taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck)
+static taskHandleType *taskQueuePeek(taskQueueType *pQueue,
+                                     bool affinityCheck,
+                                     taskQueueLinkAccessorType linkOf)
 {
-    if (pTaskQueue == NULL)
+    taskHandleType *currentTask = NULL;
+
+    if ((pQueue == NULL) || (linkOf == NULL) || taskQueueEmpty(pQueue))
     {
         return NULL;
     }
 
-    if (!taskQueueEmpty(pTaskQueue))
+    if (!affinityCheck)
     {
-        taskNodeType *currentTaskNode = pTaskQueue->head;
-
-        if (!affinityCheck)
-        {
-            return currentTaskNode->pTask;
-        }
-
-        while (currentTaskNode != NULL)
-        {
-            if (currentTaskNode->pTask->coreAffinity == AFFINITY_CORE_ANY ||
-                currentTaskNode->pTask->coreAffinity == PORT_CORE_ID())
-            {
-                return currentTaskNode->pTask;
-            }
-
-            currentTaskNode = currentTaskNode->nextTaskNode;
-        }
+        return pQueue->head;
     }
+
+    currentTask = pQueue->head;
+    while (currentTask != NULL)
+    {
+        if ((currentTask->coreAffinity == AFFINITY_CORE_ANY) ||
+            (currentTask->coreAffinity == PORT_CORE_ID()))
+        {
+            return currentTask;
+        }
+
+        currentTask = taskQueueNextTask(pQueue, currentTask, linkOf);
+    }
+
     return NULL;
+}
+
+taskQueueType *readyQueue(void)
+{
+    return &taskPool.readyQueue;
+}
+
+taskQueueType *blockedQueue(void)
+{
+    return &taskPool.blockedQueue;
+}
+
+int readyQueueAdd(taskHandleType *pTask)
+{
+    return taskQueueAddSorted(readyQueue(), pTask, taskStateQueueLink);
+}
+
+int blockedQueueAdd(taskHandleType *pTask)
+{
+    taskQueueType *pBlockedQueue = blockedQueue();
+    return taskQueueInsertBetween(pBlockedQueue, NULL, pBlockedQueue->head, pTask, taskStateQueueLink);
+}
+
+int waitQueueAdd(taskQueueType *pWaitQueue, taskHandleType *pTask)
+{
+    return taskQueueAddSorted(pWaitQueue, pTask, taskWaitQueueLink);
+}
+
+int waitQueueRemove(taskQueueType *pWaitQueue, taskHandleType *pTask)
+{
+    return taskQueueDetach(pWaitQueue, pTask, taskWaitQueueLink);
+}
+
+int readyQueueDetach(taskHandleType *pTask)
+{
+    return taskQueueDetach(readyQueue(), pTask, taskStateQueueLink);
+}
+
+int blockedQueueDetach(taskHandleType *pTask)
+{
+    return taskQueueDetach(blockedQueue(), pTask, taskStateQueueLink);
+}
+
+int waitQueueDetach(taskHandleType *pTask)
+{
+    return taskQueueDetachOwned(pTask, taskWaitQueueLink);
+}
+
+taskHandleType *stateQueueNext(taskQueueType *pStateQueue, taskHandleType *pTask)
+{
+    return taskQueueNextTask(pStateQueue, pTask, taskStateQueueLink);
+}
+
+taskHandleType *waitQueueNext(taskQueueType *pWaitQueue, taskHandleType *pTask)
+{
+    return taskQueueNextTask(pWaitQueue, pTask, taskWaitQueueLink);
+}
+
+taskHandleType *readyQueuePop(void)
+{
+    return taskQueuePop(readyQueue(), true, taskStateQueueLink);
+}
+
+taskHandleType *waitQueuePop(taskQueueType *pWaitQueue)
+{
+    return taskQueuePop(pWaitQueue, false, taskWaitQueueLink);
+}
+
+taskHandleType *readyQueuePeek(void)
+{
+    return taskQueuePeek(readyQueue(), true, taskStateQueueLink);
+}
+
+taskHandleType *waitQueuePeek(taskQueueType *pWaitQueue)
+{
+    return taskQueuePeek(pWaitQueue, false, taskWaitQueueLink);
 }

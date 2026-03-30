@@ -65,15 +65,13 @@ static void portRunFirstTask()
 {
     bool irqState = spinLock(&lock);
 
-    taskQueueType *pReadyQueue = getReadyQueue();
-
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
+    currentTask[PORT_CORE_ID()] = readyQueuePop();
 
     taskSetCurrent(currentTask[PORT_CORE_ID()]);
 
-    /*Change status to RUNNING*/
-    currentTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
+    /*Change state to RUNNING*/
+    currentTask[PORT_CORE_ID()]->state = TASK_STATE_RUNNING;
 
     portConfig();
 

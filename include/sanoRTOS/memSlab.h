@@ -54,7 +54,7 @@ extern "C"
     memSlabHandleType _name = {                                                                                 \
         .name = #_name,                                                                                         \
         .lock = 0,                                                                                              \
-        .waitQueue = {0},                                                                                       \
+        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER,                                                               \
         .buffer = _name##Buffer,                                                                                \
         .blockSize = (_blockSize),                                                                              \
         .numBlocks = (_numBlocks),                                                                              \

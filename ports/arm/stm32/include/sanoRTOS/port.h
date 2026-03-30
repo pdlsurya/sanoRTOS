@@ -170,6 +170,14 @@ extern "C"
     void portSchedulerStart();
 
     /**
+     * @brief sanoRTOS SysTick hook for STM32 SDK integration.
+     *
+     * Call this from the MCU SDK's `SysTick_Handler()` implementation instead
+     * of redefining the handler inside sanoRTOS.
+     */
+    void sanoRTOS_SysTickHook(void);
+
+    /**
      * @brief Compare-And-Set function for ARM Cortex-M
      *
      * @param ptr Pointer to the target memory location

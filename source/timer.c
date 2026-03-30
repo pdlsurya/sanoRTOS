@@ -44,8 +44,7 @@ MEM_SLAB_DEFINE(timeoutHandlerNodeSlab, sizeof(timeoutHandlerNodeType), CONFIG_T
 /*Define timer task with highest possible priority*/
 TASK_DEFINE(timerTask, 4096, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, AFFINITY_CORE_0);
 
-static int timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue,
-                                   timeoutHandlerType timeoutHandler, void *pArg)
+static int timeoutHandlerQueuePush(timeoutHandlerType timeoutHandler, void *pArg)
 {
     timeoutHandlerNodeType *newNode = NULL;
     if (memSlabAlloc(&timeoutHandlerNodeSlab, (void **)&newNode, TASK_NO_WAIT) != RET_SUCCESS)
@@ -57,23 +56,23 @@ static int timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue
     newNode->pArg = pArg;
     newNode->nextNode = NULL;
 
-    if (pTimeoutHandlerQueue->head == NULL)
+    if (timeoutHandlerQueue.head == NULL)
     {
-        pTimeoutHandlerQueue->head = newNode;
-        pTimeoutHandlerQueue->tail = pTimeoutHandlerQueue->head;
+        timeoutHandlerQueue.head = newNode;
+        timeoutHandlerQueue.tail = timeoutHandlerQueue.head;
     }
     else
     {
-        pTimeoutHandlerQueue->tail->nextNode = newNode;
-        pTimeoutHandlerQueue->tail = newNode;
+        timeoutHandlerQueue.tail->nextNode = newNode;
+        timeoutHandlerQueue.tail = newNode;
     }
 
     return RET_SUCCESS;
 }
 
-static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeoutHandlerQueue, void **ppArg)
+static timeoutHandlerType timeoutHandlerQueuePop(void **ppArg)
 {
-    if ((pTimeoutHandlerQueue == NULL) || (pTimeoutHandlerQueue->head == NULL))
+    if (timeoutHandlerQueue.head == NULL)
     {
         if (ppArg != NULL)
         {
@@ -82,19 +81,19 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
         return NULL;
     }
 
-    timeoutHandlerNodeType *temp = pTimeoutHandlerQueue->head->nextNode;
+    timeoutHandlerNodeType *temp = timeoutHandlerQueue.head->nextNode;
 
-    timeoutHandlerNodeType *pNode = pTimeoutHandlerQueue->head;
+    timeoutHandlerNodeType *pNode = timeoutHandlerQueue.head;
     timeoutHandlerType timeoutHandler = pNode->timeoutHandler;
     if (ppArg != NULL)
     {
         *ppArg = pNode->pArg;
     }
 
-    pTimeoutHandlerQueue->head = temp;
-    if (pTimeoutHandlerQueue->head == NULL)
+    timeoutHandlerQueue.head = temp;
+    if (timeoutHandlerQueue.head == NULL)
     {
-        pTimeoutHandlerQueue->tail = NULL;
+        timeoutHandlerQueue.tail = NULL;
     }
 
     (void)memSlabFree(&timeoutHandlerNodeSlab, pNode);
@@ -102,46 +101,49 @@ static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeo
     return timeoutHandler;
 }
 
-static void timerListNodeAdd(timerListType *pTimerList, timerNodeType *pTimerNode)
+static void timerListNodeAdd(timerNodeType *pTimerNode)
 {
-
-    pTimerNode->nextNode = pTimerList->head;
-
-    pTimerList->head = pTimerNode;
-}
-
-static inline void timerListDeleteFirstNode(timerListType *pTimerList)
-{
-    timerNodeType *tempNode = pTimerList->head->nextNode;
-
-    pTimerList->head->nextNode = NULL;
-
-    pTimerList->head = tempNode;
-}
-
-static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerNode)
-{
-
-    if (pTimerList->head != NULL) // Check if timerList is empty
+    pTimerNode->prevNode = NULL;
+    pTimerNode->nextNode = timerList.head;
+    if (timerList.head != NULL)
     {
-        timerNodeType *currentNode = pTimerList->head;
+        timerList.head->prevNode = pTimerNode;
+    }
 
-        /* If the timer correponds to the head node in the list, remove the timer node and reassign head node.*/
-        if (pTimerNode == pTimerList->head)
+    timerList.head = pTimerNode;
+}
+
+static int timerListNodeDelete(timerNodeType *pTimerNode)
+{
+    if (pTimerNode == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    if (timerList.head != NULL) // Check if timerList is empty
+    {
+        if ((pTimerNode->prevNode == NULL) && (timerList.head != pTimerNode))
         {
-            timerListDeleteFirstNode(pTimerList);
+            return RET_NOTACTIVE;
         }
 
+        if (pTimerNode->prevNode != NULL)
+        {
+            pTimerNode->prevNode->nextNode = pTimerNode->nextNode;
+        }
         else
         {
-            while (currentNode->nextNode != pTimerNode)
-            {
-                currentNode = currentNode->nextNode;
-            }
-
-            currentNode->nextNode = pTimerNode->nextNode;
-            pTimerNode->nextNode = NULL;
+            timerList.head = pTimerNode->nextNode;
         }
+
+        if (pTimerNode->nextNode != NULL)
+        {
+            pTimerNode->nextNode->prevNode = pTimerNode->prevNode;
+        }
+
+        pTimerNode->nextNode = NULL;
+        pTimerNode->prevNode = NULL;
+
         return RET_SUCCESS;
     }
     return RET_EMPTY;
@@ -152,7 +154,7 @@ static int timerStopLocked(timerNodeType *pTimerNode)
     if (pTimerNode->isRunning)
     {
         pTimerNode->isRunning = false;
-        return timerListNodeDelete(&timerList, pTimerNode);
+        return timerListNodeDelete(pTimerNode);
     }
 
     return RET_NOTACTIVE;
@@ -181,7 +183,7 @@ int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
         pTimerNode->ticksToExpire = pTimerNode->intervalTicks = intervalTicks;
 
         /* Add the timer in the queue of running timers*/
-        timerListNodeAdd(&timerList, pTimerNode);
+        timerListNodeAdd(pTimerNode);
     }
 
     spinUnlock(&lock, irqState);
@@ -225,7 +227,7 @@ void processTimers()
                 {
 
                     /*Add timeout handler to the timeoutHandlerQueue*/
-                    if (timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler,
+                    if (timeoutHandlerQueuePush(currentNode->timeoutHandler,
                                                 currentNode->pArg) == RET_SUCCESS)
                     {
                         /* Notify timer task that timeout work is available. */
@@ -261,7 +263,7 @@ void timerTaskFunction(void *args)
     {
         bool irqState = spinLock(&lock);
         void *pArg = NULL;
-        timeoutHandlerType timeoutHandler = timeoutHandlerQueuePop(&timeoutHandlerQueue, &pArg);
+        timeoutHandlerType timeoutHandler = timeoutHandlerQueuePop(&pArg);
         spinUnlock(&lock, irqState);
 
         if (timeoutHandler != NULL)

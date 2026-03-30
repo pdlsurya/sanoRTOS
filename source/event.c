@@ -80,19 +80,19 @@ static int eventWakeMatchingTasks(eventHandleType *pEvent, bool *pContextSwitchR
     }
 
     uint32_t clearMask = 0U;
-    taskNodeType *currentTaskNode = pEvent->waitQueue.head;
+    taskHandleType *currentTask = pEvent->waitQueue.head;
 
     /* Check each task in the wait queue for a matching event condition */
-    while (currentTaskNode != NULL)
+    while (currentTask != NULL)
     {
-        taskNodeType *nextTaskNode = currentTaskNode->nextTaskNode;
-        taskHandleType *pTask = currentTaskNode->pTask;
+        taskHandleType *nextTask = waitQueueNext(&pEvent->waitQueue, currentTask);
+        taskHandleType *pTask = currentTask;
         uint32_t matchedEvents = 0U;
 
         /* Clear any stale match state before re-evaluating the waiter */
         pTask->eventState.matchedEvents = 0U;
 
-        if ((pTask->status == TASK_STATUS_BLOCKED) &&
+        if ((pTask->state == TASK_STATE_BLOCKED) &&
             (pTask->blockedReason == WAIT_FOR_EVENT) &&
             eventConditionMatched(pEvent->events, pTask->eventState.waitMask, (pTask->eventState.waitAll != 0U)))
         {
@@ -106,7 +106,7 @@ static int eventWakeMatchingTasks(eventHandleType *pEvent, bool *pContextSwitchR
             }
 
             /* Remove matched task from the event wait queue before making it READY */
-            int retCode = taskQueueRemove(&pEvent->waitQueue, pTask);
+            int retCode = waitQueueRemove(&pEvent->waitQueue, pTask);
             if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
             {
                 return retCode;
@@ -124,7 +124,7 @@ static int eventWakeMatchingTasks(eventHandleType *pEvent, bool *pContextSwitchR
             }
         }
 
-        currentTaskNode = nextTaskNode;
+        currentTask = nextTask;
     }
 
     /* Clear all matched event bits requested with clearOnExit */
@@ -195,7 +195,7 @@ retry:
         eventTaskWaitSetup(currentTask, waitEvents, waitAll, clearOnExit);
 
         /* Add current task to the event object's wait queue */
-        retCode = taskQueueAdd(&pEvent->waitQueue, currentTask);
+        retCode = waitQueueAdd(&pEvent->waitQueue, currentTask);
         if (retCode != RET_SUCCESS)
         {
             eventTaskWaitReset(currentTask);
@@ -206,11 +206,11 @@ retry:
         spinUnlock(&pEvent->lock, irqState);
 
         /* Block current task and give CPU to other tasks while waiting for events */
-        retCode = taskBlock(currentTask, WAIT_FOR_EVENT, waitTicks);
+        retCode = taskBlock(WAIT_FOR_EVENT, waitTicks);
         if (retCode != RET_SUCCESS)
         {
             irqState = spinLock(&pEvent->lock);
-            (void)taskQueueRemove(&pEvent->waitQueue, currentTask);
+            (void)waitQueueRemove(&pEvent->waitQueue, currentTask);
             eventTaskWaitReset(currentTask);
             spinUnlock(&pEvent->lock, irqState);
             return retCode;
@@ -228,7 +228,7 @@ retry:
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
             /*Wait timed out, remove task from the waitQueue */
-            retCode = taskQueueRemove(&pEvent->waitQueue, currentTask);
+            retCode = waitQueueRemove(&pEvent->waitQueue, currentTask);
             eventTaskWaitReset(currentTask);
 
             if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
@@ -240,7 +240,7 @@ retry:
         {
             /*Task might have been suspended while waiting for events and later resumed.
               In this case, retry waiting on the event object again */
-            retCode = taskQueueRemove(&pEvent->waitQueue, currentTask);
+            retCode = waitQueueRemove(&pEvent->waitQueue, currentTask);
             eventTaskWaitReset(currentTask);
             spinUnlock(&pEvent->lock, irqState);
 

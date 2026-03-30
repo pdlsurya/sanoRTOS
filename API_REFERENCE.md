@@ -142,11 +142,14 @@ Tasks that exit or are deleted are terminal. They cannot be restarted later with
 - `taskSleep(ticks)`
 - `taskSleepMS(ms)`
 - `taskSleepUS(us)`
+- `taskBlock(blockedReasonType blockedReason, uint32_t ticks)`
 - `taskYield()`
 - `taskSuspend(taskHandleType *pTask)`
 - `taskResume(taskHandleType *pTask)`
 - `taskGetCurrent()`
 - `taskGetName()`
+
+`taskBlock()` blocks only the currently running task. Most applications should prefer higher-level wait APIs such as semaphores, events, queues, and `taskSleep*()` unless they are integrating directly with a custom kernel-style primitive.
 
 Example:
 

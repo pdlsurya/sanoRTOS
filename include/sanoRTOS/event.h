@@ -44,7 +44,7 @@ extern "C"
 #define EVENT_DEFINE(_name)         \
     eventHandleType _name = {       \
         .name = #_name,             \
-        .waitQueue = {0},           \
+        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .events = 0,                \
         .lock = 0}
 

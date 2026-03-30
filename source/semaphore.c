@@ -64,7 +64,7 @@ retry:
 
         /*Put current task in semaphore's wait queue*/
 
-        retCode = taskQueueAdd(&pSem->waitQueue, currentTask);
+        retCode = waitQueueAdd(&pSem->waitQueue, currentTask);
         if (retCode != RET_SUCCESS)
         {
             spinUnlock(&pSem->lock, irqState);
@@ -74,11 +74,11 @@ retry:
         spinUnlock(&pSem->lock, irqState);
 
         /* Block current task and give CPU to other tasks while waiting for semaphore*/
-        retCode = taskBlock(currentTask, WAIT_FOR_SEMAPHORE, waitTicks);
+        retCode = taskBlock(WAIT_FOR_SEMAPHORE, waitTicks);
         if (retCode != RET_SUCCESS)
         {
             irqState = spinLock(&pSem->lock);
-            (void)taskQueueRemove(&pSem->waitQueue, currentTask);
+            (void)waitQueueRemove(&pSem->waitQueue, currentTask);
             spinUnlock(&pSem->lock, irqState);
             return retCode;
         }
@@ -93,7 +93,7 @@ retry:
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
             /*Wait timed out,remove task from  the waitQueue.*/
-            retCode = taskQueueRemove(&pSem->waitQueue, currentTask);
+            retCode = waitQueueRemove(&pSem->waitQueue, currentTask);
             if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
             {
                 retCode = RET_TIMEOUT;
@@ -131,12 +131,12 @@ int semaphoreGive(semaphoreHandleType *pSem)
     {
         /*Get next highest priority task to unblock from the wait Queue*/
     getNextTask:
-        nextTask = TASK_GET_FROM_WAIT_QUEUE(&pSem->waitQueue);
+        nextTask = waitQueuePop(&pSem->waitQueue);
 
         if (nextTask != NULL)
         {
             /*Skip stale tasks that are no longer blocked waiting for this semaphore.*/
-            if ((nextTask->status != TASK_STATUS_BLOCKED) ||
+            if ((nextTask->state != TASK_STATE_BLOCKED) ||
                 (nextTask->blockedReason != WAIT_FOR_SEMAPHORE))
             {
                 goto getNextTask;

@@ -44,16 +44,13 @@ static inline void portConfig()
 
 void portSchedulerStart()
 {
-
-    taskQueueType *pReadyQueue = getReadyQueue();
-
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
+    currentTask[PORT_CORE_ID()] = readyQueuePop();
     // set the current running task
     taskSetCurrent(currentTask[PORT_CORE_ID()]);
 
-    /*Change status to RUNNING*/
-    currentTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
+    /*Change state to RUNNING*/
+    currentTask[PORT_CORE_ID()]->state = TASK_STATE_RUNNING;
 
     portConfig();
 

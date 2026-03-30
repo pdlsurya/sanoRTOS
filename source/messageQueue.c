@@ -45,10 +45,10 @@ static int msgQueueWakeWaitingTasks(taskQueueType *pWaitQueue,
     taskHandleType *pTask = NULL;
 
 getNextWaitingTask:
-    pTask = TASK_GET_FROM_WAIT_QUEUE(pWaitQueue);
+    pTask = waitQueuePop(pWaitQueue);
     if (pTask != NULL)
     {
-        if ((pTask->status != TASK_STATUS_BLOCKED) ||
+        if ((pTask->state != TASK_STATE_BLOCKED) ||
             (pTask->blockedReason != blockedReason))
         {
             goto getNextWaitingTask;
@@ -209,7 +209,7 @@ retry:
 
             bool irqState = spinLock(&pQueueHandle->lock);
 
-            retCode = taskQueueAdd(&pQueueHandle->producerWaitQueue, currentTask);
+            retCode = waitQueueAdd(&pQueueHandle->producerWaitQueue, currentTask);
             if (retCode != RET_SUCCESS)
             {
                 spinUnlock(&pQueueHandle->lock, irqState);
@@ -219,11 +219,11 @@ retry:
             spinUnlock(&pQueueHandle->lock, irqState);
 
             // Block current task and  give CPU to other tasks while waiting for space to be available
-            retCode = taskBlock(currentTask, WAIT_FOR_MSG_QUEUE_SPACE, waitTicks);
+            retCode = taskBlock(WAIT_FOR_MSG_QUEUE_SPACE, waitTicks);
             if (retCode != RET_SUCCESS)
             {
                 irqState = spinLock(&pQueueHandle->lock);
-                (void)taskQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
+                (void)waitQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
                 spinUnlock(&pQueueHandle->lock, irqState);
                 return retCode;
             }
@@ -237,7 +237,7 @@ retry:
                 irqState = spinLock(&pQueueHandle->lock);
 
                 /*Wait timed out,remove task from wait Queue.*/
-                retCode = taskQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
+                retCode = waitQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
 
                 spinUnlock(&pQueueHandle->lock, irqState);
 
@@ -290,7 +290,7 @@ retry:
 
             bool irqState = spinLock(&pQueueHandle->lock);
 
-            retCode = taskQueueAdd(&pQueueHandle->consumerWaitQueue, currentTask);
+            retCode = waitQueueAdd(&pQueueHandle->consumerWaitQueue, currentTask);
             if (retCode != RET_SUCCESS)
             {
                 spinUnlock(&pQueueHandle->lock, irqState);
@@ -300,11 +300,11 @@ retry:
             spinUnlock(&pQueueHandle->lock, irqState);
 
             // Block current task and give CPU to other tasks while waiting for data to be available
-            retCode = taskBlock(currentTask, WAIT_FOR_MSG_QUEUE_DATA, waitTicks);
+            retCode = taskBlock(WAIT_FOR_MSG_QUEUE_DATA, waitTicks);
             if (retCode != RET_SUCCESS)
             {
                 irqState = spinLock(&pQueueHandle->lock);
-                (void)taskQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
+                (void)waitQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
                 spinUnlock(&pQueueHandle->lock, irqState);
                 return retCode;
             }
@@ -318,7 +318,7 @@ retry:
                 irqState = spinLock(&pQueueHandle->lock);
 
                 /*Wait timed out,remove task from wait Queue.*/
-                retCode = taskQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
+                retCode = waitQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
 
                 spinUnlock(&pQueueHandle->lock, irqState);
 

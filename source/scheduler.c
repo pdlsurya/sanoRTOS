@@ -51,7 +51,6 @@ void idleTaskHandler0(void *params)
 
 static int selectNextTask(void)
 {
-    taskQueueType *const pReadyQueue = getReadyQueue();
     taskHandleType *const pCurrentTask = taskGetCurrent();
 
 #if CONFIG_CHECK_STACK_OVERFLOW
@@ -59,16 +58,16 @@ static int selectNextTask(void)
 #endif
 
     // If the current task is running, add it to the ready queue
-    if (pCurrentTask->status == TASK_STATUS_RUNNING)
+    if (pCurrentTask->state == TASK_STATE_RUNNING)
     {
-        taskHandleType *pNextReadyTask = TASK_PEEK_FROM_READY_QUEUE(pReadyQueue);
+        taskHandleType *pNextReadyTask = readyQueuePeek();
 
         //If next ready task exists and has an equal or higher priority than current task,
         // add the current task to the ready queue.
         if (pNextReadyTask != NULL && pNextReadyTask->priority <= pCurrentTask->priority)
         {
-            pCurrentTask->status = TASK_STATUS_READY;
-            int retCode = taskQueueAdd(pReadyQueue, pCurrentTask);
+            pCurrentTask->state = TASK_STATE_READY;
+            int retCode = readyQueueAdd(pCurrentTask);
             if (retCode != RET_SUCCESS)
             {
                 return retCode;
@@ -84,14 +83,14 @@ static int selectNextTask(void)
     currentTask[PORT_CORE_ID()] = pCurrentTask;
 
     // Get the next task from the ready queue
-    nextTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
+    nextTask[PORT_CORE_ID()] = readyQueuePop();
     if (nextTask[PORT_CORE_ID()] == NULL)
     {
         return RET_NOTASK;
     }
 
-    // Set the status of the next task to RUNNING
-    nextTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
+    // Set the next task state to RUNNING
+    nextTask[PORT_CORE_ID()]->state = TASK_STATE_RUNNING;
 
     // Set the current task to the next task
     taskSetCurrent(nextTask[PORT_CORE_ID()]);
@@ -101,33 +100,32 @@ static int selectNextTask(void)
 
 static void checkTimeout()
 {
-    taskQueueType *pBlockedQueue = getBlockedQueue();
+    taskQueueType *pBlockedQueue = blockedQueue();
 
     /* Iterate over each task in the blocked queue */
-    taskNodeType *currentTaskNode = pBlockedQueue->head;
+    taskHandleType *currentTask = pBlockedQueue->head;
 
-    while (currentTaskNode != NULL)
+    while (currentTask != NULL)
     {
-        /* Save next task node to avoid losing track of linked list after task node
-         * is freed while setting corresponding task to READY */
-        taskNodeType *nextTaskNode = currentTaskNode->nextTaskNode;
+        /* Save the next task before a timeout path potentially detaches the current one. */
+        taskHandleType *nextTask = stateQueueNext(pBlockedQueue, currentTask);
 
-        if (currentTaskNode->pTask->remainingSleepTicks > 0)
+        if (currentTask->remainingSleepTicks > 0)
         {
-            currentTaskNode->pTask->remainingSleepTicks--;
-            if (currentTaskNode->pTask->remainingSleepTicks == 0)
+            currentTask->remainingSleepTicks--;
+            if (currentTask->remainingSleepTicks == 0)
             {
-                if (currentTaskNode->pTask->blockedReason == SLEEP)
+                if (currentTask->blockedReason == SLEEP)
                 {
-                    (void)taskSetReady(currentTaskNode->pTask, SLEEP_TIME_TIMEOUT);
+                    (void)taskSetReady(currentTask, SLEEP_TIME_TIMEOUT);
                 }
                 else
                 {
-                    (void)taskSetReady(currentTaskNode->pTask, WAIT_TIMEOUT);
+                    (void)taskSetReady(currentTask, WAIT_TIMEOUT);
                 }
             }
         }
-        currentTaskNode = nextTaskNode;
+        currentTask = nextTask;
     }
 }
 
@@ -170,7 +168,7 @@ void tickHandler()
         /*Check for timer timeout*/
         processTimers();
 
-        taskQueueType *pBlockedQueue = getBlockedQueue();
+        taskQueueType *pBlockedQueue = blockedQueue();
 
         /*Check for wait timeout of blocked tasks*/
         if (!taskQueueEmpty(pBlockedQueue))

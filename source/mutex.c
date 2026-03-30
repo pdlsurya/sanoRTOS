@@ -107,7 +107,7 @@ retry:
     else
     {
         /* Add the task waiting on mutex to the wait queue*/
-        retCode = taskQueueAdd(&pMutex->waitQueue, currentTask);
+        retCode = waitQueueAdd(&pMutex->waitQueue, currentTask);
         if (retCode != RET_SUCCESS)
         {
             spinUnlock(&pMutex->lock, irqState);
@@ -118,11 +118,11 @@ retry:
         spinUnlock(&pMutex->lock, irqState);
 
         /* Block current task and give CPU to other tasks while waiting for mutex*/
-        retCode = taskBlock(currentTask, WAIT_FOR_MUTEX, waitTicks);
+        retCode = taskBlock(WAIT_FOR_MUTEX, waitTicks);
         if (retCode != RET_SUCCESS)
         {
             irqState = spinLock(&pMutex->lock);
-            (void)taskQueueRemove(&pMutex->waitQueue, currentTask);
+            (void)waitQueueRemove(&pMutex->waitQueue, currentTask);
             spinUnlock(&pMutex->lock, irqState);
             return retCode;
         }
@@ -137,7 +137,7 @@ retry:
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
             /*Wait timed out, remove task from  the waitQueue.*/
-            retCode = taskQueueRemove(&pMutex->waitQueue, currentTask);
+            retCode = waitQueueRemove(&pMutex->waitQueue, currentTask);
             if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
             {
                 retCode = RET_TIMEOUT;
@@ -190,12 +190,12 @@ int mutexUnlock(mutexHandleType *pMutex)
             /* Get next owner of the mutex*/
         getNextOwner:
             /*Get next highest priority task from waitQueue.*/
-            nextOwner = TASK_GET_FROM_WAIT_QUEUE(&pMutex->waitQueue);
+            nextOwner = waitQueuePop(&pMutex->waitQueue);
 
             if (nextOwner != NULL)
             {
                 /*Skip stale tasks that are no longer blocked waiting for this mutex.*/
-                if ((nextOwner->status != TASK_STATUS_BLOCKED) ||
+                if ((nextOwner->state != TASK_STATE_BLOCKED) ||
                     (nextOwner->blockedReason != WAIT_FOR_MUTEX))
                 {
                     goto getNextOwner;

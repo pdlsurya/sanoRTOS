@@ -142,6 +142,7 @@ extern "C"
             .intervalTicks = 0,                             \
             .ticksToExpire = 0,                             \
             .nextNode = NULL,                               \
+            .prevNode = NULL,                               \
             .mode = TIMER_MODE_SINGLE_SHOT,                 \
             .isRunning = false},                            \
         .pWorkQueue = NULL,                                 \
@@ -204,6 +205,7 @@ extern "C"
         pDelayedWork->timer.intervalTicks = 0U;
         pDelayedWork->timer.ticksToExpire = 0U;
         pDelayedWork->timer.nextNode = NULL;
+        pDelayedWork->timer.prevNode = NULL;
         pDelayedWork->timer.mode = TIMER_MODE_SINGLE_SHOT;
         pDelayedWork->timer.isRunning = false;
         pDelayedWork->pWorkQueue = NULL;

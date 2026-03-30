@@ -38,16 +38,13 @@ static inline void portConfig()
 
 void portSchedulerStart()
 {
-
-    taskQueueType *pReadyQueue = getReadyQueue();
-
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = taskQueueGet(pReadyQueue, true);
+    currentTask[PORT_CORE_ID()] = readyQueuePop();
 
     taskSetCurrent(currentTask[PORT_CORE_ID()]);
 
-    /*Change status to RUNNING*/
-    currentTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
+    /*Change state to RUNNING*/
+    currentTask[PORT_CORE_ID()]->state = TASK_STATE_RUNNING;
 
     portConfig();
 
@@ -63,7 +60,7 @@ void portSchedulerStart()
     currentTask[PORT_CORE_ID()]->entry(currentTask[PORT_CORE_ID()]->params);
 }
 
-void osSysTick_Handler()
+void sanoRTOS_SysTickHook()
 {
     tickHandler();
 }

@@ -44,8 +44,8 @@ extern "C"
 #define MAILBOX_DEFINE(_name)       \
     mailboxHandleType _name = {     \
         .name = #_name,             \
-        .senderWaitQueue = {0},     \
-        .receiverWaitQueue = {0},   \
+        .senderWaitQueue = TASK_WAIT_QUEUE_INITIALIZER,   \
+        .receiverWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .lock = 0}
 
     /**

@@ -25,6 +25,7 @@
 #ifndef __SANO_RTOS_TASK_QUEUE_H
 #define __SANO_RTOS_TASK_QUEUE_H
 
+#include <stddef.h>
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
 #include "sanoRTOS/retCodes.h"
@@ -34,109 +35,159 @@ extern "C"
 {
 #endif
 
-/**
- * @brief Retrieve the next highest-priority task from the ready queue.
- *
- * This macro fetches the task for immediate scheduling, so affinity checking is enabled.
- *
- * @param pReadyQueue Pointer to the ready task queue.
- * @return Task control block (TCB) pointer of the next task to run.
- */
-#define TASK_GET_FROM_READY_QUEUE(pReadyQueue) taskQueueGet(pReadyQueue, true)
-
-/**
- * @brief Retrieve the next highest-priority task from the wait queue.
- *
- * Affinity checking is disabled as this queue is not used for direct scheduling.
- *
- * @param pWaitQueue Pointer to the wait task queue.
- * @return Task control block (TCB) pointer of the next waiting task.
- */
-#define TASK_GET_FROM_WAIT_QUEUE(pWaitQueue) taskQueueGet(pWaitQueue, false)
-
-/**
- * @brief Peek at the next highest-priority task in the ready queue without removing it.
- *
- * Useful for inspecting which task is scheduled to run next, with affinity checking enabled.
- *
- * @param pReadyQueue Pointer to the ready task queue.
- * @return Task control block (TCB) pointer of the next task to run.
- */
-#define TASK_PEEK_FROM_READY_QUEUE(pReadyQueue) taskQueuePeek(pReadyQueue, true)
-
-/**
- * @brief Peek at the next highest-priority task in the wait queue without removing it.
- *
- * Affinity check is disabled. This is typically used for monitoring or diagnostics.
- *
- * @param pWaitQueue Pointer to the wait task queue.
- * @return Task control block (TCB) pointer of the next waiting task.
- */
-#define TASK_PEEK_FROM_WAIT_QUEUE(pWaitQueue) taskQueuePeek(pWaitQueue, false)
-
-    /*Forward declaration of taskHandleType*/
+    /**
+     * @brief Forward declaration of taskHandleType.
+     */
     typedef struct taskHandle taskHandleType;
 
-    /**
-     * @brief Node structure for linked list of tasks in a task queue.
-     */
-    typedef struct taskNode
-    {
-        taskHandleType *pTask;         ///< Pointer to the task represented by this node.
-        struct taskNode *nextTaskNode; ///< Pointer to the next node in the task queue.
-    } taskNodeType;
     /**
      * @brief Task queue structure used to manage a list of tasks (e.g., for ready, waiting, or blocked states).
      */
     typedef struct
     {
-        taskNodeType *head; ///< Pointer to the head of the task queue linked list.
+        taskHandleType *head; ///< Pointer to the head of the task queue linked list.
     } taskQueueType;
 
     /**
-     * @brief Get and remove the next eligible task from queue.
-     *
-     * @param pTaskQueue Pointer to task queue.
-     * @param affinityCheck `true` to enforce core-affinity filtering.
-     * @return Task handle pointer, or `NULL` if none available.
+     * @brief Intrusive doubly linked queue link stored inside each task.
      */
-    taskHandleType *taskQueueGet(taskQueueType *pTaskQueue, bool affinityCheck);
+    typedef struct
+    {
+        taskHandleType *pPrevTask;  ///< Previous task in the queue.
+        taskHandleType *pNextTask;  ///< Next task in the queue.
+        taskQueueType *pOwnerQueue; ///< Queue currently owning this link, or NULL if detached.
+    } taskQueueLinkType;
+
+#define TASK_STATE_QUEUE_INITIALIZER \
+    {                                \
+        .head = NULL}
+
+#define TASK_WAIT_QUEUE_INITIALIZER \
+    {                               \
+        .head = NULL}
 
     /**
-     * @brief Peek next eligible task from queue without removing it.
+     * @brief Get the global ready queue.
      *
-     * @param pTaskQueue Pointer to task queue.
-     * @param affinityCheck `true` to enforce core-affinity filtering.
-     * @return Task handle pointer, or `NULL` if none available.
+     * @return Pointer to the scheduler ready queue.
      */
-    taskHandleType *taskQueuePeek(taskQueueType *pTaskQueue, bool affinityCheck);
+    taskQueueType *readyQueue(void);
 
     /**
-     * @brief Add a task to queue sorted by priority.
+     * @brief Get the global blocked queue.
      *
-     * @param pTaskQueue Pointer to task queue.
+     * @return Pointer to the scheduler blocked queue.
+     */
+    taskQueueType *blockedQueue(void);
+
+    /**
+     * @brief Pop the next eligible task from a ready queue.
+     *
+     * @return Task handle pointer, or `NULL` if none available.
+     */
+    taskHandleType *readyQueuePop(void);
+
+    /**
+     * @brief Pop the next task from an object wait queue.
+     *
+     * @param pWaitQueue Pointer to wait queue.
+     * @return Task handle pointer, or `NULL` if none available.
+     */
+    taskHandleType *waitQueuePop(taskQueueType *pWaitQueue);
+
+    /**
+     * @brief Peek next eligible task from a ready queue without removing it.
+     *
+     * @return Task handle pointer, or `NULL` if none available.
+     */
+    taskHandleType *readyQueuePeek(void);
+
+    /**
+     * @brief Peek next task from an object wait queue without removing it.
+     *
+     * @param pWaitQueue Pointer to wait queue.
+     * @return Task handle pointer, or `NULL` if none available.
+     */
+    taskHandleType *waitQueuePeek(taskQueueType *pWaitQueue);
+
+    /**
+     * @brief Add a task to a ready queue sorted by priority.
+     *
      * @param pTask Pointer to task handle.
      * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    int taskQueueAdd(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    int readyQueueAdd(taskHandleType *pTask);
 
     /**
-     * @brief Add a task to the front of queue.
+     * @brief Add a task to the blocked queue.
      *
-     * @param pTaskQueue Pointer to task queue.
+     * Blocked tasks are inserted at the front because the blocked queue is not
+     * priority-sorted.
+     *
      * @param pTask Pointer to task handle.
      * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    int taskQueueAddToFront(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    int blockedQueueAdd(taskHandleType *pTask);
 
     /**
-     * @brief Remove a specific task from queue.
+     * @brief Add a task to a wait queue sorted by priority.
      *
-     * @param pTaskQueue Pointer to task queue.
+     * @param pWaitQueue Pointer to wait queue.
+     * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, error code otherwise.
+     */
+    int waitQueueAdd(taskQueueType *pWaitQueue, taskHandleType *pTask);
+
+    /**
+     * @brief Remove a specific task from a wait queue.
+     *
+     * @param pWaitQueue Pointer to wait queue.
      * @param pTask Pointer to task handle.
      * @return `RET_SUCCESS` on success, `RET_NOTASK` if not found, error code otherwise.
      */
-    int taskQueueRemove(taskQueueType *pTaskQueue, taskHandleType *pTask);
+    int waitQueueRemove(taskQueueType *pWaitQueue, taskHandleType *pTask);
+
+    /**
+     * @brief Detach a task from the ready queue.
+     *
+     * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, `RET_NOTASK` if not queued, error code otherwise.
+     */
+    int readyQueueDetach(taskHandleType *pTask);
+
+    /**
+     * @brief Detach a task from the blocked queue.
+     *
+     * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, `RET_NOTASK` if not queued, error code otherwise.
+     */
+    int blockedQueueDetach(taskHandleType *pTask);
+
+    /**
+     * @brief Detach a task from whichever wait queue currently owns its wait link.
+     *
+     * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, `RET_NOTASK` if not queued, error code otherwise.
+     */
+    int waitQueueDetach(taskHandleType *pTask);
+
+    /**
+     * @brief Get the next task in a state queue.
+     *
+     * @param pStateQueue Pointer to state queue.
+     * @param pTask Current task in the queue.
+     * @return Next task handle pointer, or `NULL` if this was the last task or arguments are invalid.
+     */
+    taskHandleType *stateQueueNext(taskQueueType *pStateQueue, taskHandleType *pTask);
+
+    /**
+     * @brief Get the next task in a wait queue.
+     *
+     * @param pWaitQueue Pointer to wait queue.
+     * @param pTask Current task in the queue.
+     * @return Next task handle pointer, or `NULL` if this was the last task or arguments are invalid.
+     */
+    taskHandleType *waitQueueNext(taskQueueType *pWaitQueue, taskHandleType *pTask);
 
     /**
      * @brief Check whether taskQueue is empty.

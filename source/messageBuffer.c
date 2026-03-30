@@ -201,7 +201,7 @@ retry:
             taskHandleType *currentTask = taskGetCurrent();
             bool irqState = spinLock(&pStreamBuffer->lock);
 
-            retCode = taskQueueAdd(&pStreamBuffer->producerWaitQueue, currentTask);
+            retCode = waitQueueAdd(&pStreamBuffer->producerWaitQueue, currentTask);
             if (retCode != RET_SUCCESS)
             {
                 spinUnlock(&pStreamBuffer->lock, irqState);
@@ -210,11 +210,11 @@ retry:
 
             spinUnlock(&pStreamBuffer->lock, irqState);
 
-            retCode = taskBlock(currentTask, WAIT_FOR_STREAM_BUFFER_SPACE, waitTicks);
+            retCode = taskBlock(WAIT_FOR_STREAM_BUFFER_SPACE, waitTicks);
             if (retCode != RET_SUCCESS)
             {
                 irqState = spinLock(&pStreamBuffer->lock);
-                (void)taskQueueRemove(&pStreamBuffer->producerWaitQueue, currentTask);
+                (void)waitQueueRemove(&pStreamBuffer->producerWaitQueue, currentTask);
                 spinUnlock(&pStreamBuffer->lock, irqState);
                 return retCode;
             }
@@ -226,7 +226,7 @@ retry:
             else if (currentTask->wakeupReason == WAIT_TIMEOUT)
             {
                 irqState = spinLock(&pStreamBuffer->lock);
-                retCode = taskQueueRemove(&pStreamBuffer->producerWaitQueue, currentTask);
+                retCode = waitQueueRemove(&pStreamBuffer->producerWaitQueue, currentTask);
                 spinUnlock(&pStreamBuffer->lock, irqState);
 
                 if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
@@ -276,7 +276,7 @@ retry:
             taskHandleType *currentTask = taskGetCurrent();
             bool irqState = spinLock(&pStreamBuffer->lock);
 
-            retCode = taskQueueAdd(&pStreamBuffer->consumerWaitQueue, currentTask);
+            retCode = waitQueueAdd(&pStreamBuffer->consumerWaitQueue, currentTask);
             if (retCode != RET_SUCCESS)
             {
                 spinUnlock(&pStreamBuffer->lock, irqState);
@@ -285,11 +285,11 @@ retry:
 
             spinUnlock(&pStreamBuffer->lock, irqState);
 
-            retCode = taskBlock(currentTask, WAIT_FOR_STREAM_BUFFER_DATA, waitTicks);
+            retCode = taskBlock(WAIT_FOR_STREAM_BUFFER_DATA, waitTicks);
             if (retCode != RET_SUCCESS)
             {
                 irqState = spinLock(&pStreamBuffer->lock);
-                (void)taskQueueRemove(&pStreamBuffer->consumerWaitQueue, currentTask);
+                (void)waitQueueRemove(&pStreamBuffer->consumerWaitQueue, currentTask);
                 spinUnlock(&pStreamBuffer->lock, irqState);
                 return retCode;
             }
@@ -301,7 +301,7 @@ retry:
             else if (currentTask->wakeupReason == WAIT_TIMEOUT)
             {
                 irqState = spinLock(&pStreamBuffer->lock);
-                retCode = taskQueueRemove(&pStreamBuffer->consumerWaitQueue, currentTask);
+                retCode = waitQueueRemove(&pStreamBuffer->consumerWaitQueue, currentTask);
                 spinUnlock(&pStreamBuffer->lock, irqState);
 
                 if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))

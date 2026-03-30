@@ -119,10 +119,10 @@ static int memSlabWakeWaitingTask(memSlabHandleType *pMemSlab, bool *pContextSwi
     taskHandleType *pTask = NULL;
 
 getNextWaitingTask:
-    pTask = TASK_GET_FROM_WAIT_QUEUE(&pMemSlab->waitQueue);
+    pTask = waitQueuePop(&pMemSlab->waitQueue);
     if (pTask != NULL)
     {
-        if ((pTask->status != TASK_STATUS_BLOCKED) ||
+        if ((pTask->state != TASK_STATE_BLOCKED) ||
             (pTask->blockedReason != WAIT_FOR_MEM_SLAB))
         {
             goto getNextWaitingTask;
@@ -183,7 +183,7 @@ retry:
     {
         taskHandleType *currentTask = taskGetCurrent();
 
-        retCode = taskQueueAdd(&pMemSlab->waitQueue, currentTask);
+        retCode = waitQueueAdd(&pMemSlab->waitQueue, currentTask);
         if (retCode != RET_SUCCESS)
         {
             spinUnlock(&pMemSlab->lock, irqState);
@@ -192,11 +192,11 @@ retry:
 
         spinUnlock(&pMemSlab->lock, irqState);
 
-        retCode = taskBlock(currentTask, WAIT_FOR_MEM_SLAB, waitTicks);
+        retCode = taskBlock(WAIT_FOR_MEM_SLAB, waitTicks);
         if (retCode != RET_SUCCESS)
         {
             irqState = spinLock(&pMemSlab->lock);
-            (void)taskQueueRemove(&pMemSlab->waitQueue, currentTask);
+            (void)waitQueueRemove(&pMemSlab->waitQueue, currentTask);
             spinUnlock(&pMemSlab->lock, irqState);
             return retCode;
         }
@@ -208,7 +208,7 @@ retry:
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
             irqState = spinLock(&pMemSlab->lock);
-            retCode = taskQueueRemove(&pMemSlab->waitQueue, currentTask);
+            retCode = waitQueueRemove(&pMemSlab->waitQueue, currentTask);
             spinUnlock(&pMemSlab->lock, irqState);
 
             if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))

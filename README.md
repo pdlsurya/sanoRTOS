@@ -27,6 +27,25 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - **Minimalistic and Lightweight Design**  
   Designed for embedded systems with limited resources — small footprint, fast context switches, and no unnecessary bloat.
 
+## Kernel Internals
+
+- **Intrusive Task Queues**
+  Ready, blocked, and object wait queues are implemented as intrusive doubly linked lists. Each task embeds one link for state queues and one link for kernel-object wait queues, which keeps arbitrary unlink operations O(1).
+
+- **Global vs Object Queue APIs**
+  The scheduler exposes singleton ready and blocked queues through the task-queue layer, so ready/blocked operations do not require callers to pass queue pointers. State-queue helpers are explicit about whether they target the ready or blocked queue. Object-owned wait queues still take explicit queue arguments because each kernel object maintains its own waiter list.
+
+- **Kernel Objects Still Own Wait Queues**
+  Semaphores, mutexes, events, mailboxes, message queues, stream buffers, message buffers, condition variables, and memory slabs still keep wait queues in their object state. The queue stores only a head anchor; the task carries the links.
+
+- **Current-Task Blocking API**
+  `taskBlock()` now blocks only the currently running task and resolves that task internally. That keeps wait-object call sites focused on the blocking reason and timeout rather than passing the current task back into the task layer.
+
+- **Software Timers Use O(1) Unlink**
+  Active software timers are tracked in a doubly linked list so `timerStop()` can remove a running timer directly without scanning from the head of the timer list.
+
+- **Timeout Handler Slab**
+  Timeout handler dispatch still uses the timer timeout-handler slab controlled by `CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS`.
 
 ## API Reference
 
@@ -53,7 +72,7 @@ The detailed API reference, including example code for each kernel object, lives
      
 6. Edit **stm32xxxx_it.c** file:
    - STM32 initializes the SysTick timer during its clock initialization process and defines the `SysTick_Handler` ISR function for the implementation of the delay function in the 
-   **Core > Src > stm32xxxx_it.c** file. Hence, the `SysTick_Handler` ISR function cannot be redefined inside the sanoRTOS. Instead, we need to call the function `osSysTick_Handler` from the `SysTick_Handler` ISR function.
+   **Core > Src > stm32xxxx_it.c** file. Hence, the `SysTick_Handler` ISR function cannot be redefined inside the sanoRTOS. Instead, call `sanoRTOS_SysTickHook()` from the SDK's `SysTick_Handler()` implementation.
     
    - Moreover, **sanoRTOS** includes definition for `PendSV_Handler` used for task scheduling and context switching. STM32 also
    defines this ISR in **stm32xxxx_it.c** file; Hence, we need to remove the definition of this ISR from the **stm32xxxx_it.c** file to avoid multiple definition error.

@@ -47,7 +47,7 @@ extern "C"
     mutexHandleType _name = {       \
         .name = #_name,             \
         .lock = 0,                  \
-        .waitQueue = {0},           \
+        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .ownerTask = NULL,          \
         .ownerDefaultPriority = -1, \
         .locked = false}
