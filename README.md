@@ -30,7 +30,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 ## Kernel Internals
 
 - **Intrusive Task Queues**
-  Ready, blocked, and object wait queues are implemented as intrusive doubly linked lists. Each task embeds one link for state queues and one link for kernel-object wait queues, which keeps arbitrary unlink operations O(1).
+  Ready, blocked, timeout, and object wait queues are implemented as intrusive doubly linked lists. Each task embeds one link for state queues, one for kernel-object wait queues, and one for the global timeout queue, which keeps arbitrary unlink operations O(1).
 
 - **Global vs Object Queue APIs**
   The scheduler exposes singleton ready and blocked queues through the task-queue layer, so ready/blocked operations do not require callers to pass queue pointers. State-queue helpers are explicit about whether they target the ready or blocked queue. Object-owned wait queues still take explicit queue arguments because each kernel object maintains its own waiter list.
@@ -39,7 +39,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
   Semaphores, mutexes, events, mailboxes, message queues, stream buffers, message buffers, condition variables, and memory slabs still keep wait queues in their object state. The queue stores only a head anchor; the task carries the links.
 
 - **Current-Task Blocking API**
-  `taskBlock()` now blocks only the currently running task and resolves that task internally. That keeps wait-object call sites focused on the blocking reason and timeout rather than passing the current task back into the task layer.
+  `taskBlock()` now blocks only the currently running task and resolves that task internally. That keeps wait-object call sites focused on the blocking reason and timeout rather than passing the current task back into the task layer. Finite waits are inserted into a global timeout queue ordered by absolute deadline, while `TASK_FOREVER_WAIT` blocks without consuming a timeout-queue slot. The scheduler owns the monotonic system tick count used to evaluate those deadlines.
 
 - **Software Timers Use O(1) Unlink**
   Active software timers are tracked in a doubly linked list so `timerStop()` can remove a running timer directly without scanning from the head of the timer list.

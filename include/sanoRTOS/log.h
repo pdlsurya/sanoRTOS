@@ -34,11 +34,11 @@
 #define LOG_MODULE_DEFINE(module_name) static const char *const tag __attribute__((unused)) = #module_name
 
 #if CONFIG_LOG_COLOR
-// ANSI escape prefix
+/* ANSI escape prefix */
 #define ANSI_ESC "\x1b["
-// Reset
+/* Reset */
 #define ANSI_RESET ANSI_ESC "0m"
-// Regular colors
+/* Regular colors */
 #define ANSI_BLACK ANSI_ESC "30m"
 #define ANSI_RED ANSI_ESC "31m"
 #define ANSI_GREEN ANSI_ESC "32m"
@@ -47,7 +47,7 @@
 #define ANSI_MAGENTA ANSI_ESC "35m"
 #define ANSI_CYAN ANSI_ESC "36m"
 #define ANSI_WHITE ANSI_ESC "37m"
-// Bright versions
+/* Bright versions */
 #define ANSI_BRIGHT_BLACK ANSI_ESC "90m"
 #define ANSI_BRIGHT_RED ANSI_ESC "91m"
 #define ANSI_BRIGHT_GREEN ANSI_ESC "92m"
@@ -56,7 +56,7 @@
 #define ANSI_BRIGHT_MAGENTA ANSI_ESC "95m"
 #define ANSI_BRIGHT_CYAN ANSI_ESC "96m"
 #define ANSI_BRIGHT_WHITE ANSI_ESC "97m"
-// Bold (optional)
+/* Bold (optional) */
 #define ANSI_BOLD ANSI_ESC "1m"
 
 #else
@@ -120,14 +120,12 @@
 #define LOG_DEBUG(fmt, ...)
 #endif
 
-#else // CONFIG_LOG not defined
-
+#else /* CONFIG_LOG not defined */
 #define LOG_PRINT(fmt, ...)
 #define LOG_INFO(fmt, ...)
 #define LOG_WARNING(fmt, ...)
 #define LOG_ERROR(fmt, ...)
 #define LOG_DEBUG(fmt, ...)
 
-#endif // CONFIG_LOG
-
-#endif // __SANORTOS_LOG_H
+#endif /* CONFIG_LOG */
+#endif /* __SANORTOS_LOG_H */

@@ -62,8 +62,7 @@ extern "C"
         .nextNode = NULL,                                \
         .prevNode = NULL}
 
-    typedef void (*timeoutHandlerType)(void *pArg); // Timeout handler function type definition
-
+    typedef void (*timeoutHandlerType)(void *pArg); /* Timeout handler function type definition */
     /**
      * @brief Structure representing a timer node in the system timer list.
      */

@@ -55,7 +55,7 @@ extern "C"
     {
         taskHandleType *pPrevTask;  ///< Previous task in the queue.
         taskHandleType *pNextTask;  ///< Next task in the queue.
-        taskQueueType *pOwnerQueue; ///< Queue currently owning this link, or NULL if detached.
+        taskQueueType *pOwnerQueue; ///< Queue currently owning this link, or NULL if not queued.
     } taskQueueLinkType;
 
 #define TASK_STATE_QUEUE_INITIALIZER \
@@ -64,6 +64,10 @@ extern "C"
 
 #define TASK_WAIT_QUEUE_INITIALIZER \
     {                               \
+        .head = NULL}
+
+#define TASK_TIMEOUT_QUEUE_INITIALIZER \
+    {                                  \
         .head = NULL}
 
     /**
@@ -79,6 +83,13 @@ extern "C"
      * @return Pointer to the scheduler blocked queue.
      */
     taskQueueType *blockedQueue(void);
+
+    /**
+     * @brief Get the global timeout queue.
+     *
+     * @return Pointer to the scheduler timeout queue.
+     */
+    taskQueueType *timeoutQueue(void);
 
     /**
      * @brief Pop the next eligible task from a ready queue.
@@ -139,37 +150,44 @@ extern "C"
     int waitQueueAdd(taskQueueType *pWaitQueue, taskHandleType *pTask);
 
     /**
-     * @brief Remove a specific task from a wait queue.
+     * @brief Add a task to the timeout queue sorted by absolute deadline.
      *
-     * @param pWaitQueue Pointer to wait queue.
      * @param pTask Pointer to task handle.
-     * @return `RET_SUCCESS` on success, `RET_NOTASK` if not found, error code otherwise.
+     * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    int waitQueueRemove(taskQueueType *pWaitQueue, taskHandleType *pTask);
+    int timeoutQueueAdd(taskHandleType *pTask);
 
     /**
-     * @brief Detach a task from the ready queue.
+     * @brief Remove a task from the ready queue.
      *
      * @param pTask Pointer to task handle.
      * @return `RET_SUCCESS` on success, `RET_NOTASK` if not queued, error code otherwise.
      */
-    int readyQueueDetach(taskHandleType *pTask);
+    int readyQueueRemove(taskHandleType *pTask);
 
     /**
-     * @brief Detach a task from the blocked queue.
+     * @brief Remove a task from the blocked queue.
      *
      * @param pTask Pointer to task handle.
      * @return `RET_SUCCESS` on success, `RET_NOTASK` if not queued, error code otherwise.
      */
-    int blockedQueueDetach(taskHandleType *pTask);
+    int blockedQueueRemove(taskHandleType *pTask);
 
     /**
-     * @brief Detach a task from whichever wait queue currently owns its wait link.
+     * @brief Remove a task from whichever wait queue currently owns its wait link.
      *
      * @param pTask Pointer to task handle.
      * @return `RET_SUCCESS` on success, `RET_NOTASK` if not queued, error code otherwise.
      */
-    int waitQueueDetach(taskHandleType *pTask);
+    int waitQueueRemove(taskHandleType *pTask);
+
+    /**
+     * @brief Remove a task from the timeout queue.
+     *
+     * @param pTask Pointer to task handle.
+     * @return `RET_SUCCESS` on success, `RET_NOTASK` if not queued, error code otherwise.
+     */
+    int timeoutQueueRemove(taskHandleType *pTask);
 
     /**
      * @brief Get the next task in a state queue.
@@ -188,6 +206,13 @@ extern "C"
      * @return Next task handle pointer, or `NULL` if this was the last task or arguments are invalid.
      */
     taskHandleType *waitQueueNext(taskQueueType *pWaitQueue, taskHandleType *pTask);
+
+    /**
+     * @brief Peek the next task due in the timeout queue.
+     *
+     * @return Task handle pointer, or `NULL` if none available.
+     */
+    taskHandleType *timeoutQueuePeek(void);
 
     /**
      * @brief Check whether taskQueue is empty.

@@ -46,7 +46,7 @@ void idleTaskHandler1(void *params)
     while (1)
     {
         taskCleanupExited();
-        // PORT_ENTER_SLEEP_MODE();
+        /* PORT_ENTER_SLEEP_MODE(); */
     }
 }
 #endif

@@ -37,6 +37,7 @@ LOG_MODULE_DEFINE(scheduler);
 TASK_DEFINE(idleTask0, 1024, idleTaskHandler0, NULL, TASK_LOWEST_PRIORITY, AFFINITY_CORE_0);
 
 static atomic_t lock;
+static volatile uint32_t systemTickCount;
 
 void idleTaskHandler0(void *params)
 {
@@ -44,8 +45,8 @@ void idleTaskHandler0(void *params)
     while (1)
     {
         taskCleanupExited();
-        // Enter sleep mode
-        // PORT_ENTER_SLEEP_MODE();
+        /* Enter sleep mode */
+        /* PORT_ENTER_SLEEP_MODE(); */
     }
 }
 
@@ -57,13 +58,13 @@ static int selectNextTask(void)
     taskCheckStackOverflow();
 #endif
 
-    // If the current task is running, add it to the ready queue
+    /* If the current task is running, add it to the ready queue */
     if (pCurrentTask->state == TASK_STATE_RUNNING)
     {
         taskHandleType *pNextReadyTask = readyQueuePeek();
 
-        //If next ready task exists and has an equal or higher priority than current task,
-        // add the current task to the ready queue.
+        /* If next ready task exists and has an equal or higher priority than current task, */
+        /* add the current task to the ready queue. */
         if (pNextReadyTask != NULL && pNextReadyTask->priority <= pCurrentTask->priority)
         {
             pCurrentTask->state = TASK_STATE_READY;
@@ -75,58 +76,27 @@ static int selectNextTask(void)
         }
         else
         {
-            return RET_NOTASK; // No need to switch to a lower priority task
+            return RET_NOTASK; /* No need to switch to a lower priority task */
         }
     }
 
-    // Set the current task to the next ready task
+    /* Set the current task to the next ready task */
     currentTask[PORT_CORE_ID()] = pCurrentTask;
 
-    // Get the next task from the ready queue
+    /* Get the next task from the ready queue */
     nextTask[PORT_CORE_ID()] = readyQueuePop();
     if (nextTask[PORT_CORE_ID()] == NULL)
     {
         return RET_NOTASK;
     }
 
-    // Set the next task state to RUNNING
+    /* Set the next task state to RUNNING */
     nextTask[PORT_CORE_ID()]->state = TASK_STATE_RUNNING;
 
-    // Set the current task to the next task
+    /* Set the current task to the next task */
     taskSetCurrent(nextTask[PORT_CORE_ID()]);
 
     return RET_SUCCESS;
-}
-
-static void checkTimeout()
-{
-    taskQueueType *pBlockedQueue = blockedQueue();
-
-    /* Iterate over each task in the blocked queue */
-    taskHandleType *currentTask = pBlockedQueue->head;
-
-    while (currentTask != NULL)
-    {
-        /* Save the next task before a timeout path potentially detaches the current one. */
-        taskHandleType *nextTask = stateQueueNext(pBlockedQueue, currentTask);
-
-        if (currentTask->remainingSleepTicks > 0)
-        {
-            currentTask->remainingSleepTicks--;
-            if (currentTask->remainingSleepTicks == 0)
-            {
-                if (currentTask->blockedReason == SLEEP)
-                {
-                    (void)taskSetReady(currentTask, SLEEP_TIME_TIMEOUT);
-                }
-                else
-                {
-                    (void)taskSetReady(currentTask, WAIT_TIMEOUT);
-                }
-            }
-        }
-        currentTask = nextTask;
-    }
 }
 
 void taskYield()
@@ -155,6 +125,11 @@ void taskYield()
     spinUnlock(&lock, irqState);
 }
 
+uint32_t schedulerGetTickCount(void)
+{
+    return systemTickCount;
+}
+
 void tickHandler()
 {
 
@@ -167,14 +142,8 @@ void tickHandler()
     {
         /*Check for timer timeout*/
         processTimers();
-
-        taskQueueType *pBlockedQueue = blockedQueue();
-
-        /*Check for wait timeout of blocked tasks*/
-        if (!taskQueueEmpty(pBlockedQueue))
-        {
-            checkTimeout();
-        }
+        systemTickCount++;
+        taskProcessExpiredTimeouts(systemTickCount);
     }
 
     /*Perform context switch if required*/

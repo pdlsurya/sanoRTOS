@@ -40,8 +40,9 @@ extern "C"
 #define TASK_LOWEST_PRIORITY 0xff
 #define TASK_HIGHEST_PRIORITY 0
 
-#define TASK_NO_WAIT 0
-#define TASK_MAX_WAIT 0xffffffffUL
+#define TASK_NO_WAIT 0U
+#define TASK_FOREVER_WAIT 0xFFFFFFFFUL
+#define TASK_MAX_WAIT TASK_FOREVER_WAIT
 
 #define STACK_GUARD_WORDS 8
 
@@ -92,7 +93,7 @@ extern "C"
         .coreAffinity = affinity,                                                                                 \
         .entry = taskEntryFunction,                                                                               \
         .params = taskParams,                                                                                     \
-        .remainingSleepTicks = 0,                                                                                 \
+        .deadlineTick = 0,                                                                                        \
         .state = TASK_STATE_READY,                                                                                \
         .blockedReason = BLOCK_REASON_NONE,                                                                       \
         .wakeupReason = WAKEUP_REASON_NONE}
@@ -211,7 +212,7 @@ extern "C"
         const char *name;                  ///< Human-readable name of the task (for debugging or logging).
         void *params;                      ///< Pointer to parameters passed to the task function.
         taskFunctionType entry;            ///< Function pointer to the task's entry function.
-        uint32_t remainingSleepTicks;      ///< Number of ticks remaining for which the task is sleeping or being blocked.
+        uint32_t deadlineTick;             ///< Absolute RTOS tick when the task timeout expires, if any.
         taskStateType state;               ///< Current lifecycle state of the task (e.g., running, ready, blocked).
         blockedReasonType blockedReason;   ///< Reason the task is blocked (e.g., waiting for mutex/semaphore,sleeping).
         wakeupReasonType wakeupReason;     ///< Reason the task was woken up (e.g., timeout, signal).
@@ -219,6 +220,7 @@ extern "C"
         uint8_t priority;                  ///< Priority level of the task (lower value indicate higher priority).
         taskQueueLinkType stateQueueLink;  ///< Intrusive queue link used by ready and blocked state queues.
         taskQueueLinkType waitQueueLink;   ///< Intrusive queue link used by kernel-object wait queues.
+        taskQueueLinkType timeoutQueueLink; ///< Intrusive queue link used by the global timeout queue.
         taskEventStateType eventState;     ///< Event wait state used by the event kernel object.
         taskMailboxStateType mailboxState; ///< Mailbox wait state used by the mailbox kernel object.
         taskNotificationType notification; ///< Direct task notification state stored in the task itself.
@@ -231,6 +233,9 @@ extern "C"
 
         /*Queue of tasks in blocked state*/
         taskQueueType blockedQueue;
+
+        /*Queue of blocked tasks with finite timeout deadlines*/
+        taskQueueType timeoutQueue;
 
         /*Currently running task*/
         taskHandleType *currentTask[PORT_CORE_COUNT];
@@ -254,7 +259,7 @@ extern "C"
      * @brief Block the current task with a reason and timeout.
      *
      * @param blockedReason Reason why the current task is blocked.
-     * @param ticks Ticks to remain blocked.
+     * @param ticks Ticks to remain blocked, or `TASK_FOREVER_WAIT` to block without a timeout.
      * @return `RET_SUCCESS` on success, error code otherwise.
      */
     int taskBlock(blockedReasonType blockedReason, uint32_t ticks);
@@ -372,6 +377,15 @@ extern "C"
      * Internal scheduler/idle path API.
      */
     void taskCleanupExited();
+
+    /**
+     * @brief Wake blocked tasks whose timeout deadlines have expired.
+     *
+     * Internal scheduler path API. Called once per RTOS tick with the current scheduler tick count.
+     *
+     * @param currentTick Current monotonic RTOS tick count.
+     */
+    void taskProcessExpiredTimeouts(uint32_t currentTick);
 
     /**
      * @brief Check current task stack-overflow guard using the lowest known saved/live stack pointer.

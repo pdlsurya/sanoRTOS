@@ -64,4 +64,4 @@ extern "C"
 }
 #endif
 
-#endif // __SANO_RTOS_MEM_HEAP_H
+#endif /* __SANO_RTOS_MEM_HEAP_H */

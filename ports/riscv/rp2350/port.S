@@ -145,14 +145,13 @@
 
 .macro clear_msip
 
-    csrr t0, mhartid             // Get current core number into a0
+    csrr t0, mhartid             /* Get current core number into a0 */
     li   t1, 1
-    addi t0, t0, 8               // Shift by 8 for core 0, 9 for core 1
-    sll  t1, t1, t0              // t1 = 1 << (mhartid + 8)
-
+    addi t0, t0, 8               /* Shift by 8 for core 0, 9 for core 1 */
+    sll  t1, t1, t0              /* t1 = 1 << (mhartid + 8) */
     li t2, (SIO_BASE+SIO_RISCV_SOFTIRQ_OFFSET)
 
-    sw   t1, 0(t2)                // Write to soft IRQ register
+    sw   t1, 0(t2)                /* Write to soft IRQ register */
 .endm
 
 .section .time_critical
@@ -170,21 +169,18 @@ isr_riscv_machine_soft_irq:
     clear_msip
 
     /* Read hart ID (CPU ID) into t2 */
-    csrr t2, mhartid       // t2 = hart ID (0 or 1)
-
+    csrr t2, mhartid       /* t2 = hart ID (0 or 1) */
     /* Save current task's stack pointer */
-    la t0, currentTask     // t0 = &currentTask
-    slli t3, t2, 2         // t3 = t2 * 4 (assuming 32-bit pointers)
-    add t0, t0, t3         // t0 = &currentTask[hartid]
-    lw t1, 0(t0)           // t1 = currentTask[hartid]
-    sw sp, 0(t1)           // Save SP to currentTask[hartid]->sp
-
+    la t0, currentTask     /* t0 = &currentTask */
+    slli t3, t2, 2         /* t3 = t2 * 4 (assuming 32-bit pointers) */
+    add t0, t0, t3         /* t0 = &currentTask[hartid] */
+    lw t1, 0(t0)           /* t1 = currentTask[hartid] */
+    sw sp, 0(t1)           /* Save SP to currentTask[hartid]->sp */
     /* Load next task's stack pointer */
-    la t0, nextTask        // t0 = &nextTask
-    add t0, t0, t3         // t0 = &nextTask[hartid]
-    lw t1, 0(t0)           // t1 = nextTask[hartid]
-    lw sp, 0(t1)           // Load SP from nextTask[hartid]->sp
-
+    la t0, nextTask        /* t0 = &nextTask */
+    add t0, t0, t3         /* t0 = &nextTask[hartid] */
+    lw t1, 0(t0)           /* t1 = nextTask[hartid] */
+    lw sp, 0(t1)           /* Load SP from nextTask[hartid]->sp */
     restore_mepc
     restore_general_regs
     

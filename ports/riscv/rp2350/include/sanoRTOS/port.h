@@ -252,13 +252,13 @@ extern "C"
 
         /* Based on sample code for CAS from RISCV specs v2.2, atomic instructions */
         __asm__ __volatile__(
-            "1: lr.w %0, 0(%2)     \n"   // load 4 bytes from addr (%2) into old_value (%0)
-            "     bne  %0, %3, 2f  \n"   // fail if old_value if not equal to compare_value (%3)
-            "     sc.w %1, %4, 0(%2) \n" // store new_value (%4) into addr,
-            "     bnez %1, 1b      \n"   // if we failed to store the new value then retry the operation
+            "1: lr.w %0, 0(%2)     \n"   /* load 4 bytes from addr (%2) into old_value (%0) */
+            "     bne  %0, %3, 2f  \n"   /* fail if old_value if not equal to compare_value (%3) */
+            "     sc.w %1, %4, 0(%2) \n" /* store new_value (%4) into addr, */
+            "     bnez %1, 1b      \n"   /* if we failed to store the new value then retry the operation */
             "2:                   \n"
-            : "=&r"(old_val), "=&r"(error)                        // output parameters
-            : "r"(ptr), "r"(compare_val), "r"(set_val) : "memory" // input parameters
+            : "=&r"(old_val), "=&r"(error)                        /* output parameters */
+            : "r"(ptr), "r"(compare_val), "r"(set_val) : "memory" /* input parameters */
         );
         PORT_MEM_FENCE();
 

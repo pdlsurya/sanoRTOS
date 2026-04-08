@@ -246,15 +246,14 @@ m_software_interrupt_handler:
    1: clear_msip
 
     /* Read hart ID (CPU ID) into t2 */
-    csrr t2, mhartid       // t2 = hart ID (0 or 1)
-
+    csrr t2, mhartid       /* t2 = hart ID (0 or 1) */
     /* Save current task's stack pointer */
-    la t0, currentTask     // t0 = &currentTask
-    slli t3, t2, 2         // t3 = t2 * 4 (assuming 32-bit pointers)
-    add t0, t0, t3         // t0 = &currentTask[hartid]
-    lw t1, 0(t0)           // t1 = currentTask[hartid]
-    sw sp, 0(t1)           // Save SP to currentTask[hartid]->sp
-    lw t0, 4(t1)           // currentTask flags
+    la t0, currentTask     /* t0 = &currentTask */
+    slli t3, t2, 2         /* t3 = t2 * 4 (assuming 32-bit pointers) */
+    add t0, t0, t3         /* t0 = &currentTask[hartid] */
+    lw t1, 0(t0)           /* t1 = currentTask[hartid] */
+    sw sp, 0(t1)           /* Save SP to currentTask[hartid]->sp */
+    lw t0, 4(t1)           /* currentTask flags */
     beq x0, t4, 2f
     ori t0, t0, TASK_FLAG_FPU_USED
     j 3f
@@ -263,10 +262,10 @@ m_software_interrupt_handler:
   3:sw t0, 4(t1)
 
     /* Load next task's stack pointer */
-    la t0, nextTask        // t0 = &nextTask
-    add t0, t0, t3         // t0 = &nextTask[hartid]
-    lw t1, 0(t0)           // t1 = nextTask[hartid]
-    lw sp, 0(t1)           // Load SP from nextTask[hartid]->sp
+    la t0, nextTask        /* t0 = &nextTask */
+    add t0, t0, t3         /* t0 = &nextTask[hartid] */
+    lw t1, 0(t0)           /* t1 = nextTask[hartid] */
+    lw sp, 0(t1)           /* Load SP from nextTask[hartid]->sp */
     lw t0, 4(t1)
     andi t4, t0, TASK_FLAG_FPU_USED
 

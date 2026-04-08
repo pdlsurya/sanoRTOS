@@ -71,7 +71,7 @@ extern "C"
      * This API must not be called from ISR context.
      *
      * @param pCondVar Pointer to condition variable handle.
-     * @param waitTicks Maximum ticks to wait (`TASK_MAX_WAIT` for infinite wait).
+     * @param waitTicks Maximum ticks to wait (`TASK_FOREVER_WAIT` for infinite wait).
      * @return `RET_SUCCESS` if signaled, `RET_TIMEOUT` on timeout, `RET_INVAL` if called
      *         from ISR context or arguments are invalid, error code otherwise.
      */

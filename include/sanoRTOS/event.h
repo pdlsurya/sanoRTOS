@@ -95,7 +95,7 @@ extern "C"
      * @param events Bit mask to wait for.
      * @param clearOnExit If `true`, clear the matched bits before returning successfully.
      * @param pMatchedEvents Output pointer receiving the matching bits.
-     * @param waitTicks Maximum ticks to wait (`TASK_MAX_WAIT` for infinite wait).
+     * @param waitTicks Maximum ticks to wait (`TASK_FOREVER_WAIT` for infinite wait).
      * @return `RET_SUCCESS` if any requested bit matched, `RET_TIMEOUT` on timeout,
      *         `RET_BUSY` if `waitTicks` is `TASK_NO_WAIT` and no bits matched, error code otherwise.
      */
@@ -109,7 +109,7 @@ extern "C"
      * @param events Bit mask to wait for.
      * @param clearOnExit If `true`, clear the matched bits before returning successfully.
      * @param pMatchedEvents Output pointer receiving the matching bits.
-     * @param waitTicks Maximum ticks to wait (`TASK_MAX_WAIT` for infinite wait).
+     * @param waitTicks Maximum ticks to wait (`TASK_FOREVER_WAIT` for infinite wait).
      * @return `RET_SUCCESS` if all requested bits matched, `RET_TIMEOUT` on timeout,
      *         `RET_BUSY` if `waitTicks` is `TASK_NO_WAIT` and the full mask did not match,
      *         error code otherwise.
@@ -126,7 +126,7 @@ extern "C"
      * @param setEvents Bit mask to set before waiting.
      * @param waitEvents Bit mask to wait for.
      * @param pMatchedEvents Output pointer receiving the matching bits.
-     * @param waitTicks Maximum ticks to wait (`TASK_MAX_WAIT` for infinite wait).
+     * @param waitTicks Maximum ticks to wait (`TASK_FOREVER_WAIT` for infinite wait).
      * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout,
      *         `RET_BUSY` if `waitTicks` is `TASK_NO_WAIT` and the full mask did not match,
      *         error code otherwise.

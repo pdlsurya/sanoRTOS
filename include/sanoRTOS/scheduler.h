@@ -83,6 +83,13 @@ extern "C"
     void schedulerStart();
 
     /**
+     * @brief Get the current RTOS system tick count.
+     *
+     * @return Monotonic RTOS tick count maintained by the scheduler.
+     */
+    uint32_t schedulerGetTickCount(void);
+
+    /**
      * @brief Voluntarily yield CPU execution to another ready task.
      */
     void taskYield();

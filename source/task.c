@@ -40,6 +40,7 @@ LOG_MODULE_DEFINE(task);
 taskPoolType taskPool = {
     .readyQueue = TASK_STATE_QUEUE_INITIALIZER,
     .blockedQueue = TASK_STATE_QUEUE_INITIALIZER,
+    .timeoutQueue = TASK_TIMEOUT_QUEUE_INITIALIZER,
     .currentTask = {0}
 };
 
@@ -89,7 +90,7 @@ static inline void taskResetInactiveState(taskHandleType *pTask)
         return;
     }
 
-    pTask->remainingSleepTicks = 0;
+    pTask->deadlineTick = 0;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
     memset(&pTask->eventState, 0, sizeof(pTask->eventState));
@@ -98,6 +99,12 @@ static inline void taskResetInactiveState(taskHandleType *pTask)
     pTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
     memset(&pTask->stateQueueLink, 0, sizeof(pTask->stateQueueLink));
     memset(&pTask->waitQueueLink, 0, sizeof(pTask->waitQueueLink));
+    memset(&pTask->timeoutQueueLink, 0, sizeof(pTask->timeoutQueueLink));
+}
+
+static inline bool taskDeadlineReached(uint32_t currentTick, uint32_t deadlineTick)
+{
+    return ((int32_t)(currentTick - deadlineTick) >= 0);
 }
 
 void taskCleanupExited()
@@ -138,13 +145,20 @@ static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReas
 
     if (pTask->state == TASK_STATE_BLOCKED)
     {
-        retCode = blockedQueueDetach(pTask);
+        retCode = blockedQueueRemove(pTask);
+        /* RET_NOTASK is benign here: a wake path may have already detached this link. */
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
             return retCode;
         }
 
-        retCode = waitQueueDetach(pTask);
+        retCode = waitQueueRemove(pTask);
+        if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+        {
+            return retCode;
+        }
+
+        retCode = timeoutQueueRemove(pTask);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
             return retCode;
@@ -154,7 +168,7 @@ static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReas
     pTask->state = TASK_STATE_READY;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = wakeupReason;
-    pTask->remainingSleepTicks = 0;
+    pTask->deadlineTick = 0;
 
     /* Add task to queue of ready tasks*/
     retCode = readyQueueAdd(pTask);
@@ -164,18 +178,53 @@ static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReas
 
 static int taskBlockLocked(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
 {
+    taskStateType previousState;
+    blockedReasonType previousBlockedReason;
+    wakeupReasonType previousWakeupReason;
+    uint32_t previousDeadlineTick;
+    int retCode;
+
     if ((pTask == NULL) || (pTask->state == TASK_STATE_TERMINATED))
     {
         return RET_INVAL;
     }
 
-    pTask->remainingSleepTicks = ticks;
+    previousState = pTask->state;
+    previousBlockedReason = pTask->blockedReason;
+    previousWakeupReason = pTask->wakeupReason;
+    previousDeadlineTick = pTask->deadlineTick;
+
+    pTask->deadlineTick = (ticks == TASK_FOREVER_WAIT) ? 0U : (schedulerGetTickCount() + ticks);
     pTask->state = TASK_STATE_BLOCKED;
     pTask->blockedReason = blockedReason;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    // Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue
-    return blockedQueueAdd(pTask);
+    /* Add task to queue of blocked tasks. We dont need to sort tasks in blockedQueue. */
+    retCode = blockedQueueAdd(pTask);
+    if (retCode != RET_SUCCESS)
+    {
+        pTask->deadlineTick = previousDeadlineTick;
+        pTask->state = previousState;
+        pTask->blockedReason = previousBlockedReason;
+        pTask->wakeupReason = previousWakeupReason;
+        return retCode;
+    }
+
+    if (ticks != TASK_FOREVER_WAIT)
+    {
+        retCode = timeoutQueueAdd(pTask);
+        if (retCode != RET_SUCCESS)
+        {
+            (void)blockedQueueRemove(pTask);
+            pTask->deadlineTick = previousDeadlineTick;
+            pTask->state = previousState;
+            pTask->blockedReason = previousBlockedReason;
+            pTask->wakeupReason = previousWakeupReason;
+            return retCode;
+        }
+    }
+
+    return RET_SUCCESS;
 }
 
 int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
@@ -216,7 +265,7 @@ int taskBlock(blockedReasonType blockedReason, uint32_t ticks)
         return retCode;
     }
 
-    // Give CPU to other tasks
+    /* Give CPU to other tasks */
     taskYield();
 
     return RET_SUCCESS;
@@ -239,18 +288,26 @@ int taskSuspend(taskHandleType *pTask)
 
     if (pTask->state == TASK_STATE_READY)
     {
-        retCode = readyQueueDetach(pTask);
+        retCode = readyQueueRemove(pTask);
     }
     else if (pTask->state == TASK_STATE_BLOCKED)
     {
-        retCode = blockedQueueDetach(pTask);
+        retCode = blockedQueueRemove(pTask);
+        /* RET_NOTASK is benign here: a wake path may have already detached this link. */
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
             spinUnlock(&lock, irqState);
             return retCode;
         }
 
-        retCode = waitQueueDetach(pTask);
+        retCode = waitQueueRemove(pTask);
+        if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+        {
+            spinUnlock(&lock, irqState);
+            return retCode;
+        }
+
+        retCode = timeoutQueueRemove(pTask);
     }
     if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
     {
@@ -258,7 +315,7 @@ int taskSuspend(taskHandleType *pTask)
         return retCode;
     }
 
-    pTask->remainingSleepTicks = 0;
+    pTask->deadlineTick = 0;
     pTask->state = TASK_STATE_SUSPENDED;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
@@ -618,7 +675,7 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
     pTask->name = (taskName != NULL) ? taskName : "dynamicTask";
     pTask->params = taskParams;
     pTask->entry = taskEntryFunction;
-    pTask->remainingSleepTicks = 0;
+    pTask->deadlineTick = 0;
     pTask->state = TASK_STATE_READY;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
@@ -673,7 +730,7 @@ int taskDelete(taskHandleType *pTask)
 
     if (pTask->state == TASK_STATE_READY)
     {
-        int retCode = readyQueueDetach(pTask);
+        int retCode = readyQueueRemove(pTask);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
             spinUnlock(&lock, irqState);
@@ -682,14 +739,22 @@ int taskDelete(taskHandleType *pTask)
     }
     else if (pTask->state == TASK_STATE_BLOCKED)
     {
-        int retCode = blockedQueueDetach(pTask);
+        int retCode = blockedQueueRemove(pTask);
+        /* RET_NOTASK is benign here: a wake path may have already detached this link. */
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
             spinUnlock(&lock, irqState);
             return retCode;
         }
 
-        retCode = waitQueueDetach(pTask);
+        retCode = waitQueueRemove(pTask);
+        if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+        {
+            spinUnlock(&lock, irqState);
+            return retCode;
+        }
+
+        retCode = timeoutQueueRemove(pTask);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
             spinUnlock(&lock, irqState);
@@ -710,6 +775,32 @@ int taskDelete(taskHandleType *pTask)
     }
 
     return RET_SUCCESS;
+}
+
+void taskProcessExpiredTimeouts(uint32_t currentTick)
+{
+    bool irqState = spinLock(&lock);
+
+    while (!taskQueueEmpty(timeoutQueue()))
+    {
+        taskHandleType *pTask = timeoutQueuePeek();
+        wakeupReasonType wakeupReason;
+        int retCode;
+
+        if ((pTask == NULL) || !taskDeadlineReached(currentTick, pTask->deadlineTick))
+        {
+            break;
+        }
+
+        wakeupReason = (pTask->blockedReason == SLEEP) ? SLEEP_TIME_TIMEOUT : WAIT_TIMEOUT;
+        retCode = taskSetReadyLocked(pTask, wakeupReason);
+        if (retCode != RET_SUCCESS)
+        {
+            break;
+        }
+    }
+
+    spinUnlock(&lock, irqState);
 }
 
 void taskExit(void)

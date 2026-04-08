@@ -218,12 +218,12 @@ retry:
 
             spinUnlock(&pQueueHandle->lock, irqState);
 
-            // Block current task and  give CPU to other tasks while waiting for space to be available
+            /* Block current task and  give CPU to other tasks while waiting for space to be available */
             retCode = taskBlock(WAIT_FOR_MSG_QUEUE_SPACE, waitTicks);
             if (retCode != RET_SUCCESS)
             {
                 irqState = spinLock(&pQueueHandle->lock);
-                (void)waitQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
+                (void)waitQueueRemove(currentTask);
                 spinUnlock(&pQueueHandle->lock, irqState);
                 return retCode;
             }
@@ -234,17 +234,7 @@ retry:
             }
             else if (currentTask->wakeupReason == WAIT_TIMEOUT)
             {
-                irqState = spinLock(&pQueueHandle->lock);
-
-                /*Wait timed out,remove task from wait Queue.*/
-                retCode = waitQueueRemove(&pQueueHandle->producerWaitQueue, currentTask);
-
-                spinUnlock(&pQueueHandle->lock, irqState);
-
-                if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
-                {
-                    retCode = RET_TIMEOUT;
-                }
+                retCode = RET_TIMEOUT;
             }
             /*Task might have been suspended while waiting for space to be available and later resumed.
               In this case, retry sending to the msgQueue again */
@@ -299,12 +289,12 @@ retry:
 
             spinUnlock(&pQueueHandle->lock, irqState);
 
-            // Block current task and give CPU to other tasks while waiting for data to be available
+            /* Block current task and give CPU to other tasks while waiting for data to be available */
             retCode = taskBlock(WAIT_FOR_MSG_QUEUE_DATA, waitTicks);
             if (retCode != RET_SUCCESS)
             {
                 irqState = spinLock(&pQueueHandle->lock);
-                (void)waitQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
+                (void)waitQueueRemove(currentTask);
                 spinUnlock(&pQueueHandle->lock, irqState);
                 return retCode;
             }
@@ -315,17 +305,7 @@ retry:
             }
             else if (currentTask->wakeupReason == WAIT_TIMEOUT)
             {
-                irqState = spinLock(&pQueueHandle->lock);
-
-                /*Wait timed out,remove task from wait Queue.*/
-                retCode = waitQueueRemove(&pQueueHandle->consumerWaitQueue, currentTask);
-
-                spinUnlock(&pQueueHandle->lock, irqState);
-
-                if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
-                {
-                    retCode = RET_TIMEOUT;
-                }
+                retCode = RET_TIMEOUT;
             }
             /*Task might have been suspended while waiting for data to be available and later resumed.
             In this case, retry receiving from the msgQueue again */

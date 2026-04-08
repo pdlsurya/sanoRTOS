@@ -302,7 +302,7 @@ retry:
             if (retCode != RET_SUCCESS)
             {
                 irqState = spinLock(&pStreamBuffer->lock);
-                (void)waitQueueRemove(&pStreamBuffer->producerWaitQueue, currentTask);
+                (void)waitQueueRemove(currentTask);
                 spinUnlock(&pStreamBuffer->lock, irqState);
                 return retCode;
             }
@@ -313,14 +313,7 @@ retry:
             }
             else if (currentTask->wakeupReason == WAIT_TIMEOUT)
             {
-                irqState = spinLock(&pStreamBuffer->lock);
-                retCode = waitQueueRemove(&pStreamBuffer->producerWaitQueue, currentTask);
-                spinUnlock(&pStreamBuffer->lock, irqState);
-
-                if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
-                {
-                    retCode = RET_TIMEOUT;
-                }
+                retCode = RET_TIMEOUT;
             }
             else
             {
@@ -400,7 +393,7 @@ retry:
             if (retCode != RET_SUCCESS)
             {
                 irqState = spinLock(&pStreamBuffer->lock);
-                (void)waitQueueRemove(&pStreamBuffer->consumerWaitQueue, currentTask);
+                (void)waitQueueRemove(currentTask);
                 spinUnlock(&pStreamBuffer->lock, irqState);
                 return retCode;
             }
@@ -411,14 +404,7 @@ retry:
             }
             else if (currentTask->wakeupReason == WAIT_TIMEOUT)
             {
-                irqState = spinLock(&pStreamBuffer->lock);
-                retCode = waitQueueRemove(&pStreamBuffer->consumerWaitQueue, currentTask);
-                spinUnlock(&pStreamBuffer->lock, irqState);
-
-                if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
-                {
-                    retCode = RET_TIMEOUT;
-                }
+                retCode = RET_TIMEOUT;
             }
             else
             {

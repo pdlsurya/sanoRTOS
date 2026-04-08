@@ -105,14 +105,7 @@ static int eventWakeMatchingTasks(eventHandleType *pEvent, bool *pContextSwitchR
                 clearMask |= matchedEvents;
             }
 
-            /* Remove matched task from the event wait queue before making it READY */
-            int retCode = waitQueueRemove(&pEvent->waitQueue, pTask);
-            if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
-            {
-                return retCode;
-            }
-
-            retCode = taskSetReady(pTask, EVENT_MATCHED);
+            int retCode = taskSetReady(pTask, EVENT_MATCHED);
             if (retCode != RET_SUCCESS)
             {
                 return retCode;
@@ -210,7 +203,7 @@ retry:
         if (retCode != RET_SUCCESS)
         {
             irqState = spinLock(&pEvent->lock);
-            (void)waitQueueRemove(&pEvent->waitQueue, currentTask);
+            (void)waitQueueRemove(currentTask);
             eventTaskWaitReset(currentTask);
             spinUnlock(&pEvent->lock, irqState);
             return retCode;
@@ -227,27 +220,15 @@ retry:
         }
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
-            /*Wait timed out, remove task from the waitQueue */
-            retCode = waitQueueRemove(&pEvent->waitQueue, currentTask);
             eventTaskWaitReset(currentTask);
-
-            if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
-            {
-                retCode = RET_TIMEOUT;
-            }
+            retCode = RET_TIMEOUT;
         }
         else
         {
             /*Task might have been suspended while waiting for events and later resumed.
               In this case, retry waiting on the event object again */
-            retCode = waitQueueRemove(&pEvent->waitQueue, currentTask);
             eventTaskWaitReset(currentTask);
             spinUnlock(&pEvent->lock, irqState);
-
-            if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
-            {
-                return retCode;
-            }
 
             goto retry;
         }

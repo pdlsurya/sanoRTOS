@@ -196,7 +196,7 @@ retry:
         if (retCode != RET_SUCCESS)
         {
             irqState = spinLock(&pMemSlab->lock);
-            (void)waitQueueRemove(&pMemSlab->waitQueue, currentTask);
+            (void)waitQueueRemove(currentTask);
             spinUnlock(&pMemSlab->lock, irqState);
             return retCode;
         }
@@ -207,14 +207,7 @@ retry:
         }
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
-            irqState = spinLock(&pMemSlab->lock);
-            retCode = waitQueueRemove(&pMemSlab->waitQueue, currentTask);
-            spinUnlock(&pMemSlab->lock, irqState);
-
-            if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
-            {
-                retCode = RET_TIMEOUT;
-            }
+            retCode = RET_TIMEOUT;
         }
         else
         {

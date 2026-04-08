@@ -31,14 +31,10 @@
 #include "sanoRTOS/memSlab.h"
 #include "sanoRTOS/spinLock.h"
 
-#define TIMER_TASK_PRIORITY TASK_HIGHEST_PRIORITY // timer task has the highest possible priority [lower the value, higher the priority]
-
-static timerListType timerList = {0}; // List of running timers
-
-static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout handlers to be executed
-
-static atomic_t lock; // Protects timer list and timeout handler queue
-
+#define TIMER_TASK_PRIORITY TASK_HIGHEST_PRIORITY /* timer task has the highest possible priority [lower the value, higher the priority] */
+static timerListType timerList = {0}; /* List of running timers */
+static timeoutHandlerQueueType timeoutHandlerQueue = {0}; /* Queue of timeout handlers to be executed */
+static atomic_t lock; /* Protects timer list and timeout handler queue */
 MEM_SLAB_DEFINE(timeoutHandlerNodeSlab, sizeof(timeoutHandlerNodeType), CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS);
 
 /*Define timer task with highest possible priority*/
@@ -120,7 +116,7 @@ static int timerListNodeDelete(timerNodeType *pTimerNode)
         return RET_INVAL;
     }
 
-    if (timerList.head != NULL) // Check if timerList is empty
+    if (timerList.head != NULL) /* Check if timerList is empty */
     {
         if ((pTimerNode->prevNode == NULL) && (timerList.head != pTimerNode))
         {
@@ -209,7 +205,7 @@ void processTimers()
 {
     bool irqState = spinLock(&lock);
 
-    if (timerList.head != NULL) // Check if timer list is empty
+    if (timerList.head != NULL) /* Check if timer list is empty */
     {
         timerNodeType *currentNode = timerList.head;
         while (currentNode != NULL)
@@ -273,7 +269,7 @@ void timerTaskFunction(void *args)
         else
         {
             /* Block until at least one timeout handler is queued. */
-            (void)taskNotifyTake(true, NULL, TASK_MAX_WAIT);
+            (void)taskNotifyTake(true, NULL, TASK_FOREVER_WAIT);
         }
     }
 }

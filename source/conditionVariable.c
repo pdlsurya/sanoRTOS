@@ -72,7 +72,7 @@ wait:
     if (retCode != RET_SUCCESS)
     {
         irqState = spinLock(&pCondVar->lock);
-        (void)waitQueueRemove(&pCondVar->waitQueue, currentTask);
+        (void)waitQueueRemove(currentTask);
         spinUnlock(&pCondVar->lock, irqState);
         return retCode;
     }
@@ -86,12 +86,7 @@ wait:
     }
     else if (currentTask->wakeupReason == WAIT_TIMEOUT)
     {
-        /*Wait timed out,remove task from  the waitQueue.*/
-        retCode = waitQueueRemove(&pCondVar->waitQueue, currentTask);
-        if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
-        {
-            retCode = RET_TIMEOUT;
-        }
+        retCode = RET_TIMEOUT;
     }
     /*Task might have been suspended while waiting on condition variable and later resumed.
       In this case, retry waiting on condition variable again */
@@ -104,7 +99,7 @@ wait:
     /*Re-acquire previously released mutex*/
     if ((retCode == RET_SUCCESS) || (retCode == RET_TIMEOUT))
     {
-        int lockRetCode = mutexLock(pCondVar->pMutex, TASK_MAX_WAIT);
+        int lockRetCode = mutexLock(pCondVar->pMutex, TASK_FOREVER_WAIT);
         if (lockRetCode != RET_SUCCESS)
         {
             return lockRetCode;

@@ -59,8 +59,8 @@ extern "C"
 
 #if (CONFIG_SMP)
 
-                // Try to atomically acquire the lock using CAS (Compare-And-Swap).
-                // It will keep retrying until the lock is successfully acquired.
+                /* Try to atomically acquire the lock using CAS (Compare-And-Swap). */
+                /* It will keep retrying until the lock is successfully acquired. */
                 while (!portAtomicCAS(pLock, 0, 1))
                 {
                         PORT_NOP(); ///< No-operation instruction to prevent tight spinning without performing any useful work.

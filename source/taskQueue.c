@@ -40,6 +40,16 @@ static inline taskQueueLinkType *taskWaitQueueLink(taskHandleType *pTask)
     return (pTask == NULL) ? NULL : &pTask->waitQueueLink;
 }
 
+static inline taskQueueLinkType *taskTimeoutQueueLink(taskHandleType *pTask)
+{
+    return (pTask == NULL) ? NULL : &pTask->timeoutQueueLink;
+}
+
+static inline bool taskDeadlineBefore(uint32_t lhs, uint32_t rhs)
+{
+    return ((int32_t)(lhs - rhs) < 0);
+}
+
 static int taskQueueInsertBetween(taskQueueType *pQueue,
                                   taskHandleType *pPrevTask,
                                   taskHandleType *pNextTask,
@@ -80,7 +90,7 @@ static int taskQueueInsertBetween(taskQueueType *pQueue,
     return RET_SUCCESS;
 }
 
-static int taskQueueDetach(taskQueueType *pQueue,
+static int taskQueueRemove(taskQueueType *pQueue,
                            taskHandleType *pTask,
                            taskQueueLinkAccessorType linkOf)
 {
@@ -118,7 +128,7 @@ static int taskQueueDetach(taskQueueType *pQueue,
     return RET_SUCCESS;
 }
 
-static int taskQueueDetachOwned(taskHandleType *pTask, taskQueueLinkAccessorType linkOf)
+static int taskQueueRemoveOwned(taskHandleType *pTask, taskQueueLinkAccessorType linkOf)
 {
     taskQueueLinkType *pLink = NULL;
 
@@ -133,7 +143,7 @@ static int taskQueueDetachOwned(taskHandleType *pTask, taskQueueLinkAccessorType
         return RET_NOTASK;
     }
 
-    return taskQueueDetach(pLink->pOwnerQueue, pTask, linkOf);
+    return taskQueueRemove(pLink->pOwnerQueue, pTask, linkOf);
 }
 
 static taskHandleType *taskQueueNextTask(taskQueueType *pQueue,
@@ -156,9 +166,9 @@ static taskHandleType *taskQueueNextTask(taskQueueType *pQueue,
     return pLink->pNextTask;
 }
 
-static int taskQueueAddSorted(taskQueueType *pQueue,
-                              taskHandleType *pTask,
-                              taskQueueLinkAccessorType linkOf)
+static int taskQueueAddPrioritySorted(taskQueueType *pQueue,
+                                      taskHandleType *pTask,
+                                      taskQueueLinkAccessorType linkOf)
 {
     taskHandleType *currentTask = NULL;
     taskHandleType *nextTask = NULL;
@@ -190,6 +200,40 @@ static int taskQueueAddSorted(taskQueueType *pQueue,
     return taskQueueInsertBetween(pQueue, currentTask, nextTask, pTask, linkOf);
 }
 
+static int taskQueueAddDeadlineSorted(taskQueueType *pQueue,
+                                      taskHandleType *pTask,
+                                      taskQueueLinkAccessorType linkOf)
+{
+    taskHandleType *currentTask = NULL;
+    taskHandleType *nextTask = NULL;
+
+    if ((pQueue == NULL) || (pTask == NULL) || (linkOf == NULL))
+    {
+        return RET_INVAL;
+    }
+
+    if (taskQueueEmpty(pQueue))
+    {
+        return taskQueueInsertBetween(pQueue, NULL, NULL, pTask, linkOf);
+    }
+
+    if (taskDeadlineBefore(pTask->deadlineTick, pQueue->head->deadlineTick))
+    {
+        return taskQueueInsertBetween(pQueue, NULL, pQueue->head, pTask, linkOf);
+    }
+
+    currentTask = pQueue->head;
+    nextTask = taskQueueNextTask(pQueue, currentTask, linkOf);
+
+    while ((nextTask != NULL) && !taskDeadlineBefore(pTask->deadlineTick, nextTask->deadlineTick))
+    {
+        currentTask = nextTask;
+        nextTask = taskQueueNextTask(pQueue, currentTask, linkOf);
+    }
+
+    return taskQueueInsertBetween(pQueue, currentTask, nextTask, pTask, linkOf);
+}
+
 static taskHandleType *taskQueuePop(taskQueueType *pQueue,
                                     bool affinityCheck,
                                     taskQueueLinkAccessorType linkOf)
@@ -204,7 +248,7 @@ static taskHandleType *taskQueuePop(taskQueueType *pQueue,
     if (!affinityCheck)
     {
         taskHandleType *pTask = pQueue->head;
-        return (taskQueueDetach(pQueue, pTask, linkOf) == RET_SUCCESS) ? pTask : NULL;
+        return (taskQueueRemove(pQueue, pTask, linkOf) == RET_SUCCESS) ? pTask : NULL;
     }
 
     currentTask = pQueue->head;
@@ -215,7 +259,7 @@ static taskHandleType *taskQueuePop(taskQueueType *pQueue,
         if ((currentTask->coreAffinity == PORT_CORE_ID()) ||
             (currentTask->coreAffinity == AFFINITY_CORE_ANY))
         {
-            return (taskQueueDetach(pQueue, currentTask, linkOf) == RET_SUCCESS) ? currentTask : NULL;
+            return (taskQueueRemove(pQueue, currentTask, linkOf) == RET_SUCCESS) ? currentTask : NULL;
         }
 
         currentTask = nextTask;
@@ -265,9 +309,14 @@ taskQueueType *blockedQueue(void)
     return &taskPool.blockedQueue;
 }
 
+taskQueueType *timeoutQueue(void)
+{
+    return &taskPool.timeoutQueue;
+}
+
 int readyQueueAdd(taskHandleType *pTask)
 {
-    return taskQueueAddSorted(readyQueue(), pTask, taskStateQueueLink);
+    return taskQueueAddPrioritySorted(readyQueue(), pTask, taskStateQueueLink);
 }
 
 int blockedQueueAdd(taskHandleType *pTask)
@@ -278,27 +327,32 @@ int blockedQueueAdd(taskHandleType *pTask)
 
 int waitQueueAdd(taskQueueType *pWaitQueue, taskHandleType *pTask)
 {
-    return taskQueueAddSorted(pWaitQueue, pTask, taskWaitQueueLink);
+    return taskQueueAddPrioritySorted(pWaitQueue, pTask, taskWaitQueueLink);
 }
 
-int waitQueueRemove(taskQueueType *pWaitQueue, taskHandleType *pTask)
+int timeoutQueueAdd(taskHandleType *pTask)
 {
-    return taskQueueDetach(pWaitQueue, pTask, taskWaitQueueLink);
+    return taskQueueAddDeadlineSorted(timeoutQueue(), pTask, taskTimeoutQueueLink);
 }
 
-int readyQueueDetach(taskHandleType *pTask)
+int readyQueueRemove(taskHandleType *pTask)
 {
-    return taskQueueDetach(readyQueue(), pTask, taskStateQueueLink);
+    return taskQueueRemove(readyQueue(), pTask, taskStateQueueLink);
 }
 
-int blockedQueueDetach(taskHandleType *pTask)
+int blockedQueueRemove(taskHandleType *pTask)
 {
-    return taskQueueDetach(blockedQueue(), pTask, taskStateQueueLink);
+    return taskQueueRemove(blockedQueue(), pTask, taskStateQueueLink);
 }
 
-int waitQueueDetach(taskHandleType *pTask)
+int waitQueueRemove(taskHandleType *pTask)
 {
-    return taskQueueDetachOwned(pTask, taskWaitQueueLink);
+    return taskQueueRemoveOwned(pTask, taskWaitQueueLink);
+}
+
+int timeoutQueueRemove(taskHandleType *pTask)
+{
+    return taskQueueRemove(timeoutQueue(), pTask, taskTimeoutQueueLink);
 }
 
 taskHandleType *stateQueueNext(taskQueueType *pStateQueue, taskHandleType *pTask)
@@ -329,4 +383,9 @@ taskHandleType *readyQueuePeek(void)
 taskHandleType *waitQueuePeek(taskQueueType *pWaitQueue)
 {
     return taskQueuePeek(pWaitQueue, false, taskWaitQueueLink);
+}
+
+taskHandleType *timeoutQueuePeek(void)
+{
+    return taskQueuePeek(timeoutQueue(), false, taskTimeoutQueueLink);
 }

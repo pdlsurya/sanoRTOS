@@ -37,10 +37,8 @@ extern "C"
 {
 #endif
 
-#define SYSTICK_PRIORITY 0xf // Priority of SysTick Timer.
-
-#define PENDSV_PRIORITY 0xf // Priority of PendSV
-
+#define SYSTICK_PRIORITY 0xf /* Priority of SysTick Timer. */
+#define PENDSV_PRIORITY 0xf /* Priority of PendSV */
 #define TRIGGER_PENDSV() (SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk)
 
     /**********--Task's default stack contents--****************************************
@@ -192,12 +190,12 @@ extern "C"
 
         __asm__ volatile(
             "1:                     \n"
-            "ldrex %0, [%2]         \n" // Load *ptr into old_val
-            "cmp %0, %3             \n" // Compare with expected
-            "bne 2f                 \n" // If not equal, branch to fail
-            "strex %1, %4, [%2]     \n" // Try to store set_val
-            "cmp   %1, #0           \n" // check if STREX succeeded
-            "bne   1b               \n" // if not, retry loop
+            "ldrex %0, [%2]         \n" /* Load *ptr into old_val */
+            "cmp %0, %3             \n" /* Compare with expected */
+            "bne 2f                 \n" /* If not equal, branch to fail */
+            "strex %1, %4, [%2]     \n" /* Try to store set_val */
+            "cmp   %1, #0           \n" /* check if STREX succeeded */
+            "bne   1b               \n" /* if not, retry loop */
             "2:                     \n"
             : "=&r"(old_val), "=&r"(status)
             : "r"(ptr), "r"(compare_val), "r"(set_val)

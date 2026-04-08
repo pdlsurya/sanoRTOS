@@ -122,7 +122,7 @@ retry:
         if (retCode != RET_SUCCESS)
         {
             irqState = spinLock(&pMutex->lock);
-            (void)waitQueueRemove(&pMutex->waitQueue, currentTask);
+            (void)waitQueueRemove(currentTask);
             spinUnlock(&pMutex->lock, irqState);
             return retCode;
         }
@@ -136,12 +136,7 @@ retry:
         }
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
-            /*Wait timed out, remove task from  the waitQueue.*/
-            retCode = waitQueueRemove(&pMutex->waitQueue, currentTask);
-            if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
-            {
-                retCode = RET_TIMEOUT;
-            }
+            retCode = RET_TIMEOUT;
         }
         /*Task might have been suspended while waiting for mutex and later resumed.
           In this case, retry locking the mutex again */

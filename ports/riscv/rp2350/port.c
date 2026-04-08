@@ -41,7 +41,7 @@ void idleTaskHandler1(void *params)
     while (1)
     {
         taskCleanupExited();
-        // PORT_ENTER_SLEEP_MODE();
+        /* PORT_ENTER_SLEEP_MODE(); */
     }
 }
 #endif
@@ -138,7 +138,7 @@ __attribute__((interrupt)) __attribute__((section(".time_critical"))) void isr_r
     uint32_t mepc_val = riscv_read_csr(mepc);
     uint32_t mstatus_val = riscv_read_csr(mstatus);
 
-    // Invoke RTOS tickHandler function
+    /* Invoke RTOS tickHandler function */
     tickHandler();
 
     /* Restore mstatus, mepc and mcause*/

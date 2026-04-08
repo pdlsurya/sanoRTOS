@@ -208,7 +208,7 @@ void workQueueTask(void *pArgs)
         else
         {
             /* Block until new work is submitted to this queue. */
-            (void)taskNotifyTake(true, NULL, TASK_MAX_WAIT);
+            (void)taskNotifyTake(true, NULL, TASK_FOREVER_WAIT);
         }
     }
 }

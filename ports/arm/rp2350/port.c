@@ -41,7 +41,7 @@ void idleTaskHandler1(void *params)
     while (true)
     {
         taskCleanupExited();
-        // PORT_ENTER_SLEEP_MODE();
+        /* PORT_ENTER_SLEEP_MODE(); */
     }
 }
 #endif
@@ -77,12 +77,9 @@ static void portRunFirstTask()
 
     __set_PSP(currentTask[PORT_CORE_ID()]->stackPointer); /* Set PSP to the top of task's stack */
 
-    uint32_t control = __get_CONTROL(); // Read CONTROL register
-
-    __set_CONTROL(control | 0x2); // Select PSP for thread mode.
-
-    __ISB(); // Instruction Synchronization Barrier
-
+    uint32_t control = __get_CONTROL(); /* Read CONTROL register */
+    __set_CONTROL(control | 0x2); /* Select PSP for thread mode. */
+    __ISB(); /* Instruction Synchronization Barrier */
     spinUnlock(&lock, irqState);
 
     /*Jump to first task*/
@@ -114,41 +111,36 @@ void SysTick_Handler()
 __attribute__((naked)) void PendSV_Handler(void)
 {
     __asm volatile(
-        "cpsid i\n" // Disable interrupts
-
-        "mrs r0, psp\n" // Get current process stack pointer
-
+        "cpsid i\n" /* Disable interrupts */
+        "mrs r0, psp\n" /* Get current process stack pointer */
         "isb\n"
 
-        // If task uses FPU, save s16–s31
+        /* If task uses FPU, save s16–s31 */
         "tst lr, #0x10\n"
         "it eq\n"
         "vstmdbeq r0!, {s16-s31}\n"
 
-        // Save r4-r11 and lr to current task's stack
+        /* Save r4-r11 and lr to current task's stack */
         "stmdb r0!, {r4-r11, lr}\n"
 
-        // Save current stack pointer to *currentTask
+        /* Save current stack pointer to *currentTask */
         "str r0, [%[current]]\n"
 
-        // Load next stack pointer from *nextTask
+        /* Load next stack pointer from *nextTask */
         "ldr r0, [%[next]]\n"
 
-        // Restore r4-r11 and lr
+        /* Restore r4-r11 and lr */
         "ldmia r0!, {r4-r11, lr}\n"
 
-        // If task uses FPU, restore s16–s31
+        /* If task uses FPU, restore s16–s31 */
         "tst lr, #0x10\n"
         "it eq\n"
         "vldmiaeq r0!, {s16-s31}\n"
 
-        "msr psp, r0\n" // Set PSP
-
-        "isb\n" // Flush instruction pipeline before return
-
-        "cpsie i\n" // Enable interrupts
-
-        "bx lr\n" // Return to Thread mode
+        "msr psp, r0\n" /* Set PSP */
+        "isb\n" /* Flush instruction pipeline before return */
+        "cpsie i\n" /* Enable interrupts */
+        "bx lr\n" /* Return to Thread mode */
         :
         : [current] "r"(&currentTask[PORT_CORE_ID()]->stackPointer),
           [next] "r"(&nextTask[PORT_CORE_ID()]->stackPointer)

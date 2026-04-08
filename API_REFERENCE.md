@@ -6,7 +6,7 @@ This guide covers the public application-facing APIs for the main sanoRTOS kerne
 
 - Lower numeric task priority means higher scheduling priority.
 - `TASK_NO_WAIT` means "do not block".
-- `TASK_MAX_WAIT` means "wait indefinitely".
+- `TASK_FOREVER_WAIT` means "wait indefinitely". `TASK_MAX_WAIT` remains as a legacy alias.
 - APIs documented as thread-only must not be called from ISR context.
 - APIs that allow ISR use require `waitTicks == TASK_NO_WAIT` when called from ISR context.
 - `TASK_DEFINE`, `TIMER_DEFINE`, `WORK_DEFINE`, and `DELAYED_WORK_DEFINE` declare their entry or handler function for you.
@@ -50,12 +50,14 @@ Defined in [`scheduler.h`](include/sanoRTOS/scheduler.h):
 - `US_TO_TIMER_TICKS(us)`
 - `US_TO_RTOS_TICKS(us)`
 - `MS_TO_RTOS_TICKS(ms)`
+- `schedulerGetTickCount()`
 
 Example:
 
 ```c
 uint32_t delay = MS_TO_RTOS_TICKS(250);
 taskSleep(delay);
+uint32_t now = schedulerGetTickCount();
 ```
 
 ## Tasks
@@ -207,7 +209,7 @@ void consumerEntry(void *args)
 
     while (1)
     {
-        if (taskNotifyWait(0, 0xFFFFFFFFu, &value, TASK_MAX_WAIT) == RET_SUCCESS)
+        if (taskNotifyWait(0, 0xFFFFFFFFu, &value, TASK_FOREVER_WAIT) == RET_SUCCESS)
         {
             /* Process notification bits/value. */
         }
@@ -227,7 +229,7 @@ void workerEntry(void *args)
 {
     while (1)
     {
-        (void)taskNotifyTake(true, NULL, TASK_MAX_WAIT);
+        (void)taskNotifyTake(true, NULL, TASK_FOREVER_WAIT);
         /* Consume one unit of work. */
     }
 }
@@ -285,7 +287,7 @@ void consumerTask(void *args)
 {
     while (1)
     {
-        if (semaphoreTake(&rxSemaphore, TASK_MAX_WAIT) == RET_SUCCESS)
+        if (semaphoreTake(&rxSemaphore, TASK_FOREVER_WAIT) == RET_SUCCESS)
         {
             /* Consume data. */
         }
@@ -310,7 +312,7 @@ MUTEX_DEFINE(logMutex);
 
 void safeLog(const char *text)
 {
-    if (mutexLock(&logMutex, TASK_MAX_WAIT) == RET_SUCCESS)
+    if (mutexLock(&logMutex, TASK_FOREVER_WAIT) == RET_SUCCESS)
     {
         /* Write to UART/log sink here. */
         (void)mutexUnlock(&logMutex);
@@ -341,10 +343,10 @@ void consumerTask(void *args)
 {
     while (1)
     {
-        (void)mutexLock(&queueMutex, TASK_MAX_WAIT);
+        (void)mutexLock(&queueMutex, TASK_FOREVER_WAIT);
         while (!dataReady)
         {
-            (void)condVarWait(&queueCondVar, TASK_MAX_WAIT);
+            (void)condVarWait(&queueCondVar, TASK_FOREVER_WAIT);
         }
         dataReady = false;
         (void)mutexUnlock(&queueMutex);
@@ -355,7 +357,7 @@ void producerTask(void *args)
 {
     while (1)
     {
-        (void)mutexLock(&queueMutex, TASK_MAX_WAIT);
+        (void)mutexLock(&queueMutex, TASK_FOREVER_WAIT);
         dataReady = true;
         (void)condVarSignal(&queueCondVar);
         (void)mutexUnlock(&queueMutex);
@@ -390,7 +392,7 @@ void ioTask(void *args)
 
     while (1)
     {
-        if (eventWaitAny(&ioEvents, EVENT_RX_READY | EVENT_TX_DONE, true, &matched, TASK_MAX_WAIT) == RET_SUCCESS)
+        if (eventWaitAny(&ioEvents, EVENT_RX_READY | EVENT_TX_DONE, true, &matched, TASK_FOREVER_WAIT) == RET_SUCCESS)
         {
             if (matched & EVENT_RX_READY)
             {
@@ -432,7 +434,7 @@ MSG_QUEUE_DEFINE(sampleQueue, 8, sizeof(sampleMsgType));
 void senderTask(void *args)
 {
     sampleMsgType msg = {.id = 1, .value = 1234};
-    (void)msgQueueSend(&sampleQueue, &msg, TASK_MAX_WAIT);
+    (void)msgQueueSend(&sampleQueue, &msg, TASK_FOREVER_WAIT);
 }
 
 void receiverTask(void *args)
@@ -441,7 +443,7 @@ void receiverTask(void *args)
 
     while (1)
     {
-        if (msgQueueReceive(&sampleQueue, &msg, TASK_MAX_WAIT) == RET_SUCCESS)
+        if (msgQueueReceive(&sampleQueue, &msg, TASK_FOREVER_WAIT) == RET_SUCCESS)
         {
             /* Process msg. */
         }
@@ -472,7 +474,7 @@ STREAM_BUFFER_DEFINE(uartStream, 64);
 void producerTask(void *args)
 {
     static const char text[] = "ABCDE12345";
-    (void)streamBufferSend(&uartStream, text, sizeof(text) - 1, TASK_MAX_WAIT);
+    (void)streamBufferSend(&uartStream, text, sizeof(text) - 1, TASK_FOREVER_WAIT);
 }
 
 void consumerTask(void *args)
@@ -483,7 +485,7 @@ void consumerTask(void *args)
     while (1)
     {
         length = sizeof(buffer);
-        if (streamBufferReceive(&uartStream, buffer, &length, TASK_MAX_WAIT) == RET_SUCCESS)
+        if (streamBufferReceive(&uartStream, buffer, &length, TASK_FOREVER_WAIT) == RET_SUCCESS)
         {
             /* length may be any value from 1 to sizeof(buffer). */
         }
@@ -516,8 +518,8 @@ void senderTask(void *args)
     static const char hello[] = "HELLO";
     static const char world[] = "ABCDEFGHIJ";
 
-    (void)msgBufferSend(&logBuffer, hello, sizeof(hello) - 1, TASK_MAX_WAIT);
-    (void)msgBufferSend(&logBuffer, world, sizeof(world) - 1, TASK_MAX_WAIT);
+    (void)msgBufferSend(&logBuffer, hello, sizeof(hello) - 1, TASK_FOREVER_WAIT);
+    (void)msgBufferSend(&logBuffer, world, sizeof(world) - 1, TASK_FOREVER_WAIT);
 }
 
 void receiverTask(void *args)
@@ -528,7 +530,7 @@ void receiverTask(void *args)
     while (1)
     {
         length = sizeof(smallBuf);
-        if (msgBufferReceive(&logBuffer, smallBuf, &length, TASK_MAX_WAIT) == RET_SUCCESS)
+        if (msgBufferReceive(&logBuffer, smallBuf, &length, TASK_FOREVER_WAIT) == RET_SUCCESS)
         {
             /* Received one full message. length is the actual message length. */
         }
@@ -568,7 +570,7 @@ void senderTask(void *args)
         .pTargetTask = MAILBOX_ANY_TASK,
     };
 
-    (void)mailboxSend(&commandMailbox, &msg, TASK_MAX_WAIT);
+    (void)mailboxSend(&commandMailbox, &msg, TASK_FOREVER_WAIT);
 }
 
 void receiverTask(void *args)
@@ -579,7 +581,7 @@ void receiverTask(void *args)
         .pSourceTask = MAILBOX_ANY_TASK,
     };
 
-    if (mailboxReceive(&commandMailbox, &msg, buffer, TASK_MAX_WAIT) == RET_SUCCESS)
+    if (mailboxReceive(&commandMailbox, &msg, buffer, TASK_FOREVER_WAIT) == RET_SUCCESS)
     {
         /* msg.info and msg.size describe the transferred payload. */
     }
@@ -710,7 +712,7 @@ void usePacketBuffer(void)
 {
     void *block;
 
-    if (memSlabAlloc(&packetSlab, &block, TASK_MAX_WAIT) == RET_SUCCESS)
+    if (memSlabAlloc(&packetSlab, &block, TASK_FOREVER_WAIT) == RET_SUCCESS)
     {
         /* Use the 64-byte block. */
         (void)memSlabFree(&packetSlab, block);
