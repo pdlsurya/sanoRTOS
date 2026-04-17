@@ -38,6 +38,10 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
     {
         return RET_INVAL;
     }
+    if (portIsInISRContext())
+    {
+        return RET_INVAL;
+    }
 
     int retCode;
 
@@ -116,6 +120,10 @@ int condVarSignal(condVarHandleType *pCondVar)
     {
         return RET_INVAL;
     }
+    if (portIsInISRContext())
+    {
+        return RET_INVAL;
+    }
 
     taskHandleType *nextSignalTask = NULL;
 
@@ -159,6 +167,10 @@ getNextSignalTask:
 int condVarBroadcast(condVarHandleType *pCondVar)
 {
     if (pCondVar == NULL)
+    {
+        return RET_INVAL;
+    }
+    if (portIsInISRContext())
     {
         return RET_INVAL;
     }

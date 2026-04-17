@@ -69,18 +69,23 @@ extern "C"
      * @brief Acquire a mutex.
      *
      * If the mutex is already locked, the caller waits up to `waitTicks`.
+     * This API must not be called from ISR context.
      *
      * @param pMutex Pointer to mutex handle.
      * @param waitTicks Maximum ticks to wait for lock acquisition.
-     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_TIMEOUT` on timeout, `RET_INVAL` if called
+     *         from ISR context or arguments are invalid, error code otherwise.
      */
     int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks);
 
-    /**
+     /**
      * @brief Release a mutex.
      *
+     * This API must not be called from ISR context.
+     *
      * @param pMutex Pointer to mutex handle.
-     * @return `RET_SUCCESS` on success, `RET_NOTOWNER` if caller is not owner, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_NOTOWNER` if caller is not owner,
+     *         `RET_INVAL` if called from ISR context or arguments are invalid, error code otherwise.
      */
     int mutexUnlock(mutexHandleType *pMutex);
 
