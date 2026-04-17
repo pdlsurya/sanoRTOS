@@ -26,6 +26,7 @@
 #define __SANO_RTOS_TASK_QUEUE_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
 #include "sanoRTOS/retCodes.h"
@@ -46,7 +47,24 @@ extern "C"
     typedef struct
     {
         taskHandleType *head; ///< Pointer to the head of the task queue linked list.
+        taskHandleType *tail; ///< Pointer to the tail of the task queue linked list.
     } taskQueueType;
+
+#if CONFIG_READY_QUEUE_PRIORITY_MULTIQ
+    /**
+     * @brief Bitmap-backed ready queue organized as FIFO queues per priority and affinity class.
+     */
+    typedef struct
+    {
+        taskQueueType queues[CONFIG_TASK_PRIORITY_LEVELS][(PORT_CORE_COUNT == 1U) ? 1U : (PORT_CORE_COUNT + 1U)];
+        uint32_t bitmaps[(PORT_CORE_COUNT == 1U) ? 1U : (PORT_CORE_COUNT + 1U)];
+    } readyQueueType;
+#else
+    /**
+     * @brief Priority-sorted ready queue backend.
+     */
+    typedef taskQueueType readyQueueType;
+#endif
 
     /**
      * @brief Intrusive doubly linked queue link stored inside each task.
@@ -58,24 +76,17 @@ extern "C"
         taskQueueType *pOwnerQueue; ///< Queue currently owning this link, or NULL if not queued.
     } taskQueueLinkType;
 
-#define TASK_STATE_QUEUE_INITIALIZER \
-    {                                \
-        .head = NULL}
-
 #define TASK_WAIT_QUEUE_INITIALIZER \
     {                               \
-        .head = NULL}
-
-#define TASK_TIMEOUT_QUEUE_INITIALIZER \
-    {                                  \
-        .head = NULL}
+        .head = NULL,                \
+        .tail = NULL}
 
     /**
      * @brief Get the global ready queue.
      *
      * @return Pointer to the scheduler ready queue.
      */
-    taskQueueType *readyQueue(void);
+    readyQueueType *readyQueue(void);
 
     /**
      * @brief Get the global blocked queue.
@@ -122,7 +133,7 @@ extern "C"
     taskHandleType *waitQueuePeek(taskQueueType *pWaitQueue);
 
     /**
-     * @brief Add a task to a ready queue sorted by priority.
+     * @brief Add a task to the configured ready queue backend.
      *
      * @param pTask Pointer to task handle.
      * @return `RET_SUCCESS` on success, error code otherwise.

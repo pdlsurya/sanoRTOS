@@ -42,15 +42,23 @@ extern "C"
 
 #define CONFIG_SMP 1///< Configure Symmetric Multiprocessing (SMP): Enables or disables SMP support (0 = Disabled, 1 = Enabled).
 
-#define CONFIG_MUTEX_USE_PRIORITY_INHERITANCE 1 ///< Configure mutex priority inheritance: Enables priority inheritance for mutexes to avoid priority inversion.
+#define CONFIG_MUTEX_PRIORITY_INHERITANCE 1 ///< Configure mutex priority inheritance: Enables priority inheritance for mutexes to avoid priority inversion.
 
-#define CONFIG_CHECK_STACK_OVERFLOW 0 ///< Configure stack overflow check
+#define CONFIG_STACK_OVERFLOW_CHECK 0 ///< Configure stack overflow check
 
 #define CONFIG_TICK_INTERVAL_US 1000 ///< Configure Tick interval to generate interrupt every TICK_INTERVAL_US (in microseconds): Sets the interrupt frequency for the system tick.
+
+#define CONFIG_READY_QUEUE_PRIORITY_MULTIQ 1 ///< Select ready-queue backend: 1 = bitmap-backed per-priority queues, 0 = single priority-sorted queue.
+
+#define CONFIG_TASK_PRIORITY_LEVELS 16 ///< Number of scheduler priority levels used by the bitmap-backed ready queue.
 
 #define CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS 32 ///< Number of fixed timeout-handler nodes kept in the internal slab allocator.
 
 #define CONFIG_DYNAMIC_TASK_TCB_SLAB_BLOCKS 16 ///< Number of dynamic task control blocks kept in the internal slab allocator.
+
+#if (CONFIG_TASK_PRIORITY_LEVELS == 0) || (CONFIG_TASK_PRIORITY_LEVELS > 32)
+#error "CONFIG_TASK_PRIORITY_LEVELS must be between 1 and 32"
+#endif
 
 #ifdef __cplusplus
 }

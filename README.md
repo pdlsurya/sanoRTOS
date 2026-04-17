@@ -30,13 +30,13 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 ## Kernel Internals
 
 - **Intrusive Task Queues**
-  Ready, blocked, timeout, and object wait queues are implemented as intrusive doubly linked lists. Each task embeds one link for state queues, one for kernel-object wait queues, and one for the global timeout queue, which keeps arbitrary unlink operations O(1).
+  The ready queue uses bitmap-backed intrusive FIFO buckets with 16 configured priority levels by default, so ready insertion and highest-priority lookup stay constant-time. Blocked, timeout, and object wait queues remain intrusive doubly linked lists, and each task embeds one link for state queues, one for kernel-object wait queues, and one for the global timeout queue.
 
 - **Global vs Object Queue APIs**
-  The scheduler exposes singleton ready and blocked queues through the task-queue layer, so ready/blocked operations do not require callers to pass queue pointers. State-queue helpers are explicit about whether they target the ready or blocked queue. Object-owned wait queues still take explicit queue arguments because each kernel object maintains its own waiter list.
+  The scheduler exposes singleton ready and blocked queues through the task-queue layer, so ready/blocked operations do not require callers to pass queue pointers. Ready-task selection also respects core affinity by splitting the ready queue into per-priority buckets for each affinity class. Object-owned wait queues still take explicit queue arguments because each kernel object maintains its own waiter list.
 
 - **Kernel Objects Still Own Wait Queues**
-  Semaphores, mutexes, events, mailboxes, message queues, stream buffers, message buffers, condition variables, and memory slabs still keep wait queues in their object state. The queue stores only a head anchor; the task carries the links.
+  Semaphores, mutexes, events, mailboxes, message queues, stream buffers, message buffers, condition variables, and memory slabs still keep wait queues in their object state. The queue stores head and tail anchors, while the task carries the intrusive links.
 
 - **Current-Task Blocking API**
   `taskBlock()` now blocks only the currently running task and resolves that task internally. That keeps wait-object call sites focused on the blocking reason and timeout rather than passing the current task back into the task layer. Finite waits are inserted into a global timeout queue ordered by absolute deadline, while `TASK_FOREVER_WAIT` blocks without consuming a timeout-queue slot. The scheduler owns the monotonic system tick count used to evaluate those deadlines.

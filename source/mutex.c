@@ -31,7 +31,7 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/mutex.h"
 
-#if CONFIG_MUTEX_USE_PRIORITY_INHERITANCE
+#if CONFIG_MUTEX_PRIORITY_INHERITANCE
 static inline void mutexApplyPriorityInheritance(mutexHandleType *pMutex, taskHandleType *pCurrentTask)
 {
     if ((pMutex == NULL) || (pCurrentTask == NULL))
@@ -87,7 +87,7 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
     taskHandleType *currentTask = taskGetCurrent();
 
 retry:
-#if CONFIG_MUTEX_USE_PRIORITY_INHERITANCE
+#if CONFIG_MUTEX_PRIORITY_INHERITANCE
     mutexApplyPriorityInheritance(pMutex, currentTask);
 #endif
     /* Check if mutex is free and no owner has been assigned. If so, lock mutex immediately.*/
@@ -179,7 +179,7 @@ int mutexUnlock(mutexHandleType *pMutex)
         if (pMutex->locked)
         {
 
-#if CONFIG_MUTEX_USE_PRIORITY_INHERITANCE
+#if CONFIG_MUTEX_PRIORITY_INHERITANCE
             mutexRestorePriorityInheritance(pMutex);
 #endif
             /* Get next owner of the mutex*/

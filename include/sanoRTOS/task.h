@@ -37,8 +37,8 @@ extern "C"
 {
 #endif
 
-#define TASK_LOWEST_PRIORITY 0xff
-#define TASK_HIGHEST_PRIORITY 0
+#define TASK_LOWEST_PRIORITY (CONFIG_TASK_PRIORITY_LEVELS - 1U)
+#define TASK_HIGHEST_PRIORITY 0U
 
 #define TASK_NO_WAIT 0U
 #define TASK_FOREVER_WAIT 0xFFFFFFFFUL
@@ -229,7 +229,7 @@ extern "C"
     typedef struct
     {
         /*Queue of tasks in ready state*/
-        taskQueueType readyQueue;
+        readyQueueType readyQueue;
 
         /*Queue of tasks in blocked state*/
         taskQueueType blockedQueue;

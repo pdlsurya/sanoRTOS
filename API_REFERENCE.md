@@ -5,6 +5,7 @@ This guide covers the public application-facing APIs for the main sanoRTOS kerne
 ## Conventions
 
 - Lower numeric task priority means higher scheduling priority.
+- The default configured task-priority range is `0..15` via `CONFIG_TASK_PRIORITY_LEVELS`.
 - `TASK_NO_WAIT` means "do not block".
 - `TASK_FOREVER_WAIT` means "wait indefinitely". `TASK_MAX_WAIT` remains as a legacy alias.
 - APIs documented as thread-only must not be called from ISR context.

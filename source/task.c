@@ -37,12 +37,7 @@
 
 LOG_MODULE_DEFINE(task);
 
-taskPoolType taskPool = {
-    .readyQueue = TASK_STATE_QUEUE_INITIALIZER,
-    .blockedQueue = TASK_STATE_QUEUE_INITIALIZER,
-    .timeoutQueue = TASK_TIMEOUT_QUEUE_INITIALIZER,
-    .currentTask = {0}
-};
+taskPoolType taskPool = {0};
 
 /*Currently scheduled task*/
 taskHandleType *currentTask[PORT_CORE_COUNT];
@@ -610,7 +605,7 @@ int taskStart(taskHandleType *pTask)
         return RET_INVAL;
     }
 
-    if (pTask->state == TASK_STATE_TERMINATED)
+    if ((pTask->state == TASK_STATE_TERMINATED) || (pTask->priority > TASK_LOWEST_PRIORITY))
     {
         return RET_INVAL;
     }
@@ -637,7 +632,8 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
 
     if ((ppTask == NULL) || (taskEntryFunction == NULL) ||
         (stackSize < ((PORT_INITIAL_TASK_STACK_OFFSET + STACK_GUARD_WORDS) * sizeof(uint32_t))) ||
-        ((stackSize % sizeof(uint32_t)) != 0))
+        ((stackSize % sizeof(uint32_t)) != 0) ||
+        (taskPriority > TASK_LOWEST_PRIORITY))
     {
         return RET_INVAL;
     }

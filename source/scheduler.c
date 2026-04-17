@@ -54,7 +54,7 @@ static int selectNextTask(void)
 {
     taskHandleType *const pCurrentTask = taskGetCurrent();
 
-#if CONFIG_CHECK_STACK_OVERFLOW
+#if CONFIG_STACK_OVERFLOW_CHECK
     taskCheckStackOverflow();
 #endif
 

@@ -30,6 +30,16 @@
 /* Selects which intrusive queue link inside a task a helper should operate on. */
 typedef taskQueueLinkType *(*taskQueueLinkAccessorType)(taskHandleType *pTask);
 
+#if CONFIG_READY_QUEUE_PRIORITY_MULTIQ
+#if (PORT_CORE_COUNT == 1U)
+#define READY_QUEUE_AFFINITY_CLASS_ANY 0U
+#define READY_QUEUE_AFFINITY_CLASS_COUNT 1U
+#else
+#define READY_QUEUE_AFFINITY_CLASS_ANY PORT_CORE_COUNT
+#define READY_QUEUE_AFFINITY_CLASS_COUNT (PORT_CORE_COUNT + 1U)
+#endif
+#endif
+
 static inline taskQueueLinkType *taskStateQueueLink(taskHandleType *pTask)
 {
     return (pTask == NULL) ? NULL : &pTask->stateQueueLink;
@@ -49,6 +59,113 @@ static inline bool taskDeadlineBefore(uint32_t lhs, uint32_t rhs)
 {
     return ((int32_t)(lhs - rhs) < 0);
 }
+
+#if CONFIG_READY_QUEUE_PRIORITY_MULTIQ
+static inline bool readyQueuePriorityValid(uint8_t priority)
+{
+    return (priority < CONFIG_TASK_PRIORITY_LEVELS);
+}
+
+static inline uint8_t readyQueueAffinityClass(coreAffinityType affinity)
+{
+    return (affinity == AFFINITY_CORE_ANY) ? READY_QUEUE_AFFINITY_CLASS_ANY : (uint8_t)affinity;
+}
+
+static inline uint8_t readyQueueHighestPriority(uint32_t bitmap)
+{
+    return (bitmap == 0U) ? CONFIG_TASK_PRIORITY_LEVELS : (uint8_t)__builtin_ctz(bitmap);
+}
+
+static inline taskQueueType *readyQueueSlot(readyQueueType *pReadyQueue,
+                                            uint8_t priority,
+                                            uint8_t affinityClass)
+{
+    if ((pReadyQueue == NULL) || !readyQueuePriorityValid(priority) ||
+        (affinityClass >= READY_QUEUE_AFFINITY_CLASS_COUNT))
+    {
+        return NULL;
+    }
+
+    return &pReadyQueue->queues[priority][affinityClass];
+}
+
+static bool readyQueueFindSlot(readyQueueType *pReadyQueue,
+                               taskQueueType *pQueue,
+                               uint8_t *pPriority,
+                               uint8_t *pAffinityClass)
+{
+    uint8_t priority;
+    uint8_t affinityClass;
+
+    if ((pReadyQueue == NULL) || (pQueue == NULL))
+    {
+        return false;
+    }
+
+    for (priority = 0U; priority < CONFIG_TASK_PRIORITY_LEVELS; priority++)
+    {
+        for (affinityClass = 0U; affinityClass < READY_QUEUE_AFFINITY_CLASS_COUNT; affinityClass++)
+        {
+            if (readyQueueSlot(pReadyQueue, priority, affinityClass) == pQueue)
+            {
+                if (pPriority != NULL)
+                {
+                    *pPriority = priority;
+                }
+                if (pAffinityClass != NULL)
+                {
+                    *pAffinityClass = affinityClass;
+                }
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static taskQueueType *readyQueueSelectQueue(readyQueueType *pReadyQueue,
+                                            uint8_t coreId,
+                                            uint8_t *pPriority,
+                                            uint8_t *pAffinityClass)
+{
+    uint32_t eligibleBitmap;
+    uint8_t priority;
+    uint8_t affinityClass;
+
+    if ((pReadyQueue == NULL) || (coreId >= PORT_CORE_COUNT))
+    {
+        return NULL;
+    }
+
+    eligibleBitmap = pReadyQueue->bitmaps[coreId] | pReadyQueue->bitmaps[READY_QUEUE_AFFINITY_CLASS_ANY];
+    if (eligibleBitmap == 0U)
+    {
+        return NULL;
+    }
+
+    priority = readyQueueHighestPriority(eligibleBitmap);
+    if (!readyQueuePriorityValid(priority))
+    {
+        return NULL;
+    }
+
+    affinityClass = ((pReadyQueue->bitmaps[coreId] & (1UL << priority)) != 0U) ?
+                        coreId :
+                        READY_QUEUE_AFFINITY_CLASS_ANY;
+
+    if (pPriority != NULL)
+    {
+        *pPriority = priority;
+    }
+    if (pAffinityClass != NULL)
+    {
+        *pAffinityClass = affinityClass;
+    }
+
+    return readyQueueSlot(pReadyQueue, priority, affinityClass);
+}
+#endif
 
 static int taskQueueInsertBetween(taskQueueType *pQueue,
                                   taskHandleType *pPrevTask,
@@ -86,6 +203,10 @@ static int taskQueueInsertBetween(taskQueueType *pQueue,
     {
         linkOf(pNextTask)->pPrevTask = pTask;
     }
+    else
+    {
+        pQueue->tail = pTask;
+    }
 
     return RET_SUCCESS;
 }
@@ -119,6 +240,10 @@ static int taskQueueRemove(taskQueueType *pQueue,
     if (pLink->pNextTask != NULL)
     {
         linkOf(pLink->pNextTask)->pPrevTask = pLink->pPrevTask;
+    }
+    else
+    {
+        pQueue->tail = pLink->pPrevTask;
     }
 
     pLink->pPrevTask = NULL;
@@ -299,7 +424,7 @@ static taskHandleType *taskQueuePeek(taskQueueType *pQueue,
     return NULL;
 }
 
-taskQueueType *readyQueue(void)
+readyQueueType *readyQueue(void)
 {
     return &taskPool.readyQueue;
 }
@@ -316,7 +441,40 @@ taskQueueType *timeoutQueue(void)
 
 int readyQueueAdd(taskHandleType *pTask)
 {
+#if CONFIG_READY_QUEUE_PRIORITY_MULTIQ
+    readyQueueType *pReadyQueue = readyQueue();
+    taskQueueType *pQueue;
+    uint8_t affinityClass;
+    int retCode;
+
+    if ((pTask == NULL) || !readyQueuePriorityValid(pTask->priority))
+    {
+        return RET_INVAL;
+    }
+
+    affinityClass = readyQueueAffinityClass(pTask->coreAffinity);
+    pQueue = readyQueueSlot(pReadyQueue, pTask->priority, affinityClass);
+
+    if (pQueue == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    retCode = taskQueueInsertBetween(pQueue, pQueue->tail, NULL, pTask, taskStateQueueLink);
+    if (retCode == RET_SUCCESS)
+    {
+        pReadyQueue->bitmaps[affinityClass] |= (1UL << pTask->priority);
+    }
+
+    return retCode;
+#else
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
+
     return taskQueueAddPrioritySorted(readyQueue(), pTask, taskStateQueueLink);
+#endif
 }
 
 int blockedQueueAdd(taskHandleType *pTask)
@@ -337,7 +495,40 @@ int timeoutQueueAdd(taskHandleType *pTask)
 
 int readyQueueRemove(taskHandleType *pTask)
 {
+#if CONFIG_READY_QUEUE_PRIORITY_MULTIQ
+    readyQueueType *pReadyQueue = readyQueue();
+    taskQueueLinkType *pLink = taskStateQueueLink(pTask);
+    taskQueueType *pQueue;
+    uint8_t priority;
+    uint8_t affinityClass;
+    int retCode;
+
+    if ((pTask == NULL) || (pLink == NULL) || (pLink->pOwnerQueue == NULL))
+    {
+        return (pTask == NULL) ? RET_INVAL : RET_NOTASK;
+    }
+
+    pQueue = pLink->pOwnerQueue;
+    if (!readyQueueFindSlot(pReadyQueue, pQueue, &priority, &affinityClass))
+    {
+        return RET_NOTASK;
+    }
+
+    retCode = taskQueueRemove(pQueue, pTask, taskStateQueueLink);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    if (taskQueueEmpty(pQueue))
+    {
+        pReadyQueue->bitmaps[affinityClass] &= ~(1UL << priority);
+    }
+
+    return RET_SUCCESS;
+#else
     return taskQueueRemove(readyQueue(), pTask, taskStateQueueLink);
+#endif
 }
 
 int blockedQueueRemove(taskHandleType *pTask)
@@ -367,7 +558,34 @@ taskHandleType *waitQueueNext(taskQueueType *pWaitQueue, taskHandleType *pTask)
 
 taskHandleType *readyQueuePop(void)
 {
+#if CONFIG_READY_QUEUE_PRIORITY_MULTIQ
+    readyQueueType *pReadyQueue = readyQueue();
+    taskQueueType *pQueue;
+    taskHandleType *pTask;
+    uint8_t priority;
+    uint8_t affinityClass;
+
+    pQueue = readyQueueSelectQueue(pReadyQueue, PORT_CORE_ID(), &priority, &affinityClass);
+    if (pQueue == NULL)
+    {
+        return NULL;
+    }
+
+    pTask = pQueue->head;
+    if ((pTask == NULL) || (taskQueueRemove(pQueue, pTask, taskStateQueueLink) != RET_SUCCESS))
+    {
+        return NULL;
+    }
+
+    if (taskQueueEmpty(pQueue))
+    {
+        pReadyQueue->bitmaps[affinityClass] &= ~(1UL << priority);
+    }
+
+    return pTask;
+#else
     return taskQueuePop(readyQueue(), true, taskStateQueueLink);
+#endif
 }
 
 taskHandleType *waitQueuePop(taskQueueType *pWaitQueue)
@@ -377,7 +595,13 @@ taskHandleType *waitQueuePop(taskQueueType *pWaitQueue)
 
 taskHandleType *readyQueuePeek(void)
 {
+#if CONFIG_READY_QUEUE_PRIORITY_MULTIQ
+    taskQueueType *pQueue = readyQueueSelectQueue(readyQueue(), PORT_CORE_ID(), NULL, NULL);
+
+    return (pQueue == NULL) ? NULL : pQueue->head;
+#else
     return taskQueuePeek(readyQueue(), true, taskStateQueueLink);
+#endif
 }
 
 taskHandleType *waitQueuePeek(taskQueueType *pWaitQueue)
