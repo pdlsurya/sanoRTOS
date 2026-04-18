@@ -198,8 +198,9 @@ int mutexUnlock(mutexHandleType *pMutex)
 
             if (nextOwner != NULL)
             {
-                /*If task was suspended while waiting for mutex,skip the task and get another waiting task from the waitQueue*/
-                if (nextOwner->status == TASK_STATUS_SUSPENDED)
+                /*Skip stale tasks that are no longer blocked waiting for this mutex.*/
+                if ((nextOwner->status != TASK_STATUS_BLOCKED) ||
+                    (nextOwner->blockedReason != WAIT_FOR_MUTEX))
                 {
                     goto getNextOwner;
                 }

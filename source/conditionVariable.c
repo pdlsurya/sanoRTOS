@@ -136,8 +136,9 @@ getNextSignalTask:
 
     if (nextSignalTask != NULL)
     {
-        /*If task was suspended while waiting on condition varibale, skip the task and get another waiting task from the waitQueue*/
-        if (nextSignalTask->status == TASK_STATUS_SUSPENDED)
+        /*Skip stale tasks that are no longer blocked waiting on this condition variable.*/
+        if ((nextSignalTask->status != TASK_STATUS_BLOCKED) ||
+            (nextSignalTask->blockedReason != WAIT_FOR_COND_VAR))
         {
             goto getNextSignalTask;
         }
@@ -185,7 +186,8 @@ int condVarBroadcast(condVarHandleType *pCondVar)
 
         while ((pTask = TASK_GET_FROM_WAIT_QUEUE(&pCondVar->waitQueue)) != NULL)
         {
-            if (pTask->status != TASK_STATUS_SUSPENDED)
+            if ((pTask->status == TASK_STATUS_BLOCKED) &&
+                (pTask->blockedReason == WAIT_FOR_COND_VAR))
             {
                 retCode = taskSetReady(pTask, COND_VAR_SIGNALLED);
                 if (retCode != RET_SUCCESS)

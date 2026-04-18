@@ -92,7 +92,8 @@ static int eventWakeMatchingTasks(eventHandleType *pEvent, bool *pContextSwitchR
         /* Clear any stale match state before re-evaluating the waiter */
         pTask->eventState.matchedEvents = 0U;
 
-        if ((pTask->status != TASK_STATUS_SUSPENDED) &&
+        if ((pTask->status == TASK_STATUS_BLOCKED) &&
+            (pTask->blockedReason == WAIT_FOR_EVENT) &&
             eventConditionMatched(pEvent->events, pTask->eventState.waitMask, (pTask->eventState.waitAll != 0U)))
         {
             matchedEvents = eventMatchedMask(pEvent->events, pTask->eventState.waitMask);
