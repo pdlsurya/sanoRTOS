@@ -169,7 +169,7 @@ int mutexUnlock(mutexHandleType *pMutex)
 
     int retCode;
 
-    bool irqState;
+    bool irqState = spinLock(&pMutex->lock);
 
     bool contextSwitchRequired = false;
 
@@ -189,12 +189,8 @@ int mutexUnlock(mutexHandleType *pMutex)
 #endif
             /* Get next owner of the mutex*/
         getNextOwner:
-            irqState = spinLock(&pMutex->lock);
-
             /*Get next highest priority task from waitQueue.*/
             nextOwner = TASK_GET_FROM_WAIT_QUEUE(&pMutex->waitQueue);
-
-            spinUnlock(&pMutex->lock, irqState);
 
             if (nextOwner != NULL)
             {
@@ -208,6 +204,7 @@ int mutexUnlock(mutexHandleType *pMutex)
                 retCode = taskSetReady(nextOwner, MUTEX_LOCKED);
                 if (retCode != RET_SUCCESS)
                 {
+                    spinUnlock(&pMutex->lock, irqState);
                     return retCode;
                 }
 
@@ -236,6 +233,8 @@ int mutexUnlock(mutexHandleType *pMutex)
     {
         retCode = RET_NOTOWNER;
     }
+
+    spinUnlock(&pMutex->lock, irqState);
 
     if (contextSwitchRequired)
     {

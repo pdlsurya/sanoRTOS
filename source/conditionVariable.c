@@ -125,6 +125,10 @@ int condVarSignal(condVarHandleType *pCondVar)
         return RET_INVAL;
     }
 
+    int retCode;
+
+    bool contextSwitchRequired = false;
+
     taskHandleType *nextSignalTask = NULL;
 
     bool irqState = spinLock(&pCondVar->lock);
@@ -142,11 +146,10 @@ getNextSignalTask:
         {
             goto getNextSignalTask;
         }
-        spinUnlock(&pCondVar->lock, irqState);
-
-        int retCode = taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
+        retCode = taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
         if (retCode != RET_SUCCESS)
         {
+            spinUnlock(&pCondVar->lock, irqState);
             return retCode;
         }
 
@@ -156,13 +159,23 @@ getNextSignalTask:
          *higher priority[lower priority value] than that of current task */
         if (nextSignalTask->priority <= currentTask->priority)
         {
-            taskYield();
+            contextSwitchRequired = true;
         }
-        return RET_SUCCESS;
+        retCode = RET_SUCCESS;
     }
+    else
+    {
+        retCode = RET_NOTASK;
+    }
+
     spinUnlock(&pCondVar->lock, irqState);
 
-    return RET_NOTASK;
+    if (contextSwitchRequired)
+    {
+        taskYield();
+    }
+
+    return retCode;
 }
 
 int condVarBroadcast(condVarHandleType *pCondVar)
