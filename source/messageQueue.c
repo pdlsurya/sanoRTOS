@@ -62,11 +62,9 @@ static int msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
             }
             if (taskSetReady(pConsumerTask, MSG_QUEUE_DATA_AVAILABLE) == RET_SUCCESS)
             {
-                taskHandleType *currentTask = taskGetCurrent();
-
                 /*Perform context switch if  unblocked pConsumerTask task has equal or
                  *higher priority[lower priority value] than that of current task */
-                if (pConsumerTask->priority <= currentTask->priority)
+                if (taskCanPreemptCurrentCore(pConsumerTask))
                 {
                     contextSwitchRequired = true;
                 }
@@ -120,11 +118,9 @@ static int msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
             }
             if (taskSetReady(pProducerTask, MSG_QUEUE_SPACE_AVAILABE) == RET_SUCCESS)
             {
-                taskHandleType *currentTask = taskGetCurrent();
-
                 /*Perform context switch if unblocked pProducerTask task has equal or
                  *higher priority[lower priority value] than that of current task */
-                if (pProducerTask->priority <= currentTask->priority)
+                if (taskCanPreemptCurrentCore(pProducerTask))
                 {
                     contextSwitchRequired = true;
                 }

@@ -148,11 +148,9 @@ int semaphoreGive(semaphoreHandleType *pSem)
                 return retCode;
             }
 
-            taskHandleType *currentTask = taskGetCurrent();
-
             /*Perform context switch if unblocked task has equal or
              *higher priority[lower priority value] than that of current task */
-            if (nextTask->priority <= currentTask->priority)
+            if (taskCanPreemptCurrentCore(nextTask))
             {
                 contextSwitchRequired = true;
             }

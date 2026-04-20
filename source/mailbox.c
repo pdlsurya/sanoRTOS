@@ -107,8 +107,7 @@ static int mailboxWakeMatchedTask(taskQueueType *pWaitQueue, taskHandleType *pTa
         return retCode;
     }
 
-    taskHandleType *currentTask = taskGetCurrent();
-    if ((currentTask != NULL) && (pTask->priority <= currentTask->priority))
+    if (taskCanPreemptCurrentCore(pTask))
     {
         *pContextSwitchRequired = true;
     }
