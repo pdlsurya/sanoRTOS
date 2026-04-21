@@ -163,7 +163,11 @@ extern "C"
 
 #define PORT_TIMER_TICK_FREQ MTIMER_TICK_FREQUENCY
 
+#if CONFIG_SMP
 #define PORT_CORE_COUNT 2
+#else
+#define PORT_CORE_COUNT 1
+#endif
 
 #define PORT_CORE_ID() get_core_num()
 

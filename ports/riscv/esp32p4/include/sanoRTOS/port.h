@@ -140,7 +140,11 @@ extern "C"
 
 #define PORT_TIMER_TICK_FREQ 360000000
 
+#if CONFIG_SMP
 #define PORT_CORE_COUNT 2
+#else
+#define PORT_CORE_COUNT 1
+#endif
 
 #define PORT_CORE_ID() portCoreId()
 
