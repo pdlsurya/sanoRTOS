@@ -98,6 +98,9 @@ int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
             return retCode;
         }
     }
+
+    pTask->coreAffinity = taskNormalizeCoreAffinity(pTask->coreAffinity);
+
     pTask->status = TASK_STATUS_READY;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = wakeupReason;
@@ -216,6 +219,8 @@ int taskStart(taskHandleType *pTask)
     int retCode;
     bool irqState = spinLock(&lock);
 
+    pTask->coreAffinity = taskNormalizeCoreAffinity(pTask->coreAffinity);
+
     taskQueueType *pReadyQueue = getReadyQueue();
 
     retCode = taskQueueAdd(pReadyQueue, pTask);
@@ -278,7 +283,7 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
     pTask->status = TASK_STATUS_READY;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
-    pTask->coreAffinity = affinity;
+    pTask->coreAffinity = taskNormalizeCoreAffinity(affinity);
     pTask->priority = taskPriority;
     pTask->flags = TASK_FLAG_DYNAMIC | TASK_FLAG_OWN_STACK;
 

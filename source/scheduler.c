@@ -51,58 +51,52 @@ void idleTaskHandler0(void *params)
 static int selectNextTask(void)
 {
     taskQueueType *const pReadyQueue = getReadyQueue();
+    taskHandleType *const pCurrentTask = taskGetCurrent();
 
-    if (!taskQueueEmpty(pReadyQueue))
+    // If the current task is running, add it to the ready queue
+    if (pCurrentTask->status == TASK_STATUS_RUNNING)
     {
-        taskHandleType *const pCurrentTask = taskGetCurrent();
+        taskHandleType *pNextReadyTask = TASK_PEEK_FROM_READY_QUEUE(pReadyQueue);
 
-        // If the current task is running, add it to the ready queue
-        if (pCurrentTask->status == TASK_STATUS_RUNNING)
+        //If next ready task exists and has an equal or higher priority than current task,
+        // add the current task to the ready queue.
+        if (pNextReadyTask != NULL && pNextReadyTask->priority <= pCurrentTask->priority)
         {
-            taskHandleType *pNextReadyTask = TASK_PEEK_FROM_READY_QUEUE(pReadyQueue);
-
-            //If next ready task exists and has an equal or higher priority than current task,
-            // add the current task to the ready queue.
-            if (pNextReadyTask != NULL && pNextReadyTask->priority <= pCurrentTask->priority)
+            pCurrentTask->status = TASK_STATUS_READY;
+            int retCode = taskQueueAdd(pReadyQueue, pCurrentTask);
+            if (retCode != RET_SUCCESS)
             {
-                pCurrentTask->status = TASK_STATUS_READY;
-                int retCode = taskQueueAdd(pReadyQueue, pCurrentTask);
-                if (retCode != RET_SUCCESS)
-                {
-                    return retCode;
-                }
-            }
-            else
-            {
-                return RET_NOTASK; // No need to switch to a lower priority task
+                return retCode;
             }
         }
-
-        // Set the current task to the next ready task
-        currentTask[PORT_CORE_ID()] = pCurrentTask;
-
-#if CONFIG_CHECK_STACK_OVERFLOW
-        // Check for stack overflow
-        taskCheckStackOverflow();
-#endif
-
-        // Get the next task from the ready queue
-        nextTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
-        if (nextTask[PORT_CORE_ID()] == NULL)
+        else
         {
-            return RET_NOTASK;
+            return RET_NOTASK; // No need to switch to a lower priority task
         }
-
-        // Set the status of the next task to RUNNING
-        nextTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
-
-        // Set the current task to the next task
-        taskSetCurrent(nextTask[PORT_CORE_ID()]);
-
-        return RET_SUCCESS;
     }
 
-    return RET_NOTASK;
+    // Set the current task to the next ready task
+    currentTask[PORT_CORE_ID()] = pCurrentTask;
+
+#if CONFIG_CHECK_STACK_OVERFLOW
+    // Check for stack overflow
+    taskCheckStackOverflow();
+#endif
+
+    // Get the next task from the ready queue
+    nextTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
+    if (nextTask[PORT_CORE_ID()] == NULL)
+    {
+        return RET_NOTASK;
+    }
+
+    // Set the status of the next task to RUNNING
+    nextTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
+
+    // Set the current task to the next task
+    taskSetCurrent(nextTask[PORT_CORE_ID()]);
+
+    return RET_SUCCESS;
 }
 
 static void checkTimeout()

@@ -318,6 +318,27 @@ extern "C"
     }
 
     /**
+     * @brief Normalize task core affinity for the current build configuration.
+     *
+     * On single-core builds, any fixed-core affinity collapses to `AFFINITY_CORE_0`
+     * so the task remains schedulable.
+     *
+     * @param affinity Requested task affinity.
+     * @return Normalized affinity for this build.
+     */
+    static inline __attribute__((always_inline)) coreAffinityType taskNormalizeCoreAffinity(coreAffinityType affinity)
+    {
+#if (PORT_CORE_COUNT == 1)
+        if (affinity != AFFINITY_CORE_ANY)
+        {
+            return AFFINITY_CORE_0;
+        }
+#endif
+
+        return affinity;
+    }
+
+    /**
      * @brief Check whether a task can preempt the current core immediately.
      *
      * A task can preempt the current core only when it is eligible to run on this
@@ -365,7 +386,7 @@ extern "C"
      */
     static inline __attribute__((always_inline)) void taskSetCoreAffinity(taskHandleType *pTask, coreAffinityType affinity)
     {
-        pTask->coreAffinity = affinity;
+        pTask->coreAffinity = taskNormalizeCoreAffinity(affinity);
     }
 
     /**
