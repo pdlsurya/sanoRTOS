@@ -39,7 +39,8 @@ static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout ha
 /*Define timer task with highest possible priority*/
 TASK_DEFINE(timerTask, 4096, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, AFFINITY_CORE_0);
 
-static int timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue, timeoutHandlerType timeoutHandler)
+static int timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue,
+                                   timeoutHandlerType timeoutHandler, void *pArg)
 {
     timeoutHandlerNodeType *newNode = (timeoutHandlerNodeType *)memAlloc(sizeof(timeoutHandlerNodeType));
     if (newNode == NULL)
@@ -48,6 +49,7 @@ static int timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue
     }
 
     newNode->timeoutHandler = timeoutHandler;
+    newNode->pArg = pArg;
     newNode->nextNode = NULL;
 
     if (pTimeoutHandlerQueue->head == NULL)
@@ -64,16 +66,32 @@ static int timeoutHandlerQueuePush(timeoutHandlerQueueType *pTimeoutHandlerQueue
     return RET_SUCCESS;
 }
 
-static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeoutHandlerQueue)
+static timeoutHandlerType timeoutHandlerQueuePop(timeoutHandlerQueueType *pTimeoutHandlerQueue, void **ppArg)
 {
+    if ((pTimeoutHandlerQueue == NULL) || (pTimeoutHandlerQueue->head == NULL))
+    {
+        if (ppArg != NULL)
+        {
+            *ppArg = NULL;
+        }
+        return NULL;
+    }
 
     timeoutHandlerNodeType *temp = pTimeoutHandlerQueue->head->nextNode;
 
     timeoutHandlerType timeoutHandler = pTimeoutHandlerQueue->head->timeoutHandler;
+    if (ppArg != NULL)
+    {
+        *ppArg = pTimeoutHandlerQueue->head->pArg;
+    }
 
     memFree(pTimeoutHandlerQueue->head);
 
     pTimeoutHandlerQueue->head = temp;
+    if (pTimeoutHandlerQueue->head == NULL)
+    {
+        pTimeoutHandlerQueue->tail = NULL;
+    }
 
     return timeoutHandler;
 }
@@ -182,7 +200,8 @@ void processTimers()
                 {
 
                     /*Add timeout handler to the timeoutHandlerQueue*/
-                    if (timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler) == RET_SUCCESS)
+                    if (timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler,
+                                                currentNode->pArg) == RET_SUCCESS)
                     {
                         /* Check if timer task is BLOCKED. If so, change status to ready to allow execution.*/
                         if (timerTask.status == TASK_STATUS_BLOCKED)
@@ -216,10 +235,11 @@ void timerTaskFunction(void *args)
 
     while (1)
     {
-        if (timeoutHandlerQueue.head != NULL) // Check for non-empty condition
+        void *pArg = NULL;
+        timeoutHandlerType timeoutHandler = timeoutHandlerQueuePop(&timeoutHandlerQueue, &pArg);
+        if (timeoutHandler != NULL)
         {
-            timeoutHandlerType timeoutHandler = timeoutHandlerQueuePop(&timeoutHandlerQueue);
-            timeoutHandler();
+            timeoutHandler(pArg);
         }
         else
         {
