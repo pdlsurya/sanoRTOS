@@ -115,24 +115,18 @@ int delayedWorkSchedule(workQueueHandleType *pWorkQueue, delayedWorkType *pDelay
         return RET_INVAL;
     }
 
-    bool irqState = spinLock(&pDelayedWork->lock);
     if (pDelayedWork->scheduled || pDelayedWork->work.pending)
     {
-        spinUnlock(&pDelayedWork->lock, irqState);
         return RET_BUSY;
     }
 
     pDelayedWork->pWorkQueue = pWorkQueue;
     pDelayedWork->scheduled = true;
-    spinUnlock(&pDelayedWork->lock, irqState);
 
     if (delayTicks == 0U)
     {
         int retCode = workSubmit(pWorkQueue, &pDelayedWork->work);
-
-        irqState = spinLock(&pDelayedWork->lock);
         pDelayedWork->scheduled = false;
-        spinUnlock(&pDelayedWork->lock, irqState);
 
         return retCode;
     }
@@ -140,9 +134,7 @@ int delayedWorkSchedule(workQueueHandleType *pWorkQueue, delayedWorkType *pDelay
     int retCode = timerStart(&pDelayedWork->timer, delayTicks);
     if (retCode != RET_SUCCESS)
     {
-        irqState = spinLock(&pDelayedWork->lock);
         pDelayedWork->scheduled = false;
-        spinUnlock(&pDelayedWork->lock, irqState);
     }
 
     return retCode;
@@ -156,7 +148,6 @@ int delayedWorkCancel(delayedWorkType *pDelayedWork)
     }
 
     int retCode;
-    bool irqState = spinLock(&pDelayedWork->lock);
 
     if (pDelayedWork->scheduled)
     {
@@ -179,8 +170,6 @@ int delayedWorkCancel(delayedWorkType *pDelayedWork)
         retCode = RET_NOTACTIVE;
     }
 
-    spinUnlock(&pDelayedWork->lock, irqState);
-
     return retCode;
 }
 
@@ -193,21 +182,16 @@ void delayedWorkTimeoutHandler(void *pArg)
         return;
     }
 
-    bool irqState = spinLock(&pDelayedWork->lock);
     if (!pDelayedWork->scheduled)
     {
-        spinUnlock(&pDelayedWork->lock, irqState);
         return;
     }
 
     workQueueHandleType *pWorkQueue = pDelayedWork->pWorkQueue;
-    spinUnlock(&pDelayedWork->lock, irqState);
 
     (void)workSubmit(pWorkQueue, &pDelayedWork->work);
 
-    irqState = spinLock(&pDelayedWork->lock);
     pDelayedWork->scheduled = false;
-    spinUnlock(&pDelayedWork->lock, irqState);
 }
 
 void workQueueTask(void *pArgs)

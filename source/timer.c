@@ -29,12 +29,15 @@
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/timer.h"
 #include "sanoRTOS/mem.h"
+#include "sanoRTOS/spinLock.h"
 
 #define TIMER_TASK_PRIORITY TASK_HIGHEST_PRIORITY // timer task has the highest possible priority [lower the value, higher the priority]
 
 static timerListType timerList = {0}; // List of running timers
 
 static timeoutHandlerQueueType timeoutHandlerQueue = {0}; // Queue of timeout handlers to be executed
+
+static atomic_t lock; // Protects timer list and timeout handler queue
 
 /*Define timer task with highest possible priority*/
 TASK_DEFINE(timerTask, 4096, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, AFFINITY_CORE_0);
@@ -141,6 +144,17 @@ static int timerListNodeDelete(timerListType *pTimerList, timerNodeType *pTimerN
     return RET_EMPTY;
 }
 
+static int timerStopLocked(timerNodeType *pTimerNode)
+{
+    if (pTimerNode->isRunning)
+    {
+        pTimerNode->isRunning = false;
+        return timerListNodeDelete(&timerList, pTimerNode);
+    }
+
+    return RET_NOTACTIVE;
+}
+
 int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
 {
     if (pTimerNode == NULL)
@@ -148,21 +162,28 @@ int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
         return RET_INVAL;
     }
 
+    int retCode = RET_SUCCESS;
+    bool irqState = spinLock(&lock);
+
     /* check if the timer is already in running state. If so, abort re-starting the timer.*/
     if (pTimerNode->isRunning)
     {
-        return RET_ALREADYACTIVE;
+        retCode = RET_ALREADYACTIVE;
+    }
+    else
+    {
+        /* Set isRunning flag for the started timer pTimerNode.*/
+        pTimerNode->isRunning = true;
+
+        pTimerNode->ticksToExpire = pTimerNode->intervalTicks = intervalTicks;
+
+        /* Add the timer in the queue of running timers*/
+        timerListNodeAdd(&timerList, pTimerNode);
     }
 
-    /* Set isRunning flag for the started timer pTimerNode.*/
-    pTimerNode->isRunning = true;
+    spinUnlock(&lock, irqState);
 
-    pTimerNode->ticksToExpire = pTimerNode->intervalTicks = intervalTicks;
-
-    /* Add the timer in the queue of running timers*/
-    timerListNodeAdd(&timerList, pTimerNode);
-
-    return RET_SUCCESS;
+    return retCode;
 }
 
 int timerStop(timerNodeType *pTimerNode)
@@ -172,16 +193,17 @@ int timerStop(timerNodeType *pTimerNode)
         return RET_INVAL;
     }
 
-    if (pTimerNode->isRunning)
-    {
-        pTimerNode->isRunning = false;
-        return timerListNodeDelete(&timerList, pTimerNode);
-    }
-    return RET_NOTACTIVE;
+    bool irqState = spinLock(&lock);
+    int retCode = timerStopLocked(pTimerNode);
+    spinUnlock(&lock, irqState);
+
+    return retCode;
 }
 
 void processTimers()
 {
+    bool irqState = spinLock(&lock);
+
     if (timerList.head != NULL) // Check if timer list is empty
     {
         timerNodeType *currentNode = timerList.head;
@@ -203,11 +225,8 @@ void processTimers()
                     if (timeoutHandlerQueuePush(&timeoutHandlerQueue, currentNode->timeoutHandler,
                                                 currentNode->pArg) == RET_SUCCESS)
                     {
-                        /* Check if timer task is BLOCKED. If so, change status to ready to allow execution.*/
-                        if (timerTask.status == TASK_STATUS_BLOCKED)
-                        {
-                            (void)taskSetReady(&timerTask, TIMER_TIMEOUT);
-                        }
+                        /* Notify timer task that timeout work is available. */
+                        (void)taskNotify(&timerTask, 0U, TASK_NOTIFY_INCREMENT);
 
                         currentNode->ticksToExpire = currentNode->intervalTicks;
                     }
@@ -215,13 +234,15 @@ void processTimers()
                     /* Check if the timer mode is SINGLE_SHOT. If true, stop the correponding timer*/
                     if (currentNode->mode == TIMER_MODE_SINGLE_SHOT)
                     {
-                        timerStop(currentNode);
+                        (void)timerStopLocked(currentNode);
                     }
                 }
             }
             currentNode = nextNode;
         }
     }
+
+    spinUnlock(&lock, irqState);
 }
 
 int timerTaskStart()
@@ -235,16 +256,19 @@ void timerTaskFunction(void *args)
 
     while (1)
     {
+        bool irqState = spinLock(&lock);
         void *pArg = NULL;
         timeoutHandlerType timeoutHandler = timeoutHandlerQueuePop(&timeoutHandlerQueue, &pArg);
+        spinUnlock(&lock, irqState);
+
         if (timeoutHandler != NULL)
         {
             timeoutHandler(pArg);
         }
         else
         {
-            /* Block timer task and give cpu to other tasks while waiting for timeout*/
-            (void)taskBlock(&timerTask, WAIT_FOR_TIMER_TIMEOUT, 0);
+            /* Block until at least one timeout handler is queued. */
+            (void)taskNotifyTake(true, NULL, TASK_MAX_WAIT);
         }
     }
 }
