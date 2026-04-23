@@ -152,6 +152,7 @@ static int eventWaitCommon(eventHandleType *pEvent, uint32_t waitEvents,
 
     bool contextSwitchRequired;
     bool irqState;
+    int retCode;
 
 retry:
     contextSwitchRequired = false;
@@ -162,7 +163,7 @@ retry:
     {
         pEvent->events |= setEvents;
 
-        int retCode = eventWakeMatchingTasks(pEvent, &contextSwitchRequired);
+        retCode = eventWakeMatchingTasks(pEvent, &contextSwitchRequired);
         if (retCode != RET_SUCCESS)
         {
             spinUnlock(&pEvent->lock, irqState);
@@ -179,95 +180,87 @@ retry:
         {
             pEvent->events &= ~(*pMatchedEvents);
         }
+        retCode = RET_SUCCESS;
+    }
+    else if (waitTicks == TASK_NO_WAIT)
+    {
+        /*Wait condition not met and caller requested no-wait */
+        retCode = RET_BUSY;
+    }
+    else
+    {
+        taskHandleType *currentTask = taskGetCurrent();
 
-        spinUnlock(&pEvent->lock, irqState);
+        /* Save current task's event wait criteria before blocking */
+        eventTaskWaitSetup(currentTask, waitEvents, waitAll, clearOnExit);
 
-        if (contextSwitchRequired)
+        /* Add current task to the event object's wait queue */
+        retCode = taskQueueAdd(&pEvent->waitQueue, currentTask);
+        if (retCode != RET_SUCCESS)
         {
-            taskYield();
+            eventTaskWaitReset(currentTask);
+            spinUnlock(&pEvent->lock, irqState);
+            return retCode;
         }
 
-        return RET_SUCCESS;
-    }
-
-    /*Wait condition not met and caller requested no-wait */
-    if (waitTicks == TASK_NO_WAIT)
-    {
         spinUnlock(&pEvent->lock, irqState);
 
-        if (contextSwitchRequired)
+        /* Block current task and give CPU to other tasks while waiting for events */
+        retCode = taskBlock(currentTask, WAIT_FOR_EVENT, waitTicks);
+        if (retCode != RET_SUCCESS)
         {
-            taskYield();
+            irqState = spinLock(&pEvent->lock);
+            (void)taskQueueRemove(&pEvent->waitQueue, currentTask);
+            eventTaskWaitReset(currentTask);
+            spinUnlock(&pEvent->lock, irqState);
+            return retCode;
         }
 
-        return RET_BUSY;
-    }
-
-    taskHandleType *currentTask = taskGetCurrent();
-
-    /* Save current task's event wait criteria before blocking */
-    eventTaskWaitSetup(currentTask, waitEvents, waitAll, clearOnExit);
-
-    /* Add current task to the event object's wait queue */
-    int retCode = taskQueueAdd(&pEvent->waitQueue, currentTask);
-    if (retCode != RET_SUCCESS)
-    {
-        eventTaskWaitReset(currentTask);
-        spinUnlock(&pEvent->lock, irqState);
-        return retCode;
-    }
-
-    spinUnlock(&pEvent->lock, irqState);
-
-    /* Block current task and give CPU to other tasks while waiting for events */
-    retCode = taskBlock(currentTask, WAIT_FOR_EVENT, waitTicks);
-    if (retCode != RET_SUCCESS)
-    {
         irqState = spinLock(&pEvent->lock);
-        (void)taskQueueRemove(&pEvent->waitQueue, currentTask);
-        eventTaskWaitReset(currentTask);
-        spinUnlock(&pEvent->lock, irqState);
-        return retCode;
-    }
 
-    irqState = spinLock(&pEvent->lock);
-
-    /*Task has been woken up either due to event match or wait timeout */
-    if (currentTask->wakeupReason == EVENT_MATCHED)
-    {
-        *pMatchedEvents = currentTask->eventState.matchedEvents;
-        eventTaskWaitReset(currentTask);
-        spinUnlock(&pEvent->lock, irqState);
-        return RET_SUCCESS;
-    }
-
-    if (currentTask->wakeupReason == WAIT_TIMEOUT)
-    {
-        /*Wait timed out, remove task from the waitQueue */
-        retCode = taskQueueRemove(&pEvent->waitQueue, currentTask);
-        eventTaskWaitReset(currentTask);
-        spinUnlock(&pEvent->lock, irqState);
-
-        if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+        /*Task has been woken up either due to event match or wait timeout */
+        if (currentTask->wakeupReason == EVENT_MATCHED)
         {
-            return RET_TIMEOUT;
+            *pMatchedEvents = currentTask->eventState.matchedEvents;
+            eventTaskWaitReset(currentTask);
+            retCode = RET_SUCCESS;
         }
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
+        {
+            /*Wait timed out, remove task from the waitQueue */
+            retCode = taskQueueRemove(&pEvent->waitQueue, currentTask);
+            eventTaskWaitReset(currentTask);
 
-        return retCode;
+            if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+            {
+                retCode = RET_TIMEOUT;
+            }
+        }
+        else
+        {
+            /*Task might have been suspended while waiting for events and later resumed.
+              In this case, retry waiting on the event object again */
+            retCode = taskQueueRemove(&pEvent->waitQueue, currentTask);
+            eventTaskWaitReset(currentTask);
+            spinUnlock(&pEvent->lock, irqState);
+
+            if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+            {
+                return retCode;
+            }
+
+            goto retry;
+        }
     }
 
-    /*Task might have been suspended while waiting for events and later resumed.
-      In this case, retry waiting on the event object again */
-    retCode = taskQueueRemove(&pEvent->waitQueue, currentTask);
-    eventTaskWaitReset(currentTask);
     spinUnlock(&pEvent->lock, irqState);
 
-    if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+    if (contextSwitchRequired)
     {
-        return retCode;
+        taskYield();
     }
 
-    goto retry;
+    return retCode;
 }
 
 int eventSet(eventHandleType *pEvent, uint32_t events)

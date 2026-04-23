@@ -99,7 +99,7 @@ retry:
         retCode = RET_SUCCESS;
     }
 
-    else if (waitTicks == TASK_NO_WAIT && pMutex->locked)
+    else if (waitTicks == TASK_NO_WAIT)
     {
         retCode = RET_BUSY;
     }

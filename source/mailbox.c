@@ -190,84 +190,82 @@ retry:
 
         *pMsg = currentTask->mailboxState.msg;
         mailboxTaskStateReset(currentTask);
-
-        spinUnlock(&pMailbox->lock, irqState);
-
-        if (contextSwitchRequired)
+        retCode = RET_SUCCESS;
+    }
+    else if (waitTicks == TASK_NO_WAIT)
+    {
+        /* No compatible receiver available and caller requested no-wait */
+        mailboxTaskStateReset(currentTask);
+        retCode = RET_BUSY;
+    }
+    else
+    {
+        /* Add current task to the sender wait queue before blocking */
+        retCode = taskQueueAdd(&pMailbox->senderWaitQueue, currentTask);
+        if (retCode != RET_SUCCESS)
         {
-            taskYield();
+            mailboxTaskStateReset(currentTask);
+            spinUnlock(&pMailbox->lock, irqState);
+            return retCode;
         }
 
-        return RET_SUCCESS;
-    }
-
-    /* No compatible receiver available and caller requested no-wait */
-    if (waitTicks == TASK_NO_WAIT)
-    {
-        mailboxTaskStateReset(currentTask);
         spinUnlock(&pMailbox->lock, irqState);
-        return RET_BUSY;
-    }
 
-    /* Add current task to the sender wait queue before blocking */
-    retCode = taskQueueAdd(&pMailbox->senderWaitQueue, currentTask);
-    if (retCode != RET_SUCCESS)
-    {
-        mailboxTaskStateReset(currentTask);
-        spinUnlock(&pMailbox->lock, irqState);
-        return retCode;
-    }
+        /* Block current task and give CPU to other tasks while waiting for a compatible receiver. */
+        retCode = taskBlock(currentTask, WAIT_FOR_MAILBOX_SEND, waitTicks);
+        if (retCode != RET_SUCCESS)
+        {
+            irqState = spinLock(&pMailbox->lock);
+            (void)taskQueueRemove(&pMailbox->senderWaitQueue, currentTask);
+            mailboxTaskStateReset(currentTask);
+            spinUnlock(&pMailbox->lock, irqState);
+            return retCode;
+        }
 
-    spinUnlock(&pMailbox->lock, irqState);
-
-    /* Block current task and give CPU to other tasks while waiting for a compatible receiver. */
-    retCode = taskBlock(currentTask, WAIT_FOR_MAILBOX_SEND, waitTicks);
-    if (retCode != RET_SUCCESS)
-    {
         irqState = spinLock(&pMailbox->lock);
-        (void)taskQueueRemove(&pMailbox->senderWaitQueue, currentTask);
-        mailboxTaskStateReset(currentTask);
-        spinUnlock(&pMailbox->lock, irqState);
-        return retCode;
-    }
 
-    irqState = spinLock(&pMailbox->lock);
-
-    /*Task has been woken up either due to mailbox transfer completion or wait timeout */
-    if (currentTask->wakeupReason == MAILBOX_TRANSFER_DONE)
-    {
-        *pMsg = currentTask->mailboxState.msg;
-        mailboxTaskStateReset(currentTask);
-        spinUnlock(&pMailbox->lock, irqState);
-        return RET_SUCCESS;
-    }
-
-    if (currentTask->wakeupReason == WAIT_TIMEOUT)
-    {
-        retCode = taskQueueRemove(&pMailbox->senderWaitQueue, currentTask);
-        mailboxTaskStateReset(currentTask);
-        spinUnlock(&pMailbox->lock, irqState);
-
-        if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+        /*Task has been woken up either due to mailbox transfer completion or wait timeout */
+        if (currentTask->wakeupReason == MAILBOX_TRANSFER_DONE)
         {
-            return RET_TIMEOUT;
+            *pMsg = currentTask->mailboxState.msg;
+            mailboxTaskStateReset(currentTask);
+            retCode = RET_SUCCESS;
         }
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
+        {
+            retCode = taskQueueRemove(&pMailbox->senderWaitQueue, currentTask);
+            mailboxTaskStateReset(currentTask);
 
-        return retCode;
+            if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+            {
+                retCode = RET_TIMEOUT;
+            }
+        }
+        else
+        {
+            /*Task might have been suspended while waiting on mailbox send and later resumed.
+              In this case, retry sending to the mailbox again */
+            retCode = taskQueueRemove(&pMailbox->senderWaitQueue, currentTask);
+            spinUnlock(&pMailbox->lock, irqState);
+
+            if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+            {
+                mailboxTaskStateReset(currentTask);
+                return retCode;
+            }
+
+            goto retry;
+        }
     }
 
-    /*Task might have been suspended while waiting on mailbox send and later resumed.
-      In this case, retry sending to the mailbox again */
-    retCode = taskQueueRemove(&pMailbox->senderWaitQueue, currentTask);
     spinUnlock(&pMailbox->lock, irqState);
 
-    if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+    if (contextSwitchRequired)
     {
-        mailboxTaskStateReset(currentTask);
-        return retCode;
+        taskYield();
     }
 
-    goto retry;
+    return retCode;
 }
 
 int mailboxReceive(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, void *pBuffer, uint32_t waitTicks)
@@ -346,82 +344,80 @@ retry:
 
         *pMsg = currentTask->mailboxState.msg;
         mailboxTaskStateReset(currentTask);
-
-        spinUnlock(&pMailbox->lock, irqState);
-
-        if (contextSwitchRequired)
+        retCode = RET_SUCCESS;
+    }
+    else if (waitTicks == TASK_NO_WAIT)
+    {
+        /* No compatible sender available and caller requested no-wait */
+        mailboxTaskStateReset(currentTask);
+        retCode = RET_BUSY;
+    }
+    else
+    {
+        /* Add current task to the receiver wait queue before blocking */
+        retCode = taskQueueAdd(&pMailbox->receiverWaitQueue, currentTask);
+        if (retCode != RET_SUCCESS)
         {
-            taskYield();
+            mailboxTaskStateReset(currentTask);
+            spinUnlock(&pMailbox->lock, irqState);
+            return retCode;
         }
 
-        return RET_SUCCESS;
-    }
-
-    /* No compatible sender available and caller requested no-wait */
-    if (waitTicks == TASK_NO_WAIT)
-    {
-        mailboxTaskStateReset(currentTask);
         spinUnlock(&pMailbox->lock, irqState);
-        return RET_BUSY;
-    }
 
-    /* Add current task to the receiver wait queue before blocking */
-    retCode = taskQueueAdd(&pMailbox->receiverWaitQueue, currentTask);
-    if (retCode != RET_SUCCESS)
-    {
-        mailboxTaskStateReset(currentTask);
-        spinUnlock(&pMailbox->lock, irqState);
-        return retCode;
-    }
+        /* Block current task and give CPU to other tasks while waiting for a compatible sender. */
+        retCode = taskBlock(currentTask, WAIT_FOR_MAILBOX_RECEIVE, waitTicks);
+        if (retCode != RET_SUCCESS)
+        {
+            irqState = spinLock(&pMailbox->lock);
+            (void)taskQueueRemove(&pMailbox->receiverWaitQueue, currentTask);
+            mailboxTaskStateReset(currentTask);
+            spinUnlock(&pMailbox->lock, irqState);
+            return retCode;
+        }
 
-    spinUnlock(&pMailbox->lock, irqState);
-
-    /* Block current task and give CPU to other tasks while waiting for a compatible sender. */
-    retCode = taskBlock(currentTask, WAIT_FOR_MAILBOX_RECEIVE, waitTicks);
-    if (retCode != RET_SUCCESS)
-    {
         irqState = spinLock(&pMailbox->lock);
-        (void)taskQueueRemove(&pMailbox->receiverWaitQueue, currentTask);
-        mailboxTaskStateReset(currentTask);
-        spinUnlock(&pMailbox->lock, irqState);
-        return retCode;
-    }
 
-    irqState = spinLock(&pMailbox->lock);
-
-    /*Task has been woken up either due to mailbox transfer completion or wait timeout */
-    if (currentTask->wakeupReason == MAILBOX_TRANSFER_DONE)
-    {
-        *pMsg = currentTask->mailboxState.msg;
-        mailboxTaskStateReset(currentTask);
-        spinUnlock(&pMailbox->lock, irqState);
-        return RET_SUCCESS;
-    }
-
-    if (currentTask->wakeupReason == WAIT_TIMEOUT)
-    {
-        retCode = taskQueueRemove(&pMailbox->receiverWaitQueue, currentTask);
-        mailboxTaskStateReset(currentTask);
-        spinUnlock(&pMailbox->lock, irqState);
-
-        if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+        /*Task has been woken up either due to mailbox transfer completion or wait timeout */
+        if (currentTask->wakeupReason == MAILBOX_TRANSFER_DONE)
         {
-            return RET_TIMEOUT;
+            *pMsg = currentTask->mailboxState.msg;
+            mailboxTaskStateReset(currentTask);
+            retCode = RET_SUCCESS;
         }
+        else if (currentTask->wakeupReason == WAIT_TIMEOUT)
+        {
+            retCode = taskQueueRemove(&pMailbox->receiverWaitQueue, currentTask);
+            mailboxTaskStateReset(currentTask);
 
-        return retCode;
+            if ((retCode == RET_SUCCESS) || (retCode == RET_NOTASK))
+            {
+                retCode = RET_TIMEOUT;
+            }
+        }
+        else
+        {
+            /*Task might have been suspended while waiting on mailbox receive and later resumed.
+              In this case, retry receiving from the mailbox again */
+            retCode = taskQueueRemove(&pMailbox->receiverWaitQueue, currentTask);
+            spinUnlock(&pMailbox->lock, irqState);
+
+            if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+            {
+                mailboxTaskStateReset(currentTask);
+                return retCode;
+            }
+
+            goto retry;
+        }
     }
 
-    /*Task might have been suspended while waiting on mailbox receive and later resumed.
-      In this case, retry receiving from the mailbox again */
-    retCode = taskQueueRemove(&pMailbox->receiverWaitQueue, currentTask);
     spinUnlock(&pMailbox->lock, irqState);
 
-    if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
+    if (contextSwitchRequired)
     {
-        mailboxTaskStateReset(currentTask);
-        return retCode;
+        taskYield();
     }
 
-    goto retry;
+    return retCode;
 }
