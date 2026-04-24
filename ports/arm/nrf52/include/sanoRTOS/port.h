@@ -207,6 +207,11 @@ extern "C"
         return (__get_IPSR() != 0U);
     }
 
+    static inline uint32_t portGetCurrentStackPointer()
+    {
+        return __get_PSP();
+    }
+
     /**
      * @brief Change interrupt status base on irqState
      *

@@ -267,6 +267,22 @@ extern "C"
         return (((mstatus & RVCSR_MSTATUS_MIE_BITS) == 0U) && (((mcause >> 31U) & 0x1U) != 0U));
     }
 
+    static inline uint32_t portGetCurrentStackPointer()
+    {
+        uint32_t stackPointer;
+
+#if defined(USE_ISR_STACK) && USE_ISR_STACK
+        if (portIsInISRContext())
+        {
+            asm volatile("csrr %0, mscratch" : "=r"(stackPointer));
+            return stackPointer;
+        }
+#endif
+
+        asm volatile("mv %0, sp" : "=r"(stackPointer));
+        return stackPointer;
+    }
+
     /**
      * @brief Disable interrupts and return previous irq status
      *

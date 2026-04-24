@@ -126,7 +126,6 @@ extern "C"
  * @param _arg Application argument passed to the work handler.
  */
 #define DELAYED_WORK_DEFINE(_name, _handler, _arg)          \
-    extern delayedWorkType _name;                           \
     delayedWorkType _name = {                               \
         .work = {                                           \
             .name = #_name,                                 \
