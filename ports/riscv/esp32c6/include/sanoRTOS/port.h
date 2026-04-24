@@ -70,9 +70,7 @@ extern "C"
     /**********--Task's default stack contents--****************************************
 
               ____<-- stackBase = stack + stackSize / sizeof(uint32_t)
-             |____|
-             |____|
-             |____| t6 (stackBase - 3)
+             |____| t6 (stackBase - 1)
              |____| t5
              |____| t4
              |____| t3
@@ -93,13 +91,15 @@ extern "C"
              |____| a3
              |____| a2
              |____| a1
-             |____| a0 (stackBase-24)<- Task params
+             |____| a0 (stackBase-22)<- Task params
              |____| s1
              |____| s0
              |____| t2
              |____| t1
              |____| t0
              |____| tp
+             |____| gp
+             |____| sp (stackBase-30) not used
              |____| ra   (stackBase-31)<--- return address
              |____| mepc (stackBase-32)
                 |
@@ -112,14 +112,14 @@ extern "C"
     static uint32_t name##Stack[stackSize / sizeof(uint32_t)] = {                                \
         [stackSize / sizeof(uint32_t) - 32] = (uint32_t)taskEntryFunction,                       \
         [stackSize / sizeof(uint32_t) - 31] = (uint32_t)taskExitFunction,                        \
-        [stackSize / sizeof(uint32_t) - 24] = (uint32_t)taskParams}
+        [stackSize / sizeof(uint32_t) - 22] = (uint32_t)taskParams}
 
 #define PORT_TASK_STACK_INIT(stack, stackWords, taskEntryFunction, taskExitFunction, taskParams) \
-    do                                                                                             \
-    {                                                                                              \
-        (stack)[(stackWords)-32] = (uint32_t)(taskEntryFunction);                                 \
-        (stack)[(stackWords)-31] = (uint32_t)(taskExitFunction);                                  \
-        (stack)[(stackWords)-24] = (uint32_t)(taskParams);                                        \
+    do                                                                                           \
+    {                                                                                            \
+        (stack)[(stackWords) - 32] = (uint32_t)(taskEntryFunction);                              \
+        (stack)[(stackWords) - 31] = (uint32_t)(taskExitFunction);                               \
+        (stack)[(stackWords) - 22] = (uint32_t)(taskParams);                                     \
     } while (0)
 
 #define PORT_INITIAL_TASK_STACK_OFFSET 32
