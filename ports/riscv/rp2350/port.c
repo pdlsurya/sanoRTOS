@@ -75,11 +75,13 @@ void syscallHandler(uint32_t sysCode)
         break;
 
     case DISABLE_INTERRUPTS:
-        PORT_DISABLE_INTERRUPTS();
+        /* Syscalls return with mret, which restores the thread interrupt state
+         * from MPIE rather than the live MIE bit inside the handler. */
+        riscv_clear_csr(mstatus, RVCSR_MSTATUS_MPIE_BITS);
         break;
 
     case ENABLE_INTERRUPTS:
-        PORT_ENABLE_INTERRUPTS();
+        riscv_set_csr(mstatus, RVCSR_MSTATUS_MPIE_BITS);
         break;
 
     case ENTER_PRIVILEGED_MODE:
@@ -168,14 +170,15 @@ void portRunFirstTask()
     bool irqState = spinLock(&lock);
 
     taskQueueType *pReadyQueue = getReadyQueue();
+    uint8_t coreId = PORT_CORE_ID();
 
     /*Get the highest priority ready task from ready Queue*/
-    currentTask[PORT_CORE_ID()] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
+    currentTask[coreId] = TASK_GET_FROM_READY_QUEUE(pReadyQueue);
 
-    taskSetCurrent(currentTask[PORT_CORE_ID()]);
+    taskSetCurrent(currentTask[coreId]);
 
     /*Change status to RUNNING*/
-    currentTask[PORT_CORE_ID()]->status = TASK_STATUS_RUNNING;
+    currentTask[coreId]->status = TASK_STATUS_RUNNING;
 
     portConfig();
 
@@ -188,7 +191,9 @@ void portRunFirstTask()
 
 #endif
 
-    __asm__ volatile(" mv sp, %0" ::"r"(currentTask[PORT_CORE_ID()]->stackPointer));
+    taskHandleType *pCurrentTask = currentTask[coreId];
+
+    __asm__ volatile(" mv sp, %0" ::"r"(pCurrentTask->stackPointer));
 
 /*If user mode is enabled, Physical Memory Protection(PMP) and Access Permission Management(APM)
   should be configured to allow user mode access to memory and peripheral regions */
@@ -202,16 +207,25 @@ void portRunFirstTask()
     /* MPIE is set to 1 to restore interrupt enable state after the transition.*/
     riscv_set_csr(mstatus, RVCSR_MSTATUS_MPIE_BITS);
 
-    /* Set up the user-mode entry point*/
-    riscv_write_csr(mepc, (uint32_t)currentTask[PORT_CORE_ID()]->entry);
+    uint32_t taskEntry = (uint32_t)pCurrentTask->entry;
+    uint32_t taskParams = (uint32_t)pCurrentTask->params;
+    uint32_t taskExit = (uint32_t)taskExitFunction;
 
-    // Execute mret to switch to U-mode
-    asm volatile("mret");
+    /* Set up the first user task context without any further calls that could clobber mepc. */
+    __asm__ volatile(
+        "csrw mepc, %0\n"
+        "mv a0, %1\n"
+        "mv ra, %2\n"
+        "mret\n"
+        :
+        : "r"(taskEntry), "r"(taskParams), "r"(taskExit)
+        : "a0", "memory");
+    __builtin_unreachable();
 
 #else
 
     /*If user mode not enabled, jump directly to the first task*/
-    currentTask[PORT_CORE_ID()]->entry(currentTask[PORT_CORE_ID()]->params);
+    pCurrentTask->entry(pCurrentTask->params);
 #endif
 }
 

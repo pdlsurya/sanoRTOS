@@ -189,15 +189,9 @@ extern "C"
 
             return coreId;
         }
-        else
-        {
-            return RV_READ_CSR(mhartid);
-        }
-
-#else
-    return RV_READ_CSR(mhartid);
-
 #endif
+
+        return RV_READ_CSR(mhartid);
     }
 
     /**
@@ -216,15 +210,9 @@ extern "C"
             PORT_EXIT_PRIVILEGED_MODE();
             return irqState;
         }
-        else
-        {
-            return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
-        }
-
-#else
-
-    return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
 #endif
+
+        return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
     }
 
     /**
@@ -235,6 +223,12 @@ extern "C"
      */
     static inline bool portIsInISRContext()
     {
+#if CONFIG_TASK_USER_MODE
+        if (!PORT_IS_PRIVILEGED())
+        {
+            return false;
+        }
+#endif
         uint32_t mstatus = RV_READ_CSR(mstatus);
         uint32_t mcause = RV_READ_CSR(mcause);
         return (((mstatus & MSTATUS_MIE) == 0U) && (((mcause >> 31U) & 0x1U) != 0U));
@@ -279,11 +273,12 @@ extern "C"
             }
         }
 #else
-    if (irqState)
-    {
-        PORT_DISABLE_INTERRUPTS();
-    }
+        if (irqState)
+        {
+            PORT_DISABLE_INTERRUPTS();
+        }
 #endif
+
         return irqState;
     }
 
@@ -295,7 +290,6 @@ extern "C"
     static inline void portIrqUnlock(bool irqState)
     {
 #if CONFIG_TASK_USER_MODE
-
         if (irqState)
         {
             if (PORT_IS_PRIVILEGED())
@@ -307,12 +301,11 @@ extern "C"
                 PORT_SYSCALL(ENABLE_INTERRUPTS);
             }
         }
-
 #else
-    if (irqState)
-    {
-        PORT_ENABLE_INTERRUPTS();
-    }
+        if (irqState)
+        {
+            PORT_ENABLE_INTERRUPTS();
+        }
 #endif
     }
 
