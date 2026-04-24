@@ -42,24 +42,9 @@ extern "C"
     /*Forward declaration of taskHandleType*/
     typedef struct taskHandle taskHandleType;
 
-    /**
-     * @brief Codes used by System call to perform a specified action.
-     *
-     */
-    typedef enum
-    {
-        SWITCH_CONTEXT = 1,
-        DISABLE_INTERRUPTS,
-        ENABLE_INTERRUPTS,
-        ENTER_PRIVILEGED_MODE,
-
-    } sysCodesType;
-
 #define SYSTICK_PRIORITY 0xf // Priority of SysTick Timer.
 
 #define PENDSV_PRIORITY 0xf // Priority of PendSV
-
-#define BASEPRI(priority) ((priority) << (8 - __NVIC_PRIO_BITS))
 
 #define TRIGGER_PENDSV() (SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk)
 
@@ -113,18 +98,6 @@ extern "C"
 
 #define PORT_INITIAL_TASK_STACK_OFFSET 17
 
-/*Macro to invoke System call. This triggers SVC exception with specified sysCode*/
-#define PORT_SYSCALL(sysCode) __asm volatile("svc %0" : : "I"(sysCode) : "memory")
-
-#define PORT_ENTER_PRIVILEGED_MODE() PORT_SYSCALL(ENTER_PRIVILEGED_MODE)
-
-#define PORT_EXIT_PRIVILEGED_MODE()           \
-    do                                        \
-    {                                         \
-        __set_CONTROL(__get_CONTROL() | 0x1); \
-        __ISB();                              \
-    } while (0)
-
 #define PORT_TRIGGER_CONTEXT_SWITCH() TRIGGER_PENDSV()
 
 #define PORT_NOP() __NOP()
@@ -145,27 +118,9 @@ extern "C"
 
 #define PORT_PRINTF printf
 
-#if CONFIG_TASK_USER_MODE
-
-#define PORT_DISABLE_INTERRUPTS() __set_BASEPRI(BASEPRI(1));
-
-#define PORT_ENABLE_INTERRUPTS() __set_BASEPRI(0);
-
-#else
-
 #define PORT_DISABLE_INTERRUPTS() __disable_irq()
 
 #define PORT_ENABLE_INTERRUPTS() __enable_irq()
-
-#endif
-
-/**
- * @brief Check if CPU is executing in Privileged or Unprivileged mode
- *
- * @retval True, if cpu is in privileged mode
- * @retval False, if cpu is in unprivileged mode
- */
-#define PORT_IS_PRIVILEGED() ((__get_IPSR() != 0) ? true : (((__get_CONTROL() & 0x1) == 0) ? true : false))
 
     /**
      * @brief Disable interrupts and return previous irq status
@@ -175,51 +130,16 @@ extern "C"
      */
     static inline bool portIrqEnabled()
     {
-#if CONFIG_TASK_USER_MODE
-        bool privileged = PORT_IS_PRIVILEGED();
-
-        if (!privileged)
-        {
-            PORT_ENTER_PRIVILEGED_MODE();
-        }
-
-        bool irqState = (__get_BASEPRI() == 0U);
-
-        if (!privileged)
-        {
-            PORT_EXIT_PRIVILEGED_MODE();
-        }
-
-        return irqState;
-#else
         return (__get_PRIMASK() == 0U);
-#endif
     }
 
     static inline bool portIrqLock()
     {
         bool irqState = portIrqEnabled();
-
-#if CONFIG_TASK_USER_MODE
-        if (irqState)
-        {
-            if (PORT_IS_PRIVILEGED())
-            {
-
-                PORT_DISABLE_INTERRUPTS();
-            }
-            else
-            {
-                PORT_SYSCALL(DISABLE_INTERRUPTS);
-            }
-        }
-
-#else
         if (irqState)
         {
             PORT_DISABLE_INTERRUPTS();
         }
-#endif
 
         return irqState;
     }
@@ -247,26 +167,10 @@ extern "C"
      */
     static inline void portIrqUnlock(bool irqState)
     {
-#if CONFIG_TASK_USER_MODE
-
         if (irqState)
         {
-            if (PORT_IS_PRIVILEGED())
-            {
-                PORT_ENABLE_INTERRUPTS();
-            }
-            else
-            {
-                PORT_SYSCALL(ENABLE_INTERRUPTS);
-            }
+            PORT_ENABLE_INTERRUPTS();
         }
-
-#else
-    if (irqState)
-    {
-        PORT_ENABLE_INTERRUPTS();
-    }
-#endif
     }
 
     /**

@@ -43,28 +43,6 @@ extern "C"
     /*Forward declaration of taskHandleType*/
     typedef struct taskHandle taskHandleType;
 
-    /**
-     * @brief Codes used by System call to perform a specified action.
-     *
-     */
-
-    typedef enum
-    {
-        SWITCH_CONTEXT = 1,
-        DISABLE_INTERRUPTS,
-        ENABLE_INTERRUPTS,
-        ENTER_PRIVILEGED_MODE,
-        EXIT_PRIVILEGED_MODE,
-        GET_PRIVILEGE_MODE
-
-    } sysCodesType;
-
-    typedef enum
-    {
-        MACHINE_MODE,
-        USER_MODE
-    } privilegeModesType;
-
     typedef void (*tickHandlerType)(void);
 
     /**********--Task's default stack contents--****************************************
@@ -124,19 +102,9 @@ extern "C"
 
 #define PORT_INITIAL_TASK_STACK_OFFSET 32
 
-/*Macro to invoke System call. This triggers SVC exception with specified sysCode*/
-#define PORT_SYSCALL(sysCode) asm volatile("mv a0,%0\n" \
-                                           "ecall" : : "r"(sysCode));
-
 #define PORT_DISABLE_INTERRUPTS() rv_utils_intr_global_disable();
 
 #define PORT_ENABLE_INTERRUPTS() rv_utils_intr_global_enable();
-
-#define PORT_ENTER_PRIVILEGED_MODE() PORT_SYSCALL(ENTER_PRIVILEGED_MODE)
-
-#define PORT_EXIT_PRIVILEGED_MODE() PORT_SYSCALL(EXIT_PRIVILEGED_MODE)
-
-#define PORT_IS_PRIVILEGED() isMachineMode()
 
 #define PORT_TIMER_TICK_FREQ 360000000
 
@@ -158,21 +126,6 @@ extern "C"
 
 #define PORT_PRINTF serial_printf
 
-    volatile extern privilegeModesType privilegeMode;
-
-    /**
-     * @brief Check if cpu is executing in machine mode
-     *
-     * @retval `true`, if cpu is executing in machine mode
-     * @retval `false`, otherwise
-     */
-    static inline bool isMachineMode()
-    {
-        PORT_SYSCALL(GET_PRIVILEGE_MODE);
-
-        return (privilegeMode == MACHINE_MODE);
-    }
-
     /**
      * @brief Get current hart id
      *
@@ -181,27 +134,7 @@ extern "C"
 
     static inline uint8_t portCoreId()
     {
-
-#if CONFIG_TASK_USER_MODE
-        if (!PORT_IS_PRIVILEGED())
-        {
-            PORT_ENTER_PRIVILEGED_MODE();
-
-            uint32_t coreId = RV_READ_CSR(mhartid);
-
-            PORT_EXIT_PRIVILEGED_MODE();
-
-            return coreId;
-        }
-        else
-        {
-            return RV_READ_CSR(mhartid);
-        }
-
-#else
-    return RV_READ_CSR(mhartid);
-
-#endif
+        return RV_READ_CSR(mhartid);
     }
 
     /**
@@ -212,23 +145,7 @@ extern "C"
      */
     static inline bool portIrqEnabled()
     {
-#if CONFIG_TASK_USER_MODE
-        if (!PORT_IS_PRIVILEGED())
-        {
-            PORT_ENTER_PRIVILEGED_MODE();
-            bool irqState = (RV_READ_CSR(mstatus) & MSTATUS_MIE);
-            PORT_EXIT_PRIVILEGED_MODE();
-            return irqState;
-        }
-        else
-        {
-            return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
-        }
-
-#else
-
-    return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
-#endif
+        return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
     }
 
     /**
@@ -239,12 +156,6 @@ extern "C"
      */
     static inline bool portIsInISRContext()
     {
-#if CONFIG_TASK_USER_MODE
-        if (!PORT_IS_PRIVILEGED())
-        {
-            return false;
-        }
-#endif
         uint32_t mstatus = RV_READ_CSR(mstatus);
         uint32_t mcause = RV_READ_CSR(mcause);
         return (((mstatus & MSTATUS_MIE) == 0U) && (((mcause >> 31U) & 0x1U) != 0U));
@@ -275,25 +186,10 @@ extern "C"
     static inline bool portIrqLock()
     {
         bool irqState = portIrqEnabled();
-
-#if CONFIG_TASK_USER_MODE
         if (irqState)
         {
-            if (PORT_IS_PRIVILEGED())
-            {
-                PORT_DISABLE_INTERRUPTS();
-            }
-            else
-            {
-                PORT_SYSCALL(DISABLE_INTERRUPTS);
-            }
+            PORT_DISABLE_INTERRUPTS();
         }
-#else
-    if (irqState)
-    {
-        PORT_DISABLE_INTERRUPTS();
-    }
-#endif
         return irqState;
     }
 
@@ -304,26 +200,10 @@ extern "C"
      */
     static inline void portIrqUnlock(bool irqState)
     {
-#if CONFIG_TASK_USER_MODE
-
         if (irqState)
         {
-            if (PORT_IS_PRIVILEGED())
-            {
-                PORT_ENABLE_INTERRUPTS();
-            }
-            else
-            {
-                PORT_SYSCALL(ENABLE_INTERRUPTS);
-            }
+            PORT_ENABLE_INTERRUPTS();
         }
-
-#else
-    if (irqState)
-    {
-        PORT_ENABLE_INTERRUPTS();
-    }
-#endif
     }
 
     /**

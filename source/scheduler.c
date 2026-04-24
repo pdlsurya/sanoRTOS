@@ -44,7 +44,7 @@ void idleTaskHandler0(void *params)
     while (1)
     {
         // Enter sleep mode
-        PORT_ENTER_SLEEP_MODE();
+        // PORT_ENTER_SLEEP_MODE();
     }
 }
 
@@ -148,16 +148,8 @@ void taskYield()
 
     if (contextSwitchRequired)
     {
-
-#if (CONFIG_TASK_USER_MODE)
-        /*Thread context in user mode requests switch via syscall.*/
-        PORT_SYSCALL(SWITCH_CONTEXT);
-
-#else
         /*Trigger platform specific context switch mechanism*/
         PORT_TRIGGER_CONTEXT_SWITCH();
-
-#endif
     }
     spinUnlock(&lock, irqState);
 }

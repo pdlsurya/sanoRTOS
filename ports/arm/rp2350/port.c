@@ -40,7 +40,7 @@ void idleTaskHandler1(void *params)
     (void)params;
     while (true)
     {
-       PORT_ENTER_SLEEP_MODE();
+        // PORT_ENTER_SLEEP_MODE();
     }
 }
 #endif
@@ -80,7 +80,7 @@ static void portRunFirstTask()
 
     uint32_t control = __get_CONTROL(); // Read CONTROL register
 
-    __set_CONTROL(CONFIG_TASK_USER_MODE ? (control | 0x3) : (control | 0x2)); // Set bit 0 to 1 to switch to unprivileged mode
+    __set_CONTROL(control | 0x2); // Select PSP for thread mode.
 
     __ISB(); // Instruction Synchronization Barrier
 
@@ -111,62 +111,6 @@ void SysTick_Handler()
 {
     tickHandler();
 }
-
-void SVC_Handler()
-{
-
-    uint32_t exc_return;
-    asm volatile("mov %0, r14" : "=r"(exc_return)::"memory");
-
-    uint32_t *stackPointer;
-
-    if (exc_return & 0x4)
-    {
-        stackPointer = (uint32_t *)__get_PSP();
-    }
-    else
-    {
-        stackPointer = (uint32_t *)__get_MSP();
-    }
-
-    /*Get PC from exception stack frame which hold address of instruction after the SVC instruction
-    ____ <-- stackBase
-   |____|xPSR stackPointer[7]
-   |____|PC stackPointer[6]
-   |____|LR stackPointer[5]
-   |____|R12 stackPointer[4]
-   |____|R3 stackPointer[3]
-   |____|R2 stackPointer[2]
-   |____|R1 stackPointer[1]
-   |____|R0 stackPointer[0]*/
-
-    uint32_t PC = stackPointer[6];
-
-    /*Extract the SVC number from the SVC instruction, which resides just before the address in the PC.
-     The SVC instruction is a 16-bit instruction, whose LSB byte is the SVC number.
-     Hence, the SVC number is extracted by accessing the value at the memory location which is two bytes before the address in the PC.*/
-    uint8_t svcNumber = *((uint8_t *)PC - 2);
-
-    switch (svcNumber)
-    {
-    case SWITCH_CONTEXT:
-        PORT_TRIGGER_CONTEXT_SWITCH();
-        break;
-
-    case DISABLE_INTERRUPTS:
-        PORT_DISABLE_INTERRUPTS();
-        break;
-
-    case ENABLE_INTERRUPTS:
-        PORT_ENABLE_INTERRUPTS();
-        break;
-    case ENTER_PRIVILEGED_MODE:
-        __set_CONTROL(__get_CONTROL() & ~0x1);
-        __ISB();
-        break;
-    }
-}
-
 
 __attribute__((naked)) void PendSV_Handler(void)
 {
