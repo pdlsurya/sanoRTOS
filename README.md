@@ -22,7 +22,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
   Includes mutexes, semaphores, condition variables, and event objects for safe and efficient coordination between tasks.
 
 - **Inter-Task Communication**  
-  Enables message passing between tasks using message queues and mailboxes.
+  Enables message passing between tasks using message queues, message buffers, and mailboxes.
 
 - **Minimalistic and Lightweight Design**  
   Designed for embedded systems with limited resources — small footprint, fast context switches, and no unnecessary bloat.
@@ -63,6 +63,13 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - `MSG_QUEUE_DEFINE(name, length, itemSize)`: Macro to statically define and initialize a message queue.
 - `msgQueueSend(pQueueHandle, pItem, waitTicks)`: Send a message to a queue, optionally waiting up to `waitTicks` for free space.
 - `msgQueueReceive(pQueueHandle, pItem, waitTicks)`: Receive a message from a queue, optionally waiting up to `waitTicks` for data.
+
+## Message Buffer
+
+- `MSG_BUFFER_DEFINE(name, bufferSize)`: Macro to statically define and initialize a message buffer.
+- `msgBufferSend(pMsgBuffer, pData, length, waitTicks)`: Send one variable-length message to the buffer.
+- `msgBufferReceive(pMsgBuffer, pData, pLength, waitTicks)`: Receive one queued message into the supplied buffer.
+- `msgBufferNextLength(pMsgBuffer, pLength)`: Get the length of the next queued message without removing it.
 
 ## Mailbox
 
