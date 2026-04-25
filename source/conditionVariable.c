@@ -31,6 +31,38 @@
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/conditionVariable.h"
+#include "objectHelpers.h"
+
+MEM_SLAB_DEFINE(dynamicCondVarObjectSlab,
+                sizeof(condVarHandleType),
+                CONFIG_DYNAMIC_COND_VAR_SLAB_BLOCKS);
+
+static int condVarObjectAlloc(condVarHandleType **ppCondVar)
+{
+    return objectAllocFromSlab(&dynamicCondVarObjectSlab,
+                               (void **)ppCondVar,
+                               sizeof(condVarHandleType));
+}
+
+static void condVarObjectFree(condVarHandleType *pCondVar)
+{
+    (void)objectFreeToSlab(&dynamicCondVarObjectSlab, pCondVar);
+}
+
+static int condVarSetup(condVarHandleType *pCondVar,
+                        mutexHandleType *pMutex, uint8_t flags)
+{
+    if ((pCondVar == NULL) || (pMutex == NULL))
+    {
+        return RET_INVAL;
+    }
+
+    memset(pCondVar, 0, sizeof(condVarHandleType));
+    pCondVar->flags = flags;
+    pCondVar->pMutex = pMutex;
+
+    return RET_SUCCESS;
+}
 
 int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
 {
@@ -213,4 +245,54 @@ int condVarBroadcast(condVarHandleType *pCondVar)
     spinUnlock(&pCondVar->lock, irqState);
 
     return retCode;
+}
+
+int condVarCreate(condVarHandleType **ppCondVar, mutexHandleType *pMutex)
+{
+    condVarHandleType *pCondVar = NULL;
+    int retCode;
+
+    if (ppCondVar == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    retCode = condVarObjectAlloc(&pCondVar);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    retCode = condVarSetup(pCondVar, pMutex, OBJECT_FLAG_DYNAMIC);
+    if (retCode != RET_SUCCESS)
+    {
+        condVarObjectFree(pCondVar);
+        return retCode;
+    }
+
+    *ppCondVar = pCondVar;
+
+    return RET_SUCCESS;
+}
+
+int condVarDelete(condVarHandleType *pCondVar)
+{
+    bool irqState;
+
+    if ((pCondVar == NULL) || !objectIsDynamic(pCondVar->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&pCondVar->lock);
+    if (objectWaitQueueHasWaiters(&pCondVar->waitQueue))
+    {
+        spinUnlock(&pCondVar->lock, irqState);
+        return RET_BUSY;
+    }
+
+    spinUnlock(&pCondVar->lock, irqState);
+    condVarObjectFree(pCondVar);
+
+    return RET_SUCCESS;
 }

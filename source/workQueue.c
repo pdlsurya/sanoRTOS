@@ -25,7 +25,29 @@
 #include "sanoRTOS/workQueue.h"
 #include "sanoRTOS/task.h"
 
-static workItemType *workQueueGetNext(workQueueHandleType *pWorkQueue)
+static void workQueuePushLocked(workQueueHandleType *pWorkQueue, workItemType *pWork)
+{
+    if ((pWorkQueue == NULL) || (pWork == NULL))
+    {
+        return;
+    }
+
+    pWork->pNextWork = NULL;
+    pWork->pending = true;
+
+    if (pWorkQueue->tail == NULL)
+    {
+        pWorkQueue->head = pWork;
+        pWorkQueue->tail = pWork;
+    }
+    else
+    {
+        pWorkQueue->tail->pNextWork = pWork;
+        pWorkQueue->tail = pWork;
+    }
+}
+
+static workItemType *workQueuePop(workQueueHandleType *pWorkQueue)
 {
     if (pWorkQueue == NULL)
     {
@@ -82,19 +104,7 @@ int workSubmit(workQueueHandleType *pWorkQueue, workItemType *pWork)
     }
     else
     {
-        pWork->pNextWork = NULL;
-        pWork->pending = true;
-
-        if (pWorkQueue->tail == NULL)
-        {
-            pWorkQueue->head = pWork;
-            pWorkQueue->tail = pWork;
-        }
-        else
-        {
-            pWorkQueue->tail->pNextWork = pWork;
-            pWorkQueue->tail = pWork;
-        }
+        workQueuePushLocked(pWorkQueue, pWork);
     }
 
     spinUnlock(&pWorkQueue->lock, irqState);
@@ -200,7 +210,7 @@ void workQueueTask(void *pArgs)
 
     while (1)
     {
-        workItemType *pWork = workQueueGetNext(pWorkQueue);
+        workItemType *pWork = workQueuePop(pWorkQueue);
         if (pWork != NULL)
         {
             pWork->handler(pWork->pArg);

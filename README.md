@@ -38,14 +38,17 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - **Kernel Objects Still Own Wait Queues**
   Semaphores, mutexes, events, mailboxes, message queues, stream buffers, message buffers, condition variables, and memory slabs still keep wait queues in their object state. The queue stores head and tail anchors, while the task carries the intrusive links.
 
+- **Static And Dynamic Object Lifetime**
+  Kernel objects continue to support zero-overhead static definition through the existing `*_DEFINE(...)` macros. Dynamic object handles are allocated from internal per-object slab-backed pools, while variable-sized backing buffers still use the heap when needed. Public `memSlab` objects themselves remain static-only. Dynamic deletion is conservative: it returns `RET_BUSY` when waiters or active use would make destruction unsafe. Runtime names are now kept only for tasks.
+
 - **Current-Task Blocking API**
   `taskBlock()` now blocks only the currently running task and resolves that task internally. That keeps wait-object call sites focused on the blocking reason and timeout rather than passing the current task back into the task layer. Finite waits are inserted into a global timeout queue ordered by absolute deadline, while `TASK_FOREVER_WAIT` blocks without consuming a timeout-queue slot. The scheduler owns the monotonic system tick count used to evaluate those deadlines.
 
 - **Software Timers Use O(1) Unlink**
   Active software timers are tracked in a doubly linked list so `timerStop()` can remove a running timer directly without scanning from the head of the timer list.
 
-- **Timeout Handler Slab**
-  Timeout handler dispatch still uses the timer timeout-handler slab controlled by `CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS`.
+- **Internal Locking Naming**
+  Internal helpers that end with `Locked` expect the caller to already hold the relevant lock. Helpers without the `Locked` suffix either acquire the lock internally or do not rely on a caller-held lock as part of their contract.
 
 ## API Reference
 

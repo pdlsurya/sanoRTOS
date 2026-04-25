@@ -30,6 +30,37 @@
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/mutex.h"
+#include "objectHelpers.h"
+
+MEM_SLAB_DEFINE(dynamicMutexObjectSlab,
+                sizeof(mutexHandleType),
+                CONFIG_DYNAMIC_MUTEX_SLAB_BLOCKS);
+
+static int mutexObjectAlloc(mutexHandleType **ppMutex)
+{
+    return objectAllocFromSlab(&dynamicMutexObjectSlab,
+                               (void **)ppMutex,
+                               sizeof(mutexHandleType));
+}
+
+static void mutexObjectFree(mutexHandleType *pMutex)
+{
+    (void)objectFreeToSlab(&dynamicMutexObjectSlab, pMutex);
+}
+
+static int mutexSetup(mutexHandleType *pMutex, uint8_t flags)
+{
+    if (pMutex == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    memset(pMutex, 0, sizeof(mutexHandleType));
+    pMutex->flags = flags;
+    pMutex->ownerDefaultPriority = -1;
+
+    return RET_SUCCESS;
+}
 
 #if CONFIG_MUTEX_PRIORITY_INHERITANCE
 static inline void mutexApplyPriorityInheritance(mutexHandleType *pMutex, taskHandleType *pCurrentTask)
@@ -237,4 +268,54 @@ int mutexUnlock(mutexHandleType *pMutex)
     }
 
     return retCode;
+}
+
+int mutexCreate(mutexHandleType **ppMutex)
+{
+    mutexHandleType *pMutex = NULL;
+    int retCode;
+
+    if (ppMutex == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    retCode = mutexObjectAlloc(&pMutex);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    retCode = mutexSetup(pMutex, OBJECT_FLAG_DYNAMIC);
+    if (retCode != RET_SUCCESS)
+    {
+        mutexObjectFree(pMutex);
+        return retCode;
+    }
+
+    *ppMutex = pMutex;
+
+    return RET_SUCCESS;
+}
+
+int mutexDelete(mutexHandleType *pMutex)
+{
+    bool irqState;
+
+    if ((pMutex == NULL) || !objectIsDynamic(pMutex->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&pMutex->lock);
+    if (pMutex->locked || objectWaitQueueHasWaiters(&pMutex->waitQueue))
+    {
+        spinUnlock(&pMutex->lock, irqState);
+        return RET_BUSY;
+    }
+
+    spinUnlock(&pMutex->lock, irqState);
+    mutexObjectFree(pMutex);
+
+    return RET_SUCCESS;
 }

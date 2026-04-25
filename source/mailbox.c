@@ -29,6 +29,36 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/mailbox.h"
+#include "objectHelpers.h"
+
+MEM_SLAB_DEFINE(dynamicMailboxObjectSlab,
+                sizeof(mailboxHandleType),
+                CONFIG_DYNAMIC_MAILBOX_SLAB_BLOCKS);
+
+static int mailboxObjectAlloc(mailboxHandleType **ppMailbox)
+{
+    return objectAllocFromSlab(&dynamicMailboxObjectSlab,
+                               (void **)ppMailbox,
+                               sizeof(mailboxHandleType));
+}
+
+static void mailboxObjectFree(mailboxHandleType *pMailbox)
+{
+    (void)objectFreeToSlab(&dynamicMailboxObjectSlab, pMailbox);
+}
+
+static int mailboxSetup(mailboxHandleType *pMailbox, uint8_t flags)
+{
+    if (pMailbox == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    memset(pMailbox, 0, sizeof(mailboxHandleType));
+    pMailbox->flags = flags;
+
+    return RET_SUCCESS;
+}
 
 static inline void mailboxTaskStateReset(taskHandleType *pTask)
 {
@@ -389,4 +419,55 @@ retry:
     }
 
     return retCode;
+}
+
+int mailboxCreate(mailboxHandleType **ppMailbox)
+{
+    mailboxHandleType *pMailbox = NULL;
+    int retCode;
+
+    if (ppMailbox == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    retCode = mailboxObjectAlloc(&pMailbox);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    retCode = mailboxSetup(pMailbox, OBJECT_FLAG_DYNAMIC);
+    if (retCode != RET_SUCCESS)
+    {
+        mailboxObjectFree(pMailbox);
+        return retCode;
+    }
+
+    *ppMailbox = pMailbox;
+
+    return RET_SUCCESS;
+}
+
+int mailboxDelete(mailboxHandleType *pMailbox)
+{
+    bool irqState;
+
+    if ((pMailbox == NULL) || !objectIsDynamic(pMailbox->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&pMailbox->lock);
+    if (objectWaitQueueHasWaiters(&pMailbox->senderWaitQueue) ||
+        objectWaitQueueHasWaiters(&pMailbox->receiverWaitQueue))
+    {
+        spinUnlock(&pMailbox->lock, irqState);
+        return RET_BUSY;
+    }
+
+    spinUnlock(&pMailbox->lock, irqState);
+    mailboxObjectFree(pMailbox);
+
+    return RET_SUCCESS;
 }

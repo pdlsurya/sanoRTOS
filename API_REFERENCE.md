@@ -7,7 +7,9 @@ This guide covers the public application-facing APIs for the main sanoRTOS kerne
 - Lower numeric task priority means higher scheduling priority.
 - The default configured task-priority range is `0..15` via `CONFIG_TASK_PRIORITY_LEVELS`.
 - `TASK_NO_WAIT` means "do not block".
-- `TASK_FOREVER_WAIT` means "wait indefinitely". `TASK_MAX_WAIT` remains as a legacy alias.
+- `TASK_FOREVER_WAIT` means "wait indefinitely".
+- Kernel objects can be defined statically with `*_DEFINE(...)`. Most kernel objects also support dynamic `Create()` / `Delete()` APIs; public memory slabs remain static-only.
+- Only tasks keep runtime names. Other kernel objects no longer store names internally.
 - APIs documented as thread-only must not be called from ISR context.
 - APIs that allow ISR use require `waitTicks == TASK_NO_WAIT` when called from ISR context.
 - `TASK_DEFINE`, `TIMER_DEFINE`, `WORK_DEFINE`, and `DELAYED_WORK_DEFINE` declare their entry or handler function for you.
@@ -267,6 +269,8 @@ void updateSharedValue(uint32_t value)
 Defined in [`semaphore.h`](include/sanoRTOS/semaphore.h).
 
 - `SEMAPHORE_DEFINE(name, initialCount, maxCount)`
+- `semaphoreCreate(semaphoreHandleType **ppSem, uint8_t initialCount, uint8_t maxCount)`
+- `semaphoreDelete(semaphoreHandleType *pSem)`
 - `semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)`
 - `semaphoreGive(semaphoreHandleType *pSem)`
 
@@ -301,6 +305,8 @@ void consumerTask(void *args)
 Defined in [`mutex.h`](include/sanoRTOS/mutex.h).
 
 - `MUTEX_DEFINE(name)`
+- `mutexCreate(mutexHandleType **ppMutex)`
+- `mutexDelete(mutexHandleType *pMutex)`
 - `mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)`
 - `mutexUnlock(mutexHandleType *pMutex)`
 
@@ -326,6 +332,8 @@ void safeLog(const char *text)
 Defined in [`conditionVariable.h`](include/sanoRTOS/conditionVariable.h).
 
 - `CONDVAR_DEFINE(name, pMutex)`
+- `condVarCreate(condVarHandleType **ppCondVar, mutexHandleType *pMutex)`
+- `condVarDelete(condVarHandleType *pCondVar)`
 - `condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)`
 - `condVarSignal(condVarHandleType *pCondVar)`
 - `condVarBroadcast(condVarHandleType *pCondVar)`
@@ -372,6 +380,8 @@ void producerTask(void *args)
 Defined in [`event.h`](include/sanoRTOS/event.h).
 
 - `EVENT_DEFINE(name)`
+- `eventCreate(eventHandleType **ppEvent)`
+- `eventDelete(eventHandleType *pEvent)`
 - `eventSet(eventHandleType *pEvent, uint32_t events)`
 - `eventClear(eventHandleType *pEvent, uint32_t events)`
 - `eventGet(eventHandleType *pEvent, uint32_t *pEvents)`
@@ -413,6 +423,8 @@ void ioTask(void *args)
 Defined in [`messageQueue.h`](include/sanoRTOS/messageQueue.h).
 
 - `MSG_QUEUE_DEFINE(name, length, itemSize)`
+- `msgQueueCreate(msgQueueHandleType **ppQueueHandle, uint32_t length, uint32_t itemSize)`
+- `msgQueueDelete(msgQueueHandleType *pQueueHandle)`
 - `msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)`
 - `msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)`
 - `msgQueueReset(msgQueueHandleType *pQueueHandle)`
@@ -457,6 +469,8 @@ void receiverTask(void *args)
 Defined in [`streamBuffer.h`](include/sanoRTOS/streamBuffer.h).
 
 - `STREAM_BUFFER_DEFINE(name, bufferSize)`
+- `streamBufferCreate(streamBufferHandleType **ppStreamBuffer, uint32_t bufferSize)`
+- `streamBufferDelete(streamBufferHandleType *pStreamBuffer)`
 - `streamBufferSend(streamBufferHandleType *pStreamBuffer, const void *pData, uint32_t length, uint32_t waitTicks)`
 - `streamBufferReceive(streamBufferHandleType *pStreamBuffer, void *pData, uint32_t *pLength, uint32_t waitTicks)`
 - `streamBufferPeek(streamBufferHandleType *pStreamBuffer, void *pData, uint32_t *pLength)`
@@ -499,6 +513,8 @@ void consumerTask(void *args)
 Defined in [`messageBuffer.h`](include/sanoRTOS/messageBuffer.h).
 
 - `MSG_BUFFER_DEFINE(name, bufferSize)`
+- `msgBufferCreate(msgBufferHandleType **ppMsgBuffer, uint32_t bufferSize)`
+- `msgBufferDelete(msgBufferHandleType *pMsgBuffer)`
 - `msgBufferSend(msgBufferHandleType *pMsgBuffer, const void *pData, uint32_t length, uint32_t waitTicks)`
 - `msgBufferReceive(msgBufferHandleType *pMsgBuffer, void *pData, uint32_t *pLength, uint32_t waitTicks)`
 - `msgBufferNextLength(msgBufferHandleType *pMsgBuffer, uint32_t *pLength)`
@@ -548,6 +564,8 @@ void receiverTask(void *args)
 Defined in [`mailbox.h`](include/sanoRTOS/mailbox.h).
 
 - `MAILBOX_DEFINE(name)`
+- `mailboxCreate(mailboxHandleType **ppMailbox)`
+- `mailboxDelete(mailboxHandleType *pMailbox)`
 - `MAILBOX_ANY_TASK`
 - `mailboxSend(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, uint32_t waitTicks)`
 - `mailboxReceive(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, void *pBuffer, uint32_t waitTicks)`
@@ -594,6 +612,8 @@ void receiverTask(void *args)
 Defined in [`timer.h`](include/sanoRTOS/timer.h).
 
 - `TIMER_DEFINE(name, timeoutHandler, timerMode)`
+- `timerCreate(timerNodeType **ppTimerNode, timeoutHandlerType timeoutHandler, void *pArg, timerModeType mode)`
+- `timerDelete(timerNodeType *pTimerNode)`
 - `timerStart(timerNodeType *pTimerNode, uint32_t interval)`
 - `timerStop(timerNodeType *pTimerNode)`
 

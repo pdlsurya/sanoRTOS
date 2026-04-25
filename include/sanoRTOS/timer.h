@@ -52,7 +52,7 @@ extern "C"
 #define TIMER_DEFINE(_name, timeout_handler, timer_mode) \
     void timeout_handler(void *);                        \
     timerNodeType _name = {                              \
-        .name = #_name,                                  \
+        .flags = 0U,                                     \
         .isRunning = false,                              \
         .mode = timer_mode,                              \
         .timeoutHandler = timeout_handler,               \
@@ -68,7 +68,7 @@ extern "C"
      */
     typedef struct timerNode
     {
-        const char *name;                  ///< Name of the timer.
+        uint8_t flags;                     ///< Dynamic ownership flags.
         timeoutHandlerType timeoutHandler; ///< Function to call when the timer expires.
         void *pArg;                        ///< Application argument passed to the timeout handler.
         uint32_t intervalTicks;            ///< Timer interval in ticks (used for periodic timers).
@@ -78,6 +78,10 @@ extern "C"
         timerModeType mode;                ///< Timer mode (e.g., one-shot or periodic).
         bool isRunning;                    ///< Indicates whether the timer is currently running.
     } timerNodeType;
+
+    int timerCreate(timerNodeType **ppTimerNode,
+                    timeoutHandlerType timeoutHandler, void *pArg, timerModeType mode);
+    int timerDelete(timerNodeType *pTimerNode);
 
     /**
      * @brief Node structure for a queue of timeout handlers to be invoked.

@@ -47,7 +47,7 @@ extern "C"
  */
 #define SEMAPHORE_DEFINE(_name, initialCount, maxCnt) \
     semaphoreHandleType _name = {                     \
-        .name = #_name,                               \
+        .flags = 0U,                                  \
         .lock = 0,                                    \
         .waitQueue = TASK_WAIT_QUEUE_INITIALIZER,     \
         .count = initialCount,                        \
@@ -58,12 +58,15 @@ extern "C"
      */
     typedef struct
     {
-        const char *name;        ///< Name of the semaphore.
+        uint8_t flags;           ///< Dynamic ownership flags.
         atomic_t lock;           ///< Spinlock variable used to ensure atomic access to the semaphore.
         taskQueueType waitQueue; ///< Queue of tasks waiting to acquire the semaphore.
         uint8_t count;           ///< Current count of the semaphore (number of available resources).
         uint8_t maxCount;        ///< Maximum count the semaphore can reach (resource capacity limit).
     } semaphoreHandleType;
+
+    int semaphoreCreate(semaphoreHandleType **ppSem, uint8_t initialCount, uint8_t maxCount);
+    int semaphoreDelete(semaphoreHandleType *pSem);
 
     /**
      * @brief Take (acquire) a semaphore.

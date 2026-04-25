@@ -28,6 +28,36 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/event.h"
+#include "objectHelpers.h"
+
+MEM_SLAB_DEFINE(dynamicEventObjectSlab,
+                sizeof(eventHandleType),
+                CONFIG_DYNAMIC_EVENT_SLAB_BLOCKS);
+
+static int eventObjectAlloc(eventHandleType **ppEvent)
+{
+    return objectAllocFromSlab(&dynamicEventObjectSlab,
+                               (void **)ppEvent,
+                               sizeof(eventHandleType));
+}
+
+static void eventObjectFree(eventHandleType *pEvent)
+{
+    (void)objectFreeToSlab(&dynamicEventObjectSlab, pEvent);
+}
+
+static int eventSetup(eventHandleType *pEvent, uint8_t flags)
+{
+    if (pEvent == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    memset(pEvent, 0, sizeof(eventHandleType));
+    pEvent->flags = flags;
+
+    return RET_SUCCESS;
+}
 
 static inline uint32_t eventMatchedMask(uint32_t activeEvents, uint32_t waitMask)
 {
@@ -326,4 +356,54 @@ int eventSync(eventHandleType *pEvent, uint32_t setEvents,
               uint32_t waitEvents, uint32_t *pMatchedEvents, uint32_t waitTicks)
 {
     return eventWaitCommon(pEvent, waitEvents, true, true, setEvents, pMatchedEvents, waitTicks);
+}
+
+int eventCreate(eventHandleType **ppEvent)
+{
+    eventHandleType *pEvent = NULL;
+    int retCode;
+
+    if (ppEvent == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    retCode = eventObjectAlloc(&pEvent);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    retCode = eventSetup(pEvent, OBJECT_FLAG_DYNAMIC);
+    if (retCode != RET_SUCCESS)
+    {
+        eventObjectFree(pEvent);
+        return retCode;
+    }
+
+    *ppEvent = pEvent;
+
+    return RET_SUCCESS;
+}
+
+int eventDelete(eventHandleType *pEvent)
+{
+    bool irqState;
+
+    if ((pEvent == NULL) || !objectIsDynamic(pEvent->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&pEvent->lock);
+    if (objectWaitQueueHasWaiters(&pEvent->waitQueue))
+    {
+        spinUnlock(&pEvent->lock, irqState);
+        return RET_BUSY;
+    }
+
+    spinUnlock(&pEvent->lock, irqState);
+    eventObjectFree(pEvent);
+
+    return RET_SUCCESS;
 }

@@ -52,7 +52,6 @@ extern "C"
     _Static_assert(((_numBlocks) > 0U), "Memory slab must contain at least one block.");                       \
     uint8_t _name##Buffer[(_blockSize) * (_numBlocks)] __attribute__((aligned(sizeof(void *))));               \
     memSlabHandleType _name = {                                                                                 \
-        .name = #_name,                                                                                         \
         .lock = 0,                                                                                              \
         .waitQueue = TASK_WAIT_QUEUE_INITIALIZER,                                                               \
         .buffer = _name##Buffer,                                                                                \
@@ -67,7 +66,6 @@ extern "C"
      */
     typedef struct
     {
-        const char *name;        ///< Name of the slab.
         atomic_t lock;           ///< Spinlock protecting slab state.
         taskQueueType waitQueue; ///< Tasks waiting for a free block.
         uint8_t *buffer;         ///< Backing storage for all blocks.

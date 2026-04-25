@@ -109,7 +109,7 @@ static bool memSlabBlockIsFreeLocked(memSlabHandleType *pMemSlab, void *pBlock)
     return false;
 }
 
-static int memSlabWakeWaitingTask(memSlabHandleType *pMemSlab, bool *pContextSwitchRequired)
+static int memSlabWakeWaitingTaskLocked(memSlabHandleType *pMemSlab, bool *pContextSwitchRequired)
 {
     if ((pMemSlab == NULL) || (pContextSwitchRequired == NULL))
     {
@@ -259,7 +259,7 @@ int memSlabFree(memSlabHandleType *pMemSlab, void *pBlock)
     pMemSlab->freeBlocks++;
 
     bool contextSwitchRequired = false;
-    retCode = memSlabWakeWaitingTask(pMemSlab, &contextSwitchRequired);
+    retCode = memSlabWakeWaitingTaskLocked(pMemSlab, &contextSwitchRequired);
 
     spinUnlock(&pMemSlab->lock, irqState);
 

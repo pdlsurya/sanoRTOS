@@ -45,7 +45,7 @@ extern "C"
  */
 #define MUTEX_DEFINE(_name)         \
     mutexHandleType _name = {       \
-        .name = #_name,             \
+        .flags = 0U,                \
         .lock = 0,                  \
         .waitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .ownerTask = NULL,          \
@@ -57,13 +57,16 @@ extern "C"
      */
     typedef struct
     {
-        const char *name;             ///< Name of the mutex.
+        uint8_t flags;                ///< Dynamic ownership flags.
         atomic_t lock;                ///< Spinlock variable used for atomic access to the mutex (for low-level synchronization).
         taskQueueType waitQueue;      ///< Queue of tasks waiting to acquire the mutex.
         taskHandleType *ownerTask;    ///< Pointer to the task currently holding the mutex.
         int16_t ownerDefaultPriority; ///< Original priority of the owner task before priority inheritance (if used).
         bool locked;                  ///< Indicates whether the mutex is currently locked.
     } mutexHandleType;
+
+    int mutexCreate(mutexHandleType **ppMutex);
+    int mutexDelete(mutexHandleType *pMutex);
 
     /**
      * @brief Acquire a mutex.

@@ -23,12 +23,46 @@
  */
 
 #include <string.h>
+#include "sanoRTOS/memHeap.h"
 #include "sanoRTOS/messageBuffer.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 #include "streamBufferInternal.h"
+#include "objectHelpers.h"
+
+MEM_SLAB_DEFINE(dynamicMsgBufferObjectSlab,
+                sizeof(msgBufferHandleType),
+                CONFIG_DYNAMIC_MSG_BUFFER_SLAB_BLOCKS);
+
+static int msgBufferObjectAlloc(msgBufferHandleType **ppMsgBuffer)
+{
+    return objectAllocFromSlab(&dynamicMsgBufferObjectSlab,
+                               (void **)ppMsgBuffer,
+                               sizeof(msgBufferHandleType));
+}
+
+static void msgBufferObjectFree(msgBufferHandleType *pMsgBuffer)
+{
+    (void)objectFreeToSlab(&dynamicMsgBufferObjectSlab, pMsgBuffer);
+}
+
+static int msgBufferSetup(msgBufferHandleType *pMsgBuffer,
+                          uint8_t *pBuffer, uint32_t bufferSize, uint8_t flags)
+{
+    if ((pMsgBuffer == NULL) || (pBuffer == NULL) || (bufferSize < sizeof(uint32_t)))
+    {
+        return RET_INVAL;
+    }
+
+    memset(pMsgBuffer, 0, sizeof(msgBufferHandleType));
+    pMsgBuffer->flags = flags;
+    pMsgBuffer->streamBuffer.buffer = pBuffer;
+    pMsgBuffer->streamBuffer.bufferSize = bufferSize;
+
+    return RET_SUCCESS;
+}
 
 static inline uint32_t msgBufferRequiredBytes(uint32_t length)
 {
@@ -327,4 +361,73 @@ int msgBufferReset(msgBufferHandleType *pMsgBuffer)
     }
 
     return streamBufferReset(&pMsgBuffer->streamBuffer);
+}
+
+int msgBufferCreate(msgBufferHandleType **ppMsgBuffer, uint32_t bufferSize)
+{
+    msgBufferHandleType *pMsgBuffer = NULL;
+    uint8_t *pBuffer = NULL;
+    int retCode;
+
+    if ((ppMsgBuffer == NULL) || (bufferSize < sizeof(uint32_t)))
+    {
+        return RET_INVAL;
+    }
+
+    retCode = msgBufferObjectAlloc(&pMsgBuffer);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    pBuffer = (uint8_t *)memHeapAlloc(bufferSize);
+    if (pBuffer == NULL)
+    {
+        msgBufferObjectFree(pMsgBuffer);
+        return RET_NOMEM;
+    }
+
+    retCode = msgBufferSetup(pMsgBuffer, pBuffer, bufferSize,
+                             OBJECT_FLAG_DYNAMIC | OBJECT_FLAG_OWN_BUFFER);
+    if (retCode != RET_SUCCESS)
+    {
+        memHeapFree(pBuffer);
+        msgBufferObjectFree(pMsgBuffer);
+        return retCode;
+    }
+
+    *ppMsgBuffer = pMsgBuffer;
+
+    return RET_SUCCESS;
+}
+
+int msgBufferDelete(msgBufferHandleType *pMsgBuffer)
+{
+    bool irqState;
+    uint8_t flags;
+    uint8_t *pBuffer;
+
+    if ((pMsgBuffer == NULL) || !objectIsDynamic(pMsgBuffer->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&pMsgBuffer->streamBuffer.lock);
+    if (objectWaitQueueHasWaiters(&pMsgBuffer->streamBuffer.producerWaitQueue) ||
+        objectWaitQueueHasWaiters(&pMsgBuffer->streamBuffer.consumerWaitQueue))
+    {
+        spinUnlock(&pMsgBuffer->streamBuffer.lock, irqState);
+        return RET_BUSY;
+    }
+
+    flags = pMsgBuffer->flags;
+    pBuffer = pMsgBuffer->streamBuffer.buffer;
+    spinUnlock(&pMsgBuffer->streamBuffer.lock, irqState);
+    if ((flags & OBJECT_FLAG_OWN_BUFFER) != 0U)
+    {
+        memHeapFree(pBuffer);
+    }
+    msgBufferObjectFree(pMsgBuffer);
+
+    return RET_SUCCESS;
 }

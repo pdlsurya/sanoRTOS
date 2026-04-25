@@ -43,7 +43,7 @@ extern "C"
  */
 #define EVENT_DEFINE(_name)         \
     eventHandleType _name = {       \
-        .name = #_name,             \
+        .flags = 0U,                \
         .waitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .events = 0,                \
         .lock = 0}
@@ -53,11 +53,14 @@ extern "C"
      */
     typedef struct
     {
-        const char *name;        ///< Name of the event object.
+        uint8_t flags;           ///< Dynamic ownership flags.
         taskQueueType waitQueue; ///< Queue of tasks waiting for event bits.
         uint32_t events;         ///< Current event-bit state.
         atomic_t lock;           ///< Spinlock protecting the event object.
     } eventHandleType;
+
+    int eventCreate(eventHandleType **ppEvent);
+    int eventDelete(eventHandleType *pEvent);
 
     /**
      * @brief Set one or more bits in an event object.

@@ -43,7 +43,7 @@ extern "C"
  */
 #define MAILBOX_DEFINE(_name)       \
     mailboxHandleType _name = {     \
-        .name = #_name,             \
+        .flags = 0U,                \
         .senderWaitQueue = TASK_WAIT_QUEUE_INITIALIZER,   \
         .receiverWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .lock = 0}
@@ -65,11 +65,14 @@ extern "C"
      */
     typedef struct mailboxHandle
     {
-        const char *name;               ///< Mailbox name.
+        uint8_t flags;                  ///< Dynamic ownership flags.
         taskQueueType senderWaitQueue;  ///< Queue of tasks waiting to send a mailbox message.
         taskQueueType receiverWaitQueue; ///< Queue of tasks waiting to receive a mailbox message.
         atomic_t lock;                  ///< Spinlock protecting the mailbox object.
     } mailboxHandleType;
+
+    int mailboxCreate(mailboxHandleType **ppMailbox);
+    int mailboxDelete(mailboxHandleType *pMailbox);
 
     /**
      * @brief Send a message through a mailbox.

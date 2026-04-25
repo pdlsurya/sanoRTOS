@@ -48,7 +48,7 @@ extern "C"
 #define MSG_QUEUE_DEFINE(_name, length, item_size) \
     uint8_t _name##Buffer[length * item_size];     \
     msgQueueHandleType _name = {                   \
-        .name = #_name,                            \
+        .flags = 0U,                               \
         .producerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .consumerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .buffer = _name##Buffer,                    \
@@ -64,7 +64,7 @@ extern "C"
      */
     typedef struct
     {
-        const char *name;                ///< Name of the message queue
+        uint8_t flags;                   ///< Dynamic ownership flags.
         taskQueueType producerWaitQueue; ///< Queue of producer tasks waiting to enqueue data when the buffer is full.
         taskQueueType consumerWaitQueue; ///< Queue of consumer tasks waiting to dequeue data when the buffer is empty.
         uint8_t *buffer;                 ///< Pointer to the buffer storing messages/items.
@@ -75,6 +75,9 @@ extern "C"
         uint32_t writeIndex;             ///< Index at which the next item will be written.
         atomic_t lock;                   ///< Spinlock to ensure atomic access to the queue for both producers and consumers.
     } msgQueueHandleType;
+
+    int msgQueueCreate(msgQueueHandleType **ppQueueHandle, uint32_t length, uint32_t itemSize);
+    int msgQueueDelete(msgQueueHandleType *pQueueHandle);
 
     /**
      * @brief Check whether message queue is full.

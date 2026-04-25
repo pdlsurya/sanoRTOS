@@ -24,12 +24,48 @@
 
 #include <string.h>
 #include "sanoRTOS/retCodes.h"
+#include "sanoRTOS/memHeap.h"
 #include "sanoRTOS/messageQueue.h"
 #include "sanoRTOS/mutex.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
+#include "objectHelpers.h"
+
+MEM_SLAB_DEFINE(dynamicMsgQueueObjectSlab,
+                sizeof(msgQueueHandleType),
+                CONFIG_DYNAMIC_MSG_QUEUE_SLAB_BLOCKS);
+
+static int msgQueueObjectAlloc(msgQueueHandleType **ppQueueHandle)
+{
+    return objectAllocFromSlab(&dynamicMsgQueueObjectSlab,
+                               (void **)ppQueueHandle,
+                               sizeof(msgQueueHandleType));
+}
+
+static void msgQueueObjectFree(msgQueueHandleType *pQueueHandle)
+{
+    (void)objectFreeToSlab(&dynamicMsgQueueObjectSlab, pQueueHandle);
+}
+
+static int msgQueueSetup(msgQueueHandleType *pQueueHandle,
+                         uint8_t *pBuffer, uint32_t length, uint32_t itemSize, uint8_t flags)
+{
+    if ((pQueueHandle == NULL) || (pBuffer == NULL) || (length == 0U) || (itemSize == 0U) ||
+        (length > (UINT32_MAX / itemSize)))
+    {
+        return RET_INVAL;
+    }
+
+    memset(pQueueHandle, 0, sizeof(msgQueueHandleType));
+    pQueueHandle->flags = flags;
+    pQueueHandle->buffer = pBuffer;
+    pQueueHandle->queueLength = length;
+    pQueueHandle->itemSize = itemSize;
+
+    return RET_SUCCESS;
+}
 
 static int msgQueueWakeWaitingTasks(taskQueueType *pWaitQueue,
                                     blockedReasonType blockedReason,
@@ -321,4 +357,74 @@ retry:
     }
 
     return retCode;
+}
+
+int msgQueueCreate(msgQueueHandleType **ppQueueHandle, uint32_t length, uint32_t itemSize)
+{
+    msgQueueHandleType *pQueueHandle = NULL;
+    uint8_t *pBuffer = NULL;
+    int retCode;
+
+    if ((ppQueueHandle == NULL) || (length == 0U) || (itemSize == 0U) ||
+        (length > (UINT32_MAX / itemSize)))
+    {
+        return RET_INVAL;
+    }
+
+    retCode = msgQueueObjectAlloc(&pQueueHandle);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    pBuffer = (uint8_t *)memHeapAlloc(length * itemSize);
+    if (pBuffer == NULL)
+    {
+        msgQueueObjectFree(pQueueHandle);
+        return RET_NOMEM;
+    }
+
+    retCode = msgQueueSetup(pQueueHandle, pBuffer, length, itemSize,
+                            OBJECT_FLAG_DYNAMIC | OBJECT_FLAG_OWN_BUFFER);
+    if (retCode != RET_SUCCESS)
+    {
+        memHeapFree(pBuffer);
+        msgQueueObjectFree(pQueueHandle);
+        return retCode;
+    }
+
+    *ppQueueHandle = pQueueHandle;
+
+    return RET_SUCCESS;
+}
+
+int msgQueueDelete(msgQueueHandleType *pQueueHandle)
+{
+    bool irqState;
+    uint8_t flags;
+    uint8_t *pBuffer;
+
+    if ((pQueueHandle == NULL) || !objectIsDynamic(pQueueHandle->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&pQueueHandle->lock);
+    if (objectWaitQueueHasWaiters(&pQueueHandle->producerWaitQueue) ||
+        objectWaitQueueHasWaiters(&pQueueHandle->consumerWaitQueue))
+    {
+        spinUnlock(&pQueueHandle->lock, irqState);
+        return RET_BUSY;
+    }
+
+    flags = pQueueHandle->flags;
+    pBuffer = pQueueHandle->buffer;
+    spinUnlock(&pQueueHandle->lock, irqState);
+    if ((flags & OBJECT_FLAG_OWN_BUFFER) != 0U)
+    {
+        memHeapFree(pBuffer);
+    }
+    msgQueueObjectFree(pQueueHandle);
+
+    return RET_SUCCESS;
 }

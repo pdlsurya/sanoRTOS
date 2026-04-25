@@ -52,9 +52,27 @@ extern "C"
 
 #define CONFIG_TASK_PRIORITY_LEVELS 16 ///< Number of scheduler priority levels used by the bitmap-backed ready queue.
 
-#define CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS 32 ///< Number of fixed timeout-handler nodes kept in the internal slab allocator.
+#define CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS 32 ///< Number of slab blocks for timeout-handler nodes.
 
-#define CONFIG_DYNAMIC_TASK_TCB_SLAB_BLOCKS 16 ///< Number of dynamic task control blocks kept in the internal slab allocator.
+#define CONFIG_DYNAMIC_TASK_TCB_SLAB_BLOCKS 16 ///< Number of slab blocks for dynamic task control blocks.
+
+#define CONFIG_DYNAMIC_SEMAPHORE_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic semaphores.
+
+#define CONFIG_DYNAMIC_MUTEX_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic mutexes.
+
+#define CONFIG_DYNAMIC_EVENT_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic events.
+
+#define CONFIG_DYNAMIC_COND_VAR_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic condition variables.
+
+#define CONFIG_DYNAMIC_MAILBOX_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic mailboxes.
+
+#define CONFIG_DYNAMIC_MSG_QUEUE_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic message queues.
+
+#define CONFIG_DYNAMIC_STREAM_BUFFER_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic stream buffers.
+
+#define CONFIG_DYNAMIC_MSG_BUFFER_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic message buffers.
+
+#define CONFIG_DYNAMIC_TIMER_SLAB_BLOCKS 8 ///< Number of slab blocks for dynamic timers.
 
 #if (CONFIG_TASK_PRIORITY_LEVELS == 0) || (CONFIG_TASK_PRIORITY_LEVELS > 32)
 #error "CONFIG_TASK_PRIORITY_LEVELS must be between 1 and 32"

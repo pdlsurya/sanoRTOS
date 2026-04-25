@@ -48,7 +48,7 @@ extern "C"
 #define STREAM_BUFFER_DEFINE(_name, _bufferSize) \
     uint8_t _name##Buffer[_bufferSize];          \
     streamBufferHandleType _name = {             \
-        .name = #_name,                          \
+        .flags = 0U,                             \
         .producerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .consumerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
         .buffer = _name##Buffer,                 \
@@ -63,7 +63,7 @@ extern "C"
      */
     typedef struct
     {
-        const char *name;                ///< Name of the stream buffer.
+        uint8_t flags;                   ///< Dynamic ownership flags.
         taskQueueType producerWaitQueue; ///< Tasks waiting for free space.
         taskQueueType consumerWaitQueue; ///< Tasks waiting for available data.
         uint8_t *buffer;                 ///< Underlying byte ring buffer.
@@ -73,6 +73,9 @@ extern "C"
         uint32_t writeIndex;             ///< Ring index at which the next byte will be written.
         atomic_t lock;                   ///< Spinlock protecting the stream buffer state.
     } streamBufferHandleType;
+
+    int streamBufferCreate(streamBufferHandleType **ppStreamBuffer, uint32_t bufferSize);
+    int streamBufferDelete(streamBufferHandleType *pStreamBuffer);
 
     /**
      * @brief Check whether the stream buffer is empty.

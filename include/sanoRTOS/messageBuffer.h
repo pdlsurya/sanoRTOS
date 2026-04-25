@@ -47,8 +47,9 @@ extern "C"
 #define MSG_BUFFER_DEFINE(_name, _bufferSize) \
     uint8_t _name##Buffer[_bufferSize];       \
     msgBufferHandleType _name = {             \
+        .flags = 0U,                          \
         .streamBuffer = {                     \
-            .name = #_name,                   \
+            .flags = 0U,                      \
             .producerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
             .consumerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
             .buffer = _name##Buffer,          \
@@ -63,8 +64,12 @@ extern "C"
      */
     typedef struct
     {
+        uint8_t flags;                    ///< Dynamic ownership flags.
         streamBufferHandleType streamBuffer; ///< Underlying stream buffer storage and wait queues.
     } msgBufferHandleType;
+
+    int msgBufferCreate(msgBufferHandleType **ppMsgBuffer, uint32_t bufferSize);
+    int msgBufferDelete(msgBufferHandleType *pMsgBuffer);
 
     /**
      * @brief Check whether the message buffer is empty.

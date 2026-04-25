@@ -23,12 +23,46 @@
  */
 
 #include <string.h>
+#include "sanoRTOS/memHeap.h"
 #include "sanoRTOS/streamBuffer.h"
 #include "sanoRTOS/task.h"
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 #include "streamBufferInternal.h"
+#include "objectHelpers.h"
+
+MEM_SLAB_DEFINE(dynamicStreamBufferObjectSlab,
+                sizeof(streamBufferHandleType),
+                CONFIG_DYNAMIC_STREAM_BUFFER_SLAB_BLOCKS);
+
+static int streamBufferObjectAlloc(streamBufferHandleType **ppStreamBuffer)
+{
+    return objectAllocFromSlab(&dynamicStreamBufferObjectSlab,
+                               (void **)ppStreamBuffer,
+                               sizeof(streamBufferHandleType));
+}
+
+static void streamBufferObjectFree(streamBufferHandleType *pStreamBuffer)
+{
+    (void)objectFreeToSlab(&dynamicStreamBufferObjectSlab, pStreamBuffer);
+}
+
+static int streamBufferSetup(streamBufferHandleType *pStreamBuffer,
+                             uint8_t *pBuffer, uint32_t bufferSize, uint8_t flags)
+{
+    if ((pStreamBuffer == NULL) || (pBuffer == NULL) || (bufferSize == 0U))
+    {
+        return RET_INVAL;
+    }
+
+    memset(pStreamBuffer, 0, sizeof(streamBufferHandleType));
+    pStreamBuffer->flags = flags;
+    pStreamBuffer->buffer = pBuffer;
+    pStreamBuffer->bufferSize = bufferSize;
+
+    return RET_SUCCESS;
+}
 
 static void streamBufferRingWrite(streamBufferHandleType *pStreamBuffer, uint32_t index, const void *pData, uint32_t length)
 {
@@ -74,11 +108,11 @@ static void streamBufferRingRead(streamBufferHandleType *pStreamBuffer, uint32_t
     }
 }
 
-static int streamBufferWakeWaitingTask(taskQueueType *pWaitQueue,
-                                       blockedReasonType blockedReason,
-                                       wakeupReasonType wakeupReason,
-                                       bool *pContextSwitchRequired,
-                                       bool wakeAll)
+static int streamBufferWakeWaitingTaskLocked(taskQueueType *pWaitQueue,
+                                             blockedReasonType blockedReason,
+                                             wakeupReasonType wakeupReason,
+                                             bool *pContextSwitchRequired,
+                                             bool wakeAll)
 {
     if ((pWaitQueue == NULL) || (pContextSwitchRequired == NULL))
     {
@@ -187,11 +221,11 @@ int streamBufferWakeDataAvailableLocked(streamBufferHandleType *pStreamBuffer,
         return RET_INVAL;
     }
 
-    return streamBufferWakeWaitingTask(&pStreamBuffer->consumerWaitQueue,
-                                       WAIT_FOR_STREAM_BUFFER_DATA,
-                                       STREAM_BUFFER_DATA_AVAILABLE,
-                                       pContextSwitchRequired,
-                                       false);
+    return streamBufferWakeWaitingTaskLocked(&pStreamBuffer->consumerWaitQueue,
+                                             WAIT_FOR_STREAM_BUFFER_DATA,
+                                             STREAM_BUFFER_DATA_AVAILABLE,
+                                             pContextSwitchRequired,
+                                             false);
 }
 
 int streamBufferWakeSpaceAvailableLocked(streamBufferHandleType *pStreamBuffer,
@@ -202,11 +236,11 @@ int streamBufferWakeSpaceAvailableLocked(streamBufferHandleType *pStreamBuffer,
         return RET_INVAL;
     }
 
-    return streamBufferWakeWaitingTask(&pStreamBuffer->producerWaitQueue,
-                                       WAIT_FOR_STREAM_BUFFER_SPACE,
-                                       STREAM_BUFFER_SPACE_AVAILABLE,
-                                       pContextSwitchRequired,
-                                       false);
+    return streamBufferWakeWaitingTaskLocked(&pStreamBuffer->producerWaitQueue,
+                                             WAIT_FOR_STREAM_BUFFER_SPACE,
+                                             STREAM_BUFFER_SPACE_AVAILABLE,
+                                             pContextSwitchRequired,
+                                             false);
 }
 
 int streamBufferPeekLocked(streamBufferHandleType *pStreamBuffer,
@@ -459,11 +493,11 @@ int streamBufferReset(streamBufferHandleType *pStreamBuffer)
     pStreamBuffer->readIndex = 0U;
     pStreamBuffer->writeIndex = 0U;
 
-    int retCode = streamBufferWakeWaitingTask(&pStreamBuffer->producerWaitQueue,
-                                              WAIT_FOR_STREAM_BUFFER_SPACE,
-                                              STREAM_BUFFER_SPACE_AVAILABLE,
-                                              &contextSwitchRequired,
-                                              true);
+    int retCode = streamBufferWakeWaitingTaskLocked(&pStreamBuffer->producerWaitQueue,
+                                                    WAIT_FOR_STREAM_BUFFER_SPACE,
+                                                    STREAM_BUFFER_SPACE_AVAILABLE,
+                                                    &contextSwitchRequired,
+                                                    true);
 
     spinUnlock(&pStreamBuffer->lock, irqState);
 
@@ -473,4 +507,73 @@ int streamBufferReset(streamBufferHandleType *pStreamBuffer)
     }
 
     return retCode;
+}
+
+int streamBufferCreate(streamBufferHandleType **ppStreamBuffer, uint32_t bufferSize)
+{
+    streamBufferHandleType *pStreamBuffer = NULL;
+    uint8_t *pBuffer = NULL;
+    int retCode;
+
+    if ((ppStreamBuffer == NULL) || (bufferSize == 0U))
+    {
+        return RET_INVAL;
+    }
+
+    retCode = streamBufferObjectAlloc(&pStreamBuffer);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    pBuffer = (uint8_t *)memHeapAlloc(bufferSize);
+    if (pBuffer == NULL)
+    {
+        streamBufferObjectFree(pStreamBuffer);
+        return RET_NOMEM;
+    }
+
+    retCode = streamBufferSetup(pStreamBuffer, pBuffer, bufferSize,
+                                OBJECT_FLAG_DYNAMIC | OBJECT_FLAG_OWN_BUFFER);
+    if (retCode != RET_SUCCESS)
+    {
+        memHeapFree(pBuffer);
+        streamBufferObjectFree(pStreamBuffer);
+        return retCode;
+    }
+
+    *ppStreamBuffer = pStreamBuffer;
+
+    return RET_SUCCESS;
+}
+
+int streamBufferDelete(streamBufferHandleType *pStreamBuffer)
+{
+    bool irqState;
+    uint8_t flags;
+    uint8_t *pBuffer;
+
+    if ((pStreamBuffer == NULL) || !objectIsDynamic(pStreamBuffer->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&pStreamBuffer->lock);
+    if (objectWaitQueueHasWaiters(&pStreamBuffer->producerWaitQueue) ||
+        objectWaitQueueHasWaiters(&pStreamBuffer->consumerWaitQueue))
+    {
+        spinUnlock(&pStreamBuffer->lock, irqState);
+        return RET_BUSY;
+    }
+
+    flags = pStreamBuffer->flags;
+    pBuffer = pStreamBuffer->buffer;
+    spinUnlock(&pStreamBuffer->lock, irqState);
+    if ((flags & OBJECT_FLAG_OWN_BUFFER) != 0U)
+    {
+        memHeapFree(pBuffer);
+    }
+    streamBufferObjectFree(pStreamBuffer);
+
+    return RET_SUCCESS;
 }

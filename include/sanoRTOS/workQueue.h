@@ -44,7 +44,6 @@ extern "C"
      */
     typedef struct workItem
     {
-        const char *name;          ///< Work item name used for debugging.
         workHandlerType handler;   ///< Function executed by the work queue worker task.
         void *pArg;                ///< Application argument passed to the work handler.
         struct workItem *pNextWork; ///< Pointer to the next queued work item.
@@ -56,7 +55,6 @@ extern "C"
      */
     typedef struct
     {
-        const char *name;           ///< Work queue name.
         workItemType *head;         ///< Head of the queued work item list.
         workItemType *tail;         ///< Tail of the queued work item list.
         taskHandleType *pWorkerTask; ///< Worker task that processes queued work items.
@@ -97,7 +95,6 @@ extern "C"
 #define WORK_DEFINE(_name, _handler, _arg) \
     void _handler(void *);                 \
     workItemType _name = {                 \
-        .name = #_name,                    \
         .handler = _handler,               \
         .pArg = _arg,                      \
         .pNextWork = NULL,                 \
@@ -114,7 +111,6 @@ extern "C"
     extern workQueueHandleType _name;                                                    \
     TASK_DEFINE(_name##WorkerTask, stackSize, workQueueTask, &_name, taskPriority, affinity); \
     workQueueHandleType _name = {                                                        \
-        .name = #_name,                                                                  \
         .head = NULL,                                                                    \
         .tail = NULL,                                                                    \
         .pWorkerTask = &_name##WorkerTask,                                               \
@@ -130,13 +126,11 @@ extern "C"
     void _handler(void *);                                  \
     delayedWorkType _name = {                               \
         .work = {                                           \
-            .name = #_name,                                 \
             .handler = _handler,                            \
             .pArg = _arg,                                   \
             .pNextWork = NULL,                              \
             .pending = false},                              \
         .timer = {                                          \
-            .name = #_name,                                 \
             .timeoutHandler = delayedWorkTimeoutHandler,    \
             .pArg = &_name,                                 \
             .intervalTicks = 0,                             \
@@ -152,12 +146,11 @@ extern "C"
      * @brief Initialize a work item at runtime.
      *
      * @param pWork Pointer to work item.
-     * @param name Work item name.
      * @param handler Work handler function.
      * @param pArg Application argument passed to the work handler.
      * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    static inline __attribute__((always_inline)) int workInit(workItemType *pWork, const char *name,
+    static inline __attribute__((always_inline)) int workInit(workItemType *pWork,
                                                               workHandlerType handler, void *pArg)
     {
         if ((pWork == NULL) || (handler == NULL))
@@ -165,7 +158,6 @@ extern "C"
             return RET_INVAL;
         }
 
-        pWork->name = name;
         pWork->handler = handler;
         pWork->pArg = pArg;
         pWork->pNextWork = NULL;
@@ -178,13 +170,11 @@ extern "C"
      * @brief Initialize a delayed work item at runtime.
      *
      * @param pDelayedWork Pointer to delayed work item.
-     * @param name Delayed work item name.
      * @param handler Work handler function.
      * @param pArg Application argument passed to the work handler.
      * @return `RET_SUCCESS` on success, error code otherwise.
      */
     static inline __attribute__((always_inline)) int delayedWorkInit(delayedWorkType *pDelayedWork,
-                                                                     const char *name,
                                                                      workHandlerType handler,
                                                                      void *pArg)
     {
@@ -193,13 +183,12 @@ extern "C"
             return RET_INVAL;
         }
 
-        int retCode = workInit(&pDelayedWork->work, name, handler, pArg);
+        int retCode = workInit(&pDelayedWork->work, handler, pArg);
         if (retCode != RET_SUCCESS)
         {
             return retCode;
         }
 
-        pDelayedWork->timer.name = name;
         pDelayedWork->timer.timeoutHandler = delayedWorkTimeoutHandler;
         pDelayedWork->timer.pArg = pDelayedWork;
         pDelayedWork->timer.intervalTicks = 0U;

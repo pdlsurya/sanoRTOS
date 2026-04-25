@@ -30,17 +30,33 @@
 #include "sanoRTOS/timer.h"
 #include "sanoRTOS/memSlab.h"
 #include "sanoRTOS/spinLock.h"
+#include "objectHelpers.h"
 
 #define TIMER_TASK_PRIORITY TASK_HIGHEST_PRIORITY /* timer task has the highest possible priority [lower the value, higher the priority] */
 static timerListType timerList = {0}; /* List of running timers */
 static timeoutHandlerQueueType timeoutHandlerQueue = {0}; /* Queue of timeout handlers to be executed */
 static atomic_t lock; /* Protects timer list and timeout handler queue */
 MEM_SLAB_DEFINE(timeoutHandlerNodeSlab, sizeof(timeoutHandlerNodeType), CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS);
+MEM_SLAB_DEFINE(dynamicTimerObjectSlab,
+                sizeof(timerNodeType),
+                CONFIG_DYNAMIC_TIMER_SLAB_BLOCKS);
+
+static int timerObjectAlloc(timerNodeType **ppTimerNode)
+{
+    return objectAllocFromSlab(&dynamicTimerObjectSlab,
+                               (void **)ppTimerNode,
+                               sizeof(timerNodeType));
+}
+
+static void timerObjectFree(timerNodeType *pTimerNode)
+{
+    (void)objectFreeToSlab(&dynamicTimerObjectSlab, pTimerNode);
+}
 
 /*Define timer task with highest possible priority*/
 TASK_DEFINE(timerTask, 4096, timerTaskFunction, NULL, TIMER_TASK_PRIORITY, AFFINITY_CORE_0);
 
-static int timeoutHandlerQueuePush(timeoutHandlerType timeoutHandler, void *pArg)
+static int timeoutHandlerQueuePushLocked(timeoutHandlerType timeoutHandler, void *pArg)
 {
     timeoutHandlerNodeType *newNode = NULL;
     if (memSlabAlloc(&timeoutHandlerNodeSlab, (void **)&newNode, TASK_NO_WAIT) != RET_SUCCESS)
@@ -66,7 +82,7 @@ static int timeoutHandlerQueuePush(timeoutHandlerType timeoutHandler, void *pArg
     return RET_SUCCESS;
 }
 
-static timeoutHandlerType timeoutHandlerQueuePop(void **ppArg)
+static timeoutHandlerType timeoutHandlerQueuePopLocked(void **ppArg)
 {
     if (timeoutHandlerQueue.head == NULL)
     {
@@ -97,7 +113,7 @@ static timeoutHandlerType timeoutHandlerQueuePop(void **ppArg)
     return timeoutHandler;
 }
 
-static void timerListNodeAdd(timerNodeType *pTimerNode)
+static void timerListNodeAddLocked(timerNodeType *pTimerNode)
 {
     pTimerNode->prevNode = NULL;
     pTimerNode->nextNode = timerList.head;
@@ -109,7 +125,7 @@ static void timerListNodeAdd(timerNodeType *pTimerNode)
     timerList.head = pTimerNode;
 }
 
-static int timerListNodeDelete(timerNodeType *pTimerNode)
+static int timerListNodeDeleteLocked(timerNodeType *pTimerNode)
 {
     if (pTimerNode == NULL)
     {
@@ -150,10 +166,29 @@ static int timerStopLocked(timerNodeType *pTimerNode)
     if (pTimerNode->isRunning)
     {
         pTimerNode->isRunning = false;
-        return timerListNodeDelete(pTimerNode);
+        return timerListNodeDeleteLocked(pTimerNode);
     }
 
     return RET_NOTACTIVE;
+}
+
+static int timerSetup(timerNodeType *pTimerNode,
+                      timeoutHandlerType timeoutHandler, void *pArg,
+                      timerModeType mode, uint8_t flags)
+{
+    if ((pTimerNode == NULL) || (timeoutHandler == NULL) ||
+        ((mode != TIMER_MODE_SINGLE_SHOT) && (mode != TIMER_MODE_PERIODIC)))
+    {
+        return RET_INVAL;
+    }
+
+    memset(pTimerNode, 0, sizeof(timerNodeType));
+    pTimerNode->flags = flags;
+    pTimerNode->timeoutHandler = timeoutHandler;
+    pTimerNode->pArg = pArg;
+    pTimerNode->mode = mode;
+
+    return RET_SUCCESS;
 }
 
 int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
@@ -179,7 +214,7 @@ int timerStart(timerNodeType *pTimerNode, uint32_t intervalTicks)
         pTimerNode->ticksToExpire = pTimerNode->intervalTicks = intervalTicks;
 
         /* Add the timer in the queue of running timers*/
-        timerListNodeAdd(pTimerNode);
+        timerListNodeAddLocked(pTimerNode);
     }
 
     spinUnlock(&lock, irqState);
@@ -223,8 +258,8 @@ void processTimers()
                 {
 
                     /*Add timeout handler to the timeoutHandlerQueue*/
-                    if (timeoutHandlerQueuePush(currentNode->timeoutHandler,
-                                                currentNode->pArg) == RET_SUCCESS)
+                    if (timeoutHandlerQueuePushLocked(currentNode->timeoutHandler,
+                                                      currentNode->pArg) == RET_SUCCESS)
                     {
                         /* Notify timer task that timeout work is available. */
                         (void)taskNotify(&timerTask, 0U, TASK_NOTIFY_INCREMENT);
@@ -259,7 +294,7 @@ void timerTaskFunction(void *args)
     {
         bool irqState = spinLock(&lock);
         void *pArg = NULL;
-        timeoutHandlerType timeoutHandler = timeoutHandlerQueuePop(&pArg);
+        timeoutHandlerType timeoutHandler = timeoutHandlerQueuePopLocked(&pArg);
         spinUnlock(&lock, irqState);
 
         if (timeoutHandler != NULL)
@@ -272,4 +307,55 @@ void timerTaskFunction(void *args)
             (void)taskNotifyTake(true, NULL, TASK_FOREVER_WAIT);
         }
     }
+}
+
+int timerCreate(timerNodeType **ppTimerNode,
+                timeoutHandlerType timeoutHandler, void *pArg, timerModeType mode)
+{
+    timerNodeType *pTimerNode = NULL;
+    int retCode;
+
+    if (ppTimerNode == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    retCode = timerObjectAlloc(&pTimerNode);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    retCode = timerSetup(pTimerNode, timeoutHandler, pArg, mode, OBJECT_FLAG_DYNAMIC);
+    if (retCode != RET_SUCCESS)
+    {
+        timerObjectFree(pTimerNode);
+        return retCode;
+    }
+
+    *ppTimerNode = pTimerNode;
+
+    return RET_SUCCESS;
+}
+
+int timerDelete(timerNodeType *pTimerNode)
+{
+    bool irqState;
+
+    if ((pTimerNode == NULL) || !objectIsDynamic(pTimerNode->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&lock);
+    if (pTimerNode->isRunning)
+    {
+        spinUnlock(&lock, irqState);
+        return RET_BUSY;
+    }
+
+    spinUnlock(&lock, irqState);
+    timerObjectFree(pTimerNode);
+
+    return RET_SUCCESS;
 }

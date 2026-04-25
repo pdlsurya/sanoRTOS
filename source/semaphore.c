@@ -29,6 +29,39 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/semaphore.h"
+#include "objectHelpers.h"
+
+MEM_SLAB_DEFINE(dynamicSemaphoreObjectSlab,
+                sizeof(semaphoreHandleType),
+                CONFIG_DYNAMIC_SEMAPHORE_SLAB_BLOCKS);
+
+static int semaphoreObjectAlloc(semaphoreHandleType **ppSem)
+{
+    return objectAllocFromSlab(&dynamicSemaphoreObjectSlab,
+                               (void **)ppSem,
+                               sizeof(semaphoreHandleType));
+}
+
+static void semaphoreObjectFree(semaphoreHandleType *pSem)
+{
+    (void)objectFreeToSlab(&dynamicSemaphoreObjectSlab, pSem);
+}
+
+static int semaphoreSetup(semaphoreHandleType *pSem,
+                          uint8_t initialCount, uint8_t maxCount, uint8_t flags)
+{
+    if ((pSem == NULL) || (maxCount == 0U) || (initialCount > maxCount))
+    {
+        return RET_INVAL;
+    }
+
+    memset(pSem, 0, sizeof(semaphoreHandleType));
+    pSem->flags = flags;
+    pSem->count = initialCount;
+    pSem->maxCount = maxCount;
+
+    return RET_SUCCESS;
+}
 
 int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
 {
@@ -169,4 +202,54 @@ int semaphoreGive(semaphoreHandleType *pSem)
     }
 
     return retCode;
+}
+
+int semaphoreCreate(semaphoreHandleType **ppSem, uint8_t initialCount, uint8_t maxCount)
+{
+    semaphoreHandleType *pSem = NULL;
+    int retCode;
+
+    if (ppSem == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    retCode = semaphoreObjectAlloc(&pSem);
+    if (retCode != RET_SUCCESS)
+    {
+        return retCode;
+    }
+
+    retCode = semaphoreSetup(pSem, initialCount, maxCount, OBJECT_FLAG_DYNAMIC);
+    if (retCode != RET_SUCCESS)
+    {
+        semaphoreObjectFree(pSem);
+        return retCode;
+    }
+
+    *ppSem = pSem;
+
+    return RET_SUCCESS;
+}
+
+int semaphoreDelete(semaphoreHandleType *pSem)
+{
+    bool irqState;
+
+    if ((pSem == NULL) || !objectIsDynamic(pSem->flags))
+    {
+        return RET_INVAL;
+    }
+
+    irqState = spinLock(&pSem->lock);
+    if (objectWaitQueueHasWaiters(&pSem->waitQueue))
+    {
+        spinUnlock(&pSem->lock, irqState);
+        return RET_BUSY;
+    }
+
+    spinUnlock(&pSem->lock, irqState);
+    semaphoreObjectFree(pSem);
+
+    return RET_SUCCESS;
 }
