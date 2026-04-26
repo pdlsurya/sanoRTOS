@@ -126,6 +126,17 @@ extern "C"
      */
     int msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks);
 
+    /**
+     * @brief Reset a message queue to the empty state.
+     *
+     * Stored items are discarded. Producers waiting only for free space are
+     * woken so they can retry immediately.
+     *
+     * @param pQueueHandle Pointer to queue handle.
+     * @return `RET_SUCCESS` on success, `RET_INVAL` for invalid arguments, error code otherwise.
+     */
+    int msgQueueReset(msgQueueHandleType *pQueueHandle);
+
 #ifdef __cplusplus
 }
 #endif

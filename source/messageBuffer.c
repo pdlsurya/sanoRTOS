@@ -332,3 +332,13 @@ int msgBufferNextLength(msgBufferHandleType *pMsgBuffer, uint32_t *pLength)
 
     return retCode;
 }
+
+int msgBufferReset(msgBufferHandleType *pMsgBuffer)
+{
+    if (pMsgBuffer == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    return streamBufferReset(&pMsgBuffer->streamBuffer);
+}

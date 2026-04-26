@@ -43,6 +43,7 @@ void idleTaskHandler0(void *params)
     (void)params;
     while (1)
     {
+        taskCleanupExited();
         // Enter sleep mode
         // PORT_ENTER_SLEEP_MODE();
     }
@@ -139,6 +140,8 @@ void taskYield()
     {
         return;
     }
+
+    taskCleanupExited();
 
     bool contextSwitchRequired = false;
 

@@ -46,22 +46,16 @@ taskHandleType *currentTask[PORT_CORE_COUNT];
 taskHandleType *nextTask[PORT_CORE_COUNT];
 
 static atomic_t lock;
+static taskHandleType *exitedTask[PORT_CORE_COUNT];
 
 MEM_SLAB_DEFINE(dynamicTaskTcbSlab, sizeof(taskHandleType), CONFIG_DYNAMIC_TASK_TCB_SLAB_BLOCKS);
-
-void taskExitFunction()
-{
-
-    while (1)
-        ;
-}
 
 static void taskInitStack(uint32_t *stack, uint32_t stackSize, taskFunctionType taskEntryFunction, void *taskParams)
 {
     uint32_t stackWords = stackSize / sizeof(uint32_t);
 
     memset(stack, 0, stackSize);
-    PORT_TASK_STACK_INIT(stack, stackWords, taskEntryFunction, taskExitFunction, taskParams);
+    PORT_TASK_STACK_INIT(stack, stackWords, taskEntryFunction, taskExit, taskParams);
 }
 
 static inline void taskDestroyDynamicResources(taskHandleType *pTask)
@@ -82,6 +76,50 @@ static inline void taskDestroyDynamicResources(taskHandleType *pTask)
     }
 
     (void)memSlabFree(&dynamicTaskTcbSlab, pTask);
+}
+
+static inline void taskResetTerminalState(taskHandleType *pTask)
+{
+    if (pTask == NULL)
+    {
+        return;
+    }
+
+    pTask->remainingSleepTicks = 0;
+    pTask->status = TASK_STATUS_SUSPENDED;
+    pTask->blockedReason = BLOCK_REASON_NONE;
+    pTask->wakeupReason = WAKEUP_REASON_NONE;
+    memset(&pTask->eventState, 0, sizeof(pTask->eventState));
+    memset(&pTask->mailboxState, 0, sizeof(pTask->mailboxState));
+    pTask->notification.value = 0U;
+    pTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
+}
+
+void taskCleanupExited()
+{
+    taskHandleType *pTaskToDestroy = NULL;
+    uint8_t coreIndex = PORT_CORE_ID();
+
+    if (portIsInISRContext())
+    {
+        return;
+    }
+
+    bool irqState = spinLock(&lock);
+
+    taskHandleType *pTask = exitedTask[coreIndex];
+    if ((pTask != NULL) && (pTask != taskPool.currentTask[coreIndex]))
+    {
+        exitedTask[coreIndex] = NULL;
+        pTaskToDestroy = pTask;
+    }
+
+    spinUnlock(&lock, irqState);
+
+    if (pTaskToDestroy != NULL)
+    {
+        taskDestroyDynamicResources(pTaskToDestroy);
+    }
 }
 
 static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReason)
@@ -210,6 +248,11 @@ int taskSuspend(taskHandleType *pTask)
 int taskResume(taskHandleType *pTask)
 {
     if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    if ((pTask->flags & TASK_FLAG_TERMINATED) != 0U)
     {
         return RET_INVAL;
     }
@@ -475,6 +518,11 @@ int taskStart(taskHandleType *pTask)
         return RET_INVAL;
     }
 
+    if ((pTask->flags & TASK_FLAG_TERMINATED) != 0U)
+    {
+        return RET_INVAL;
+    }
+
     int retCode;
     bool irqState = spinLock(&lock);
 
@@ -578,6 +626,12 @@ int taskDelete(taskHandleType *pTask)
         return RET_BUSY;
     }
 
+    if ((pTask->flags & TASK_FLAG_EXIT_PENDING) != 0U)
+    {
+        spinUnlock(&lock, irqState);
+        return RET_BUSY;
+    }
+
     if (pTask->status == TASK_STATUS_READY)
     {
         int retCode = taskQueueRemove(getReadyQueue(), pTask);
@@ -597,10 +651,7 @@ int taskDelete(taskHandleType *pTask)
         }
     }
 
-    pTask->remainingSleepTicks = 0;
-    pTask->status = TASK_STATUS_SUSPENDED;
-    pTask->blockedReason = BLOCK_REASON_NONE;
-    pTask->wakeupReason = WAKEUP_REASON_NONE;
+    taskResetTerminalState(pTask);
 
     isDynamicTask = ((pTask->flags & TASK_FLAG_DYNAMIC) != 0U);
 
@@ -612,6 +663,51 @@ int taskDelete(taskHandleType *pTask)
     }
 
     return RET_SUCCESS;
+}
+
+void taskExit(void)
+{
+    taskCleanupExited();
+
+    if (portIsInISRContext())
+    {
+        while (1)
+        {
+            PORT_NOP();
+        }
+    }
+
+    taskHandleType *pCurrentTask;
+
+    bool irqState = spinLock(&lock);
+
+    pCurrentTask = taskGetCurrent();
+    if (pCurrentTask == NULL)
+    {
+        spinUnlock(&lock, irqState);
+        while (1)
+        {
+            PORT_NOP();
+        }
+    }
+
+    taskResetTerminalState(pCurrentTask);
+    pCurrentTask->flags |= TASK_FLAG_TERMINATED;
+
+    if ((pCurrentTask->flags & TASK_FLAG_DYNAMIC) != 0U)
+    {
+        pCurrentTask->flags |= TASK_FLAG_EXIT_PENDING;
+        exitedTask[PORT_CORE_ID()] = pCurrentTask;
+    }
+
+    spinUnlock(&lock, irqState);
+
+    taskYield();
+
+    while (1)
+    {
+        PORT_NOP();
+    }
 }
 
 void taskCheckStackOverflow(void)

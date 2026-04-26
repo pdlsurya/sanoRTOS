@@ -91,6 +91,8 @@ int main(void)
 
 - `taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize, taskFunctionType taskEntryFunction, void *taskParams, uint8_t taskPriority, coreAffinityType affinity)`
 - `taskDelete(taskHandleType *pTask)`
+- `taskExit()`
+- `taskDeleteSelf()`
 
 Example:
 
@@ -122,6 +124,18 @@ void stopDynamicTask(void)
     }
 }
 ```
+
+Task self-exit example:
+
+```c
+void oneShotTask(void *args)
+{
+    /* Do one-time work here. */
+    taskExit();
+}
+```
+
+Tasks that exit are terminal. They cannot be restarted later with `taskStart()` or `taskResume()`.
 
 ### Sleep and yield
 
@@ -395,6 +409,7 @@ Defined in [`messageQueue.h`](include/sanoRTOS/messageQueue.h).
 - `MSG_QUEUE_DEFINE(name, length, itemSize)`
 - `msgQueueSend(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)`
 - `msgQueueReceive(msgQueueHandleType *pQueueHandle, void *pItem, uint32_t waitTicks)`
+- `msgQueueReset(msgQueueHandleType *pQueueHandle)`
 - `msgQueueFull(...)`
 - `msgQueueEmpty(...)`
 
@@ -439,6 +454,7 @@ Defined in [`streamBuffer.h`](include/sanoRTOS/streamBuffer.h).
 - `streamBufferSend(streamBufferHandleType *pStreamBuffer, const void *pData, uint32_t length, uint32_t waitTicks)`
 - `streamBufferReceive(streamBufferHandleType *pStreamBuffer, void *pData, uint32_t *pLength, uint32_t waitTicks)`
 - `streamBufferPeek(streamBufferHandleType *pStreamBuffer, void *pData, uint32_t *pLength)`
+- `streamBufferReset(streamBufferHandleType *pStreamBuffer)`
 - `streamBufferBytesUsed(...)`
 - `streamBufferBytesFree(...)`
 - `streamBufferEmpty(...)`
@@ -480,6 +496,7 @@ Defined in [`messageBuffer.h`](include/sanoRTOS/messageBuffer.h).
 - `msgBufferSend(msgBufferHandleType *pMsgBuffer, const void *pData, uint32_t length, uint32_t waitTicks)`
 - `msgBufferReceive(msgBufferHandleType *pMsgBuffer, void *pData, uint32_t *pLength, uint32_t waitTicks)`
 - `msgBufferNextLength(msgBufferHandleType *pMsgBuffer, uint32_t *pLength)`
+- `msgBufferReset(msgBufferHandleType *pMsgBuffer)`
 - `msgBufferBytesUsed(...)`
 - `msgBufferBytesFree(...)`
 - `msgBufferEmpty(...)`
