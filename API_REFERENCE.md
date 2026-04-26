@@ -50,8 +50,6 @@ Defined in [`scheduler.h`](include/sanoRTOS/scheduler.h):
 - `US_TO_TIMER_TICKS(us)`
 - `US_TO_RTOS_TICKS(us)`
 - `MS_TO_RTOS_TICKS(ms)`
-- `schedulerStart()`
-- `taskYield()`
 
 Example:
 
