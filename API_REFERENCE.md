@@ -9,6 +9,7 @@ This guide covers the public application-facing APIs for the main sanoRTOS kerne
 - `TASK_MAX_WAIT` means "wait indefinitely".
 - APIs documented as thread-only must not be called from ISR context.
 - APIs that allow ISR use require `waitTicks == TASK_NO_WAIT` when called from ISR context.
+- `TASK_DEFINE`, `TIMER_DEFINE`, `WORK_DEFINE`, and `DELAYED_WORK_DEFINE` declare their entry or handler function for you.
 
 ## Basic Setup
 
@@ -22,8 +23,6 @@ Most applications include at least:
 Minimal startup:
 
 ```c
-void appTask(void *args);
-
 TASK_DEFINE(appTaskHandle, 1024, appTask, NULL, 1, AFFINITY_CORE_ANY);
 
 void appTask(void *args)
@@ -73,8 +72,6 @@ Defined in [`task.h`](include/sanoRTOS/task.h).
 Example:
 
 ```c
-void workerTask(void *args);
-
 TASK_DEFINE(workerTaskHandle, 1024, workerTask, NULL, 2, AFFINITY_CORE_ANY);
 
 void workerTask(void *args)
@@ -535,6 +532,8 @@ Defined in [`mailbox.h`](include/sanoRTOS/mailbox.h).
 - `mailboxReceive(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, void *pBuffer, uint32_t waitTicks)`
 
 Mailboxes match senders and receivers directly. They are thread-only objects.
+When calling `mailboxSend()`, `pSourceTask` does not need to be set.
+When calling `mailboxReceive()`, `pTargetTask` does not need to be set.
 
 Example:
 
@@ -549,7 +548,6 @@ void senderTask(void *args)
         .size = sizeof(payload),
         .pTxData = payload,
         .pTargetTask = MAILBOX_ANY_TASK,
-        .pSourceTask = taskGetCurrent(),
     };
 
     (void)mailboxSend(&commandMailbox, &msg, TASK_MAX_WAIT);
@@ -591,8 +589,6 @@ Notes:
 Example:
 
 ```c
-void heartbeatTimeout(void *arg);
-
 TIMER_DEFINE(heartbeatTimer, heartbeatTimeout, TIMER_MODE_PERIODIC);
 
 void heartbeatTimeout(void *arg)
@@ -622,8 +618,6 @@ This is a FIFO of work items executed by a dedicated worker task.
 Example:
 
 ```c
-void blinkWorkHandler(void *arg);
-
 WORK_QUEUE_DEFINE(systemWorkQueue, 1024, 1, AFFINITY_CORE_ANY);
 WORK_DEFINE(blinkWork, blinkWorkHandler, NULL);
 
@@ -658,8 +652,6 @@ Delayed work uses a one-shot timer and submits the underlying work item to a wor
 Example:
 
 ```c
-void ledWorkHandler(void *arg);
-
 WORK_QUEUE_DEFINE(systemWorkQueue, 1024, 1, AFFINITY_CORE_ANY);
 DELAYED_WORK_DEFINE(statusLedWork, ledWorkHandler, NULL);
 

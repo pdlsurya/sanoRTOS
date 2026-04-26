@@ -142,7 +142,7 @@ int mailboxSend(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, uint32_t wait
     taskHandleType *pReceiverTask;
     taskNodeType *currentTaskNode;
 
-    /* Save the caller's send request in the task's mailbox wait state */
+    /* Save the caller's send request in the task's mailbox wait state. pSourceTask is ignored on send. */
     currentTask->mailboxState.msg = *pMsg;
     currentTask->mailboxState.pRxBuffer = NULL;
 
@@ -295,7 +295,7 @@ int mailboxReceive(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, void *pBuf
     taskHandleType *pSenderTask;
     taskNodeType *currentTaskNode;
 
-    /* Save the caller's receive request and destination buffer in the task's mailbox wait state */
+    /* Save the caller's receive request and destination buffer in the task's mailbox wait state. pTargetTask is ignored on receive. */
     currentTask->mailboxState.msg = *pMsg;
     currentTask->mailboxState.msg.pTxData = NULL;
     currentTask->mailboxState.pRxBuffer = pBuffer;
