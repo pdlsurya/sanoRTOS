@@ -31,7 +31,22 @@
 #include "nrf_soc.h"
 #include "cmsis_gcc.h"
 #include "sanoRTOS/config.h"
+
+#if defined(__has_include)
+#if __has_include("usb_log.h")
+#include "usb_log.h"
+#define PORT_PRINTF log_printf
+#elif __has_include("debug_log.h")
 #include "debug_log.h"
+#define PORT_PRINTF debug_log_print
+#else
+#include <stdio.h>
+#define PORT_PRINTF printf
+#endif
+#else
+#include <stdio.h>
+#define PORT_PRINTF printf
+#endif
 
 #ifdef __cplusplus
 extern "C"
@@ -109,8 +124,6 @@ extern "C"
 #define PORT_TIMER_TICK_FREQ SystemCoreClock
 
 #define PORT_ENTER_SLEEP_MODE() __WFI()
-
-#define PORT_PRINTF debug_log_print
 
     /**
      * @brief Disable interrupts and return previous irq status

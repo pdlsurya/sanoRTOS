@@ -31,7 +31,7 @@
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/config.h"
 
-#define LOG_MODULE_DEFINE(module_name) static const char *tag = #module_name
+#define LOG_MODULE_DEFINE(module_name) static const char *const tag __attribute__((unused)) = #module_name
 
 #if CONFIG_LOG_COLOR
 // ANSI escape prefix
