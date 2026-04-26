@@ -72,6 +72,13 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 - `streamBufferReceive(pStreamBuffer, pData, pLength, waitTicks)`: Receive up to `*pLength` bytes from the stream buffer.
 - `streamBufferPeek(pStreamBuffer, pData, pLength)`: Peek up to `*pLength` bytes without consuming them.
 
+## Memory Slab
+
+- Fixed-size block allocator with deterministic allocation and free paths.
+- `MEM_SLAB_DEFINE(name, blockSize, numBlocks)`: Macro to statically define and initialize a memory slab.
+- `memSlabAlloc(pMemSlab, ppBlock, waitTicks)`: Allocate one block from the slab.
+- `memSlabFree(pMemSlab, pBlock)`: Return one block to the slab.
+
 ## Message Buffer
 
 - Variable-length discrete messages built on top of the stream buffer internals.

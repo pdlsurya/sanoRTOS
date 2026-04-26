@@ -48,6 +48,12 @@ extern "C"
 
 #define CONFIG_TICK_INTERVAL_US 1000 ///< Configure Tick interval to generate interrupt every TICK_INTERVAL_US (in microseconds): Sets the interrupt frequency for the system tick.
 
+#define CONFIG_TASK_QUEUE_NODE_SLAB_BLOCKS 64 ///< Number of fixed task-queue nodes kept in the internal slab allocator.
+
+#define CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS 32 ///< Number of fixed timeout-handler nodes kept in the internal slab allocator.
+
+#define CONFIG_DYNAMIC_TASK_TCB_SLAB_BLOCKS 16 ///< Number of dynamic task control blocks kept in the internal slab allocator.
+
 #ifdef __cplusplus
 }
 #endif
