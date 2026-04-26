@@ -135,7 +135,7 @@ void oneShotTask(void *args)
 }
 ```
 
-Tasks that exit are terminal. They cannot be restarted later with `taskStart()` or `taskResume()`.
+Tasks that exit or are deleted are terminal. They cannot be restarted later with `taskStart()` or `taskResume()`.
 
 ### Sleep and yield
 

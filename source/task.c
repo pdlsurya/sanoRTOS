@@ -78,7 +78,7 @@ static inline void taskDestroyDynamicResources(taskHandleType *pTask)
     (void)memSlabFree(&dynamicTaskTcbSlab, pTask);
 }
 
-static inline void taskResetTerminalState(taskHandleType *pTask)
+static inline void taskResetInactiveState(taskHandleType *pTask)
 {
     if (pTask == NULL)
     {
@@ -86,7 +86,6 @@ static inline void taskResetTerminalState(taskHandleType *pTask)
     }
 
     pTask->remainingSleepTicks = 0;
-    pTask->status = TASK_STATUS_SUSPENDED;
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
     memset(&pTask->eventState, 0, sizeof(pTask->eventState));
@@ -126,6 +125,11 @@ static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReas
 {
     int retCode = RET_SUCCESS;
 
+    if ((pTask == NULL) || (pTask->status == TASK_STATUS_TERMINATED))
+    {
+        return RET_INVAL;
+    }
+
     if (pTask->status == TASK_STATUS_BLOCKED)
     {
         taskQueueType *pBlockedQueue = getBlockedQueue();
@@ -153,6 +157,11 @@ static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReas
 
 static int taskBlockLocked(taskHandleType *pTask, blockedReasonType blockedReason, uint32_t ticks)
 {
+    if ((pTask == NULL) || (pTask->status == TASK_STATUS_TERMINATED))
+    {
+        return RET_INVAL;
+    }
+
     pTask->remainingSleepTicks = ticks;
     pTask->status = TASK_STATUS_BLOCKED;
     pTask->blockedReason = blockedReason;
@@ -207,6 +216,11 @@ int taskSuspend(taskHandleType *pTask)
         return RET_INVAL;
     }
 
+    if (pTask->status == TASK_STATUS_TERMINATED)
+    {
+        return RET_INVAL;
+    }
+
     int retCode = RET_SUCCESS;
     bool irqState = spinLock(&lock);
 
@@ -252,7 +266,7 @@ int taskResume(taskHandleType *pTask)
         return RET_INVAL;
     }
 
-    if ((pTask->flags & TASK_FLAG_TERMINATED) != 0U)
+    if (pTask->status == TASK_STATUS_TERMINATED)
     {
         return RET_INVAL;
     }
@@ -518,7 +532,7 @@ int taskStart(taskHandleType *pTask)
         return RET_INVAL;
     }
 
-    if ((pTask->flags & TASK_FLAG_TERMINATED) != 0U)
+    if (pTask->status == TASK_STATUS_TERMINATED)
     {
         return RET_INVAL;
     }
@@ -632,6 +646,12 @@ int taskDelete(taskHandleType *pTask)
         return RET_BUSY;
     }
 
+    if (pTask->status == TASK_STATUS_TERMINATED)
+    {
+        spinUnlock(&lock, irqState);
+        return RET_SUCCESS;
+    }
+
     if (pTask->status == TASK_STATUS_READY)
     {
         int retCode = taskQueueRemove(getReadyQueue(), pTask);
@@ -651,7 +671,8 @@ int taskDelete(taskHandleType *pTask)
         }
     }
 
-    taskResetTerminalState(pTask);
+    taskResetInactiveState(pTask);
+    pTask->status = TASK_STATUS_TERMINATED;
 
     isDynamicTask = ((pTask->flags & TASK_FLAG_DYNAMIC) != 0U);
 
@@ -691,8 +712,8 @@ void taskExit(void)
         }
     }
 
-    taskResetTerminalState(pCurrentTask);
-    pCurrentTask->flags |= TASK_FLAG_TERMINATED;
+    taskResetInactiveState(pCurrentTask);
+    pCurrentTask->status = TASK_STATUS_TERMINATED;
 
     if ((pCurrentTask->flags & TASK_FLAG_DYNAMIC) != 0U)
     {
