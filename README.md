@@ -107,6 +107,29 @@ target_sources(project_name PRIVATE ${SANORTOS_SRCS})
 
 ```
 
+## Example for RP2040 (Raspberry Pi Pico) using pico-sdk
+1. Add sanoRTOS to your Pico SDK project and include the RP2040 ARM port files.
+
+```cmake
+file(GLOB_RECURSE SANORTOS_SRCS
+    sanoRTOS/source/*.c
+    sanoRTOS/ports/arm/rp2040/port.c)
+
+target_include_directories(project_name PRIVATE
+   sanoRTOS/include
+   sanoRTOS/ports/arm/rp2040/include
+)
+
+target_sources(project_name PRIVATE ${SANORTOS_SRCS})
+target_link_libraries(project_name PRIVATE pico_stdlib pico_multicore hardware_sync)
+```
+
+2. The RP2040 port uses:
+   - `SysTick_Handler()` from the sanoRTOS port for the scheduler tick
+   - `PendSV_Handler()` from the sanoRTOS port for context switching
+   - `multicore_launch_core1()` when `CONFIG_SMP` is enabled
+   - RP2040 hardware spin lock `PICO_SPINLOCK_ID_OS1` to serialize RTOS CAS operations on Cortex-M0+
+
 ## Example Code:
  
  ```c
