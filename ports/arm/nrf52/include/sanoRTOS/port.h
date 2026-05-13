@@ -28,7 +28,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include "nrf_soc.h"
+#include "nrf.h"
 #include "cmsis_gcc.h"
 #include "sanoRTOS/config.h"
 

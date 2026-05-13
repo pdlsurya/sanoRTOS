@@ -27,6 +27,21 @@
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/task.h"
 
+#if defined(__FPU_PRESENT) && (__FPU_PRESENT == 1U) && defined(__ARM_FP) && (__ARM_FP > 0)
+#define PORT_SAVE_FP_CONTEXT_ASM      \
+    "tst lr, #0x10\n"                 \
+    "it eq\n"                         \
+    "vstmdbeq r0!, {s16-s31}\n"
+
+#define PORT_RESTORE_FP_CONTEXT_ASM   \
+    "tst lr, #0x10\n"                 \
+    "it eq\n"                         \
+    "vldmiaeq r0!, {s16-s31}\n"
+#else
+#define PORT_SAVE_FP_CONTEXT_ASM
+#define PORT_RESTORE_FP_CONTEXT_ASM
+#endif
+
 /*RTOS tick handler function*/
 extern void tickHandler(void);
 
@@ -75,10 +90,7 @@ __attribute__((naked)) void PendSV_Handler(void)
         "mrs r0, psp\n" /* Get current process stack pointer */
         "isb\n"
 
-        /* If task uses FPU, save s16–s31 */
-        "tst lr, #0x10\n"
-        "it eq\n"
-        "vstmdbeq r0!, {s16-s31}\n"
+        PORT_SAVE_FP_CONTEXT_ASM
 
         /* Save r4-r11 and lr to current task's stack */
         "stmdb r0!, {r4-r11, lr}\n"
@@ -92,10 +104,7 @@ __attribute__((naked)) void PendSV_Handler(void)
         /* Restore r4-r11 and lr */
         "ldmia r0!, {r4-r11, lr}\n"
 
-        /* If task uses FPU, restore s16–s31 */
-        "tst lr, #0x10\n"
-        "it eq\n"
-        "vldmiaeq r0!, {s16-s31}\n"
+        PORT_RESTORE_FP_CONTEXT_ASM
 
         "msr psp, r0\n" /* Set PSP */
         "isb\n"

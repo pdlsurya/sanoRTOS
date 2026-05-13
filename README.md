@@ -55,23 +55,23 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 The detailed API reference, including example code for each kernel object, lives in [API_REFERENCE.md](API_REFERENCE.md).
 
 # Building and Running
-## Example for STM32Cube IDE
+## Example for STM32F4 using STM32Cube IDE
 
 1. Clone the Repository:
    - Open a terminal and clone the sanoRTOS repository
      `git clone https://github.com/pdlsurya/sanoRTOS.git`
 2. Open STM32Cube IDE:
 
-   - Launch STM32Cube IDE and create a new STM32 project or open an existing one.
+   - Launch STM32Cube IDE and create a new STM32F4 project or open an existing one.
 
 3. Include sanoRTOS in Project:
    - Right-click on your project and select **Properties**.
    - Go to **C/C++ Build > Settings**.
-   - Under **Tool Settings**, go to **MCU GCC Compiler > Include paths** and add the path to **sanoRTOS/include** and **sanoRTOS/ports/arm/stm32/include** directory.
+   - Under **Tool Settings**, go to **MCU GCC Compiler > Include paths** and add the path to **sanoRTOS/include** and **sanoRTOS/ports/arm/stm32f4/include** directory.
 
 4. Add Source Files:
    - Navigate to **C/C++ General > Paths and Symbols**.
-   - In the **Source Location** tab, click on **Link folder** and add the path to **sanoRTOS/source** and **sanoRTOS/ports/arm/stm32** directory by selecting **Link to folder in the filesystem**.
+   - In the **Source Location** tab, click on **Link folder** and add the path to **sanoRTOS/source** and **sanoRTOS/ports/arm/stm32f4** directory by selecting **Link to folder in the filesystem**.
      
 6. Edit **stm32xxxx_it.c** file:
    - STM32 initializes the SysTick timer during its clock initialization process and defines the `SysTick_Handler` ISR function for the implementation of the delay function in the 
