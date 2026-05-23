@@ -29,7 +29,7 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 
-static atomic_t lock;
+static atomicType lock;
 
 #if (CONFIG_SMP)
 

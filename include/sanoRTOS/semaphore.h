@@ -49,7 +49,10 @@ extern "C"
     semaphoreHandleType _name = {                     \
         .flags = 0U,                                  \
         .lock = 0,                                    \
-        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER,     \
+        .waitQueue = {                                \
+            .head = NULL,                             \
+            .tail = NULL,                             \
+            .pLock = &_name.lock},                    \
         .count = initialCount,                        \
         .maxCount = maxCnt}
 
@@ -59,7 +62,7 @@ extern "C"
     typedef struct
     {
         uint8_t flags;           ///< Dynamic ownership flags.
-        atomic_t lock;           ///< Spinlock variable used to ensure atomic access to the semaphore.
+        atomicType lock;         ///< Spinlock variable used to ensure atomic access to the semaphore.
         taskQueueType waitQueue; ///< Queue of tasks waiting to acquire the semaphore.
         uint8_t count;           ///< Current count of the semaphore (number of available resources).
         uint8_t maxCount;        ///< Maximum count the semaphore can reach (resource capacity limit).

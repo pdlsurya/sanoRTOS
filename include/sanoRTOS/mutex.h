@@ -47,7 +47,10 @@ extern "C"
     mutexHandleType _name = {       \
         .flags = 0U,                \
         .lock = 0,                  \
-        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
+        .waitQueue = {              \
+            .head = NULL,           \
+            .tail = NULL,           \
+            .pLock = &_name.lock},  \
         .ownerTask = NULL,          \
         .ownerDefaultPriority = -1, \
         .locked = false}
@@ -58,7 +61,7 @@ extern "C"
     typedef struct
     {
         uint8_t flags;                ///< Dynamic ownership flags.
-        atomic_t lock;                ///< Spinlock variable used for atomic access to the mutex (for low-level synchronization).
+        atomicType lock;              ///< Spinlock variable used for atomic access to the mutex (for low-level synchronization).
         taskQueueType waitQueue;      ///< Queue of tasks waiting to acquire the mutex.
         taskHandleType *ownerTask;    ///< Pointer to the task currently holding the mutex.
         int16_t ownerDefaultPriority; ///< Original priority of the owner task before priority inheritance (if used).

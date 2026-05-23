@@ -30,6 +30,7 @@
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/semaphore.h"
 #include "objectHelpers.h"
+#include "taskInternal.h"
 
 MEM_SLAB_DEFINE(dynamicSemaphoreObjectSlab,
                 sizeof(semaphoreHandleType),
@@ -57,6 +58,7 @@ static int semaphoreSetup(semaphoreHandleType *pSem,
 
     memset(pSem, 0, sizeof(semaphoreHandleType));
     pSem->flags = flags;
+    pSem->waitQueue.pLock = &pSem->lock;
     pSem->count = initialCount;
     pSem->maxCount = maxCount;
 
@@ -75,10 +77,11 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
     }
 
     int retCode;
-
-    bool irqState = spinLock(&pSem->lock);
+    bool irqState;
 
 retry:
+    irqState = spinLock(&pSem->lock);
+
     if (pSem->count != 0)
     {
         pSem->count--;
@@ -95,37 +98,22 @@ retry:
     {
         taskHandleType *currentTask = taskGetCurrent();
 
-        /*Put current task in semaphore's wait queue*/
-
-        retCode = waitQueueAdd(&pSem->waitQueue, currentTask);
+        retCode = taskBlockOnWaitQueue(&pSem->waitQueue,
+                                       WAIT_FOR_SEMAPHORE,
+                                       waitTicks,
+                                       irqState);
         if (retCode != RET_SUCCESS)
         {
-            spinUnlock(&pSem->lock, irqState);
             return retCode;
         }
-
-        spinUnlock(&pSem->lock, irqState);
-
-        /* Block current task and give CPU to other tasks while waiting for semaphore*/
-        retCode = taskBlock(WAIT_FOR_SEMAPHORE, waitTicks);
-        if (retCode != RET_SUCCESS)
-        {
-            irqState = spinLock(&pSem->lock);
-            (void)waitQueueRemove(currentTask);
-            spinUnlock(&pSem->lock, irqState);
-            return retCode;
-        }
-
-        /*Re-acquire spinlock after being unblocked*/
-        irqState = spinLock(&pSem->lock);
 
         if (currentTask->wakeupReason == SEMAPHORE_TAKEN)
         {
-            retCode = RET_SUCCESS;
+            return RET_SUCCESS;
         }
         else if (currentTask->wakeupReason == WAIT_TIMEOUT)
         {
-            retCode = RET_TIMEOUT;
+            return RET_TIMEOUT;
         }
         /*Task might have been suspended while waiting for semaphore and later resumed.
           In this case, retry taking the semaphore again */
@@ -156,18 +144,10 @@ int semaphoreGive(semaphoreHandleType *pSem)
 
     if (pSem->count != pSem->maxCount)
     {
-        /*Get next highest priority task to unblock from the wait Queue*/
-    getNextTask:
         nextTask = waitQueuePop(&pSem->waitQueue);
 
         if (nextTask != NULL)
         {
-            /*Skip stale tasks that are no longer blocked waiting for this semaphore.*/
-            if ((nextTask->state != TASK_STATE_BLOCKED) ||
-                (nextTask->blockedReason != WAIT_FOR_SEMAPHORE))
-            {
-                goto getNextTask;
-            }
             retCode = taskSetReady(nextTask, SEMAPHORE_TAKEN);
             if (retCode != RET_SUCCESS)
             {

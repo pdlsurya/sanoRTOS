@@ -49,8 +49,14 @@ extern "C"
     uint8_t _name##Buffer[_bufferSize];          \
     streamBufferHandleType _name = {             \
         .flags = 0U,                             \
-        .producerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
-        .consumerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
+        .producerWaitQueue = {                   \
+            .head = NULL,                        \
+            .tail = NULL,                        \
+            .pLock = &_name.lock},              \
+        .consumerWaitQueue = {                   \
+            .head = NULL,                        \
+            .tail = NULL,                        \
+            .pLock = &_name.lock},              \
         .buffer = _name##Buffer,                 \
         .bufferSize = _bufferSize,               \
         .usedBytes = 0,                          \
@@ -71,7 +77,7 @@ extern "C"
         uint32_t usedBytes;              ///< Number of bytes currently stored.
         uint32_t readIndex;              ///< Ring index of the next byte to read.
         uint32_t writeIndex;             ///< Ring index at which the next byte will be written.
-        atomic_t lock;                   ///< Spinlock protecting the stream buffer state.
+        atomicType lock;                 ///< Spinlock protecting the stream buffer state.
     } streamBufferHandleType;
 
     int streamBufferCreate(streamBufferHandleType **ppStreamBuffer, uint32_t bufferSize);

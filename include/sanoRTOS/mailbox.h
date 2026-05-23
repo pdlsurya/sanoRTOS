@@ -44,8 +44,14 @@ extern "C"
 #define MAILBOX_DEFINE(_name)       \
     mailboxHandleType _name = {     \
         .flags = 0U,                \
-        .senderWaitQueue = TASK_WAIT_QUEUE_INITIALIZER,   \
-        .receiverWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
+        .senderWaitQueue = {         \
+            .head = NULL,            \
+            .tail = NULL,            \
+            .pLock = &_name.lock},  \
+        .receiverWaitQueue = {       \
+            .head = NULL,            \
+            .tail = NULL,            \
+            .pLock = &_name.lock},  \
         .lock = 0}
 
     /**
@@ -68,7 +74,7 @@ extern "C"
         uint8_t flags;                  ///< Dynamic ownership flags.
         taskQueueType senderWaitQueue;  ///< Queue of tasks waiting to send a mailbox message.
         taskQueueType receiverWaitQueue; ///< Queue of tasks waiting to receive a mailbox message.
-        atomic_t lock;                  ///< Spinlock protecting the mailbox object.
+        atomicType lock;                ///< Spinlock protecting the mailbox object.
     } mailboxHandleType;
 
     int mailboxCreate(mailboxHandleType **ppMailbox);

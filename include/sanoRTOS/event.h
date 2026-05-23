@@ -44,7 +44,10 @@ extern "C"
 #define EVENT_DEFINE(_name)         \
     eventHandleType _name = {       \
         .flags = 0U,                \
-        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
+        .waitQueue = {              \
+            .head = NULL,           \
+            .tail = NULL,           \
+            .pLock = &_name.lock}, \
         .events = 0,                \
         .lock = 0}
 
@@ -56,7 +59,7 @@ extern "C"
         uint8_t flags;           ///< Dynamic ownership flags.
         taskQueueType waitQueue; ///< Queue of tasks waiting for event bits.
         uint32_t events;         ///< Current event-bit state.
-        atomic_t lock;           ///< Spinlock protecting the event object.
+        atomicType lock;         ///< Spinlock protecting the event object.
     } eventHandleType;
 
     int eventCreate(eventHandleType **ppEvent);

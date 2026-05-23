@@ -58,7 +58,7 @@ extern "C"
         workItemType *head;         ///< Head of the queued work item list.
         workItemType *tail;         ///< Tail of the queued work item list.
         taskHandleType *pWorkerTask; ///< Worker task that processes queued work items.
-        atomic_t lock;              ///< Spinlock protecting the work queue.
+        atomicType lock;            ///< Spinlock protecting the work queue.
     } workQueueHandleType;
 
     /**

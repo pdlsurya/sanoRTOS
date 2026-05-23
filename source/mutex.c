@@ -30,6 +30,7 @@
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/mutex.h"
+#include "taskInternal.h"
 #include "objectHelpers.h"
 
 MEM_SLAB_DEFINE(dynamicMutexObjectSlab,
@@ -57,6 +58,7 @@ static int mutexSetup(mutexHandleType *pMutex, uint8_t flags)
 
     memset(pMutex, 0, sizeof(mutexHandleType));
     pMutex->flags = flags;
+    pMutex->waitQueue.pLock = &pMutex->lock;
     pMutex->ownerDefaultPriority = -1;
 
     return RET_SUCCESS;
@@ -112,12 +114,13 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
     }
 
     int retCode;
-
-    bool irqState = spinLock(&pMutex->lock);
+    bool irqState;
 
     taskHandleType *currentTask = taskGetCurrent();
 
 retry:
+    irqState = spinLock(&pMutex->lock);
+
 #if CONFIG_MUTEX_PRIORITY_INHERITANCE
     mutexApplyPriorityInheritance(pMutex, currentTask);
 #endif
@@ -137,29 +140,14 @@ retry:
 
     else
     {
-        /* Add the task waiting on mutex to the wait queue*/
-        retCode = waitQueueAdd(&pMutex->waitQueue, currentTask);
+        retCode = taskBlockOnWaitQueue(&pMutex->waitQueue,
+                                       WAIT_FOR_MUTEX,
+                                       waitTicks,
+                                       irqState);
         if (retCode != RET_SUCCESS)
         {
-            spinUnlock(&pMutex->lock, irqState);
             return retCode;
         }
-
-        /*Release spinlock before blocking the task*/
-        spinUnlock(&pMutex->lock, irqState);
-
-        /* Block current task and give CPU to other tasks while waiting for mutex*/
-        retCode = taskBlock(WAIT_FOR_MUTEX, waitTicks);
-        if (retCode != RET_SUCCESS)
-        {
-            irqState = spinLock(&pMutex->lock);
-            (void)waitQueueRemove(currentTask);
-            spinUnlock(&pMutex->lock, irqState);
-            return retCode;
-        }
-
-        /*Re-acquire spinlock section after being unblocked*/
-        irqState = spinLock(&pMutex->lock);
 
         if (currentTask->wakeupReason == MUTEX_LOCKED && pMutex->ownerTask == currentTask)
         {
@@ -175,6 +163,8 @@ retry:
         {
             goto retry;
         }
+
+        return retCode;
     }
 
     spinUnlock(&pMutex->lock, irqState);
@@ -214,22 +204,15 @@ int mutexUnlock(mutexHandleType *pMutex)
             mutexRestorePriorityInheritance(pMutex);
 #endif
             /* Get next owner of the mutex*/
-        getNextOwner:
-            /*Get next highest priority task from waitQueue.*/
             nextOwner = waitQueuePop(&pMutex->waitQueue);
 
             if (nextOwner != NULL)
             {
-                /*Skip stale tasks that are no longer blocked waiting for this mutex.*/
-                if ((nextOwner->state != TASK_STATE_BLOCKED) ||
-                    (nextOwner->blockedReason != WAIT_FOR_MUTEX))
-                {
-                    goto getNextOwner;
-                }
-
+                pMutex->ownerTask = nextOwner;
                 retCode = taskSetReady(nextOwner, MUTEX_LOCKED);
                 if (retCode != RET_SUCCESS)
                 {
+                    pMutex->ownerTask = currentTask;
                     spinUnlock(&pMutex->lock, irqState);
                     return retCode;
                 }
@@ -244,9 +227,8 @@ int mutexUnlock(mutexHandleType *pMutex)
             else
             {
                 pMutex->locked = false;
+                pMutex->ownerTask = NULL;
             }
-
-            pMutex->ownerTask = nextOwner;
 
             retCode = RET_SUCCESS;
         }

@@ -30,6 +30,7 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 #include "streamBufferInternal.h"
+#include "taskInternal.h"
 #include "objectHelpers.h"
 
 MEM_SLAB_DEFINE(dynamicStreamBufferObjectSlab,
@@ -58,6 +59,8 @@ static int streamBufferSetup(streamBufferHandleType *pStreamBuffer,
 
     memset(pStreamBuffer, 0, sizeof(streamBufferHandleType));
     pStreamBuffer->flags = flags;
+    pStreamBuffer->producerWaitQueue.pLock = &pStreamBuffer->lock;
+    pStreamBuffer->consumerWaitQueue.pLock = &pStreamBuffer->lock;
     pStreamBuffer->buffer = pBuffer;
     pStreamBuffer->bufferSize = bufferSize;
 
@@ -109,7 +112,6 @@ static void streamBufferRingRead(streamBufferHandleType *pStreamBuffer, uint32_t
 }
 
 static int streamBufferWakeWaitingTaskLocked(taskQueueType *pWaitQueue,
-                                             blockedReasonType blockedReason,
                                              wakeupReasonType wakeupReason,
                                              bool *pContextSwitchRequired,
                                              bool wakeAll)
@@ -119,19 +121,10 @@ static int streamBufferWakeWaitingTaskLocked(taskQueueType *pWaitQueue,
         return RET_INVAL;
     }
 
-    taskHandleType *pTask = NULL;
+    taskHandleType *pTask;
 
-getNextWaitingTask:
-    pTask = waitQueuePop(pWaitQueue);
-    if (pTask != NULL)
+    while ((pTask = waitQueuePop(pWaitQueue)) != NULL)
     {
-        /* Skip stale tasks that are no longer blocked on this stream buffer wait reason. */
-        if ((pTask->state != TASK_STATE_BLOCKED) ||
-            (pTask->blockedReason != blockedReason))
-        {
-            goto getNextWaitingTask;
-        }
-
         int retCode = taskSetReady(pTask, wakeupReason);
         if (retCode != RET_SUCCESS)
         {
@@ -143,9 +136,9 @@ getNextWaitingTask:
             *pContextSwitchRequired = true;
         }
 
-        if (wakeAll)
+        if (!wakeAll)
         {
-            goto getNextWaitingTask;
+            break;
         }
     }
 
@@ -222,7 +215,6 @@ int streamBufferWakeDataAvailableLocked(streamBufferHandleType *pStreamBuffer,
     }
 
     return streamBufferWakeWaitingTaskLocked(&pStreamBuffer->consumerWaitQueue,
-                                             WAIT_FOR_STREAM_BUFFER_DATA,
                                              STREAM_BUFFER_DATA_AVAILABLE,
                                              pContextSwitchRequired,
                                              false);
@@ -237,7 +229,6 @@ int streamBufferWakeSpaceAvailableLocked(streamBufferHandleType *pStreamBuffer,
     }
 
     return streamBufferWakeWaitingTaskLocked(&pStreamBuffer->producerWaitQueue,
-                                             WAIT_FOR_STREAM_BUFFER_SPACE,
                                              STREAM_BUFFER_SPACE_AVAILABLE,
                                              pContextSwitchRequired,
                                              false);
@@ -323,21 +314,12 @@ retry:
             taskHandleType *currentTask = taskGetCurrent();
 
             irqState = spinLock(&pStreamBuffer->lock);
-            retCode = waitQueueAdd(&pStreamBuffer->producerWaitQueue, currentTask);
+            retCode = taskBlockOnWaitQueue(&pStreamBuffer->producerWaitQueue,
+                                           WAIT_FOR_STREAM_BUFFER_SPACE,
+                                           waitTicks,
+                                           irqState);
             if (retCode != RET_SUCCESS)
             {
-                spinUnlock(&pStreamBuffer->lock, irqState);
-                return retCode;
-            }
-
-            spinUnlock(&pStreamBuffer->lock, irqState);
-
-            retCode = taskBlock(WAIT_FOR_STREAM_BUFFER_SPACE, waitTicks);
-            if (retCode != RET_SUCCESS)
-            {
-                irqState = spinLock(&pStreamBuffer->lock);
-                (void)waitQueueRemove(currentTask);
-                spinUnlock(&pStreamBuffer->lock, irqState);
                 return retCode;
             }
 
@@ -414,21 +396,12 @@ retry:
             taskHandleType *currentTask = taskGetCurrent();
 
             irqState = spinLock(&pStreamBuffer->lock);
-            retCode = waitQueueAdd(&pStreamBuffer->consumerWaitQueue, currentTask);
+            retCode = taskBlockOnWaitQueue(&pStreamBuffer->consumerWaitQueue,
+                                           WAIT_FOR_STREAM_BUFFER_DATA,
+                                           waitTicks,
+                                           irqState);
             if (retCode != RET_SUCCESS)
             {
-                spinUnlock(&pStreamBuffer->lock, irqState);
-                return retCode;
-            }
-
-            spinUnlock(&pStreamBuffer->lock, irqState);
-
-            retCode = taskBlock(WAIT_FOR_STREAM_BUFFER_DATA, waitTicks);
-            if (retCode != RET_SUCCESS)
-            {
-                irqState = spinLock(&pStreamBuffer->lock);
-                (void)waitQueueRemove(currentTask);
-                spinUnlock(&pStreamBuffer->lock, irqState);
                 return retCode;
             }
 
@@ -494,7 +467,6 @@ int streamBufferReset(streamBufferHandleType *pStreamBuffer)
     pStreamBuffer->writeIndex = 0U;
 
     int retCode = streamBufferWakeWaitingTaskLocked(&pStreamBuffer->producerWaitQueue,
-                                                    WAIT_FOR_STREAM_BUFFER_SPACE,
                                                     STREAM_BUFFER_SPACE_AVAILABLE,
                                                     &contextSwitchRequired,
                                                     true);

@@ -53,7 +53,10 @@ extern "C"
     uint8_t _name##Buffer[(_blockSize) * (_numBlocks)] __attribute__((aligned(sizeof(void *))));               \
     memSlabHandleType _name = {                                                                                 \
         .lock = 0,                                                                                              \
-        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER,                                                               \
+        .waitQueue = {                                                                                          \
+            .head = NULL,                                                                                       \
+            .tail = NULL,                                                                                       \
+            .pLock = &_name.lock},                                                                              \
         .buffer = _name##Buffer,                                                                                \
         .blockSize = (_blockSize),                                                                              \
         .numBlocks = (_numBlocks),                                                                              \
@@ -66,7 +69,7 @@ extern "C"
      */
     typedef struct
     {
-        atomic_t lock;           ///< Spinlock protecting slab state.
+        atomicType lock;         ///< Spinlock protecting slab state.
         taskQueueType waitQueue; ///< Tasks waiting for a free block.
         uint8_t *buffer;         ///< Backing storage for all blocks.
         uint32_t blockSize;      ///< Size of each block in bytes.

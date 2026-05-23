@@ -34,6 +34,7 @@
 #include "sanoRTOS/memHeap.h"
 #include "sanoRTOS/memSlab.h"
 #include "sanoRTOS/log.h"
+#include "taskInternal.h"
 
 LOG_MODULE_DEFINE(task);
 
@@ -45,7 +46,7 @@ taskHandleType *currentTask[PORT_CORE_COUNT];
 /*Next task to be scheduled*/
 taskHandleType *nextTask[PORT_CORE_COUNT];
 
-static atomic_t lock;
+static atomicType lock;
 static taskHandleType *exitedTask[PORT_CORE_COUNT];
 
 MEM_SLAB_DEFINE(dynamicTaskTcbSlab, sizeof(taskHandleType), CONFIG_DYNAMIC_TASK_TCB_SLAB_BLOCKS);
@@ -129,6 +130,70 @@ void taskCleanupExited()
     }
 }
 
+static void taskStateLocksRelease(taskQueueType *pWaitQueue,
+                                  bool taskIrqState,
+                                  bool objectIrqState)
+{
+    spinUnlock(&lock, taskIrqState);
+
+    if ((pWaitQueue != NULL) && (pWaitQueue->pLock != NULL))
+    {
+        spinUnlock(pWaitQueue->pLock, objectIrqState);
+    }
+}
+
+static void taskStateLocksAcquire(taskHandleType *pTask,
+                                  taskQueueType **ppWaitQueue,
+                                  bool *pTaskIrqState,
+                                  bool *pObjectIrqState)
+{
+    taskQueueType *pWaitQueue;
+
+    if ((ppWaitQueue == NULL) || (pTaskIrqState == NULL) || (pObjectIrqState == NULL))
+    {
+        return;
+    }
+
+    while (1)
+    {
+        /* Another core may change the task's state or wait-queue ownership after this snapshot. */
+        pWaitQueue = pTask->waitQueueLink.pOwnerQueue;
+        if ((pTask->state == TASK_STATE_BLOCKED) &&
+            (pWaitQueue != NULL) &&
+            (pWaitQueue->pLock != NULL))
+        {
+            *pObjectIrqState = spinLock(pWaitQueue->pLock);
+            *pTaskIrqState = spinLock(&lock);
+            if ((pTask->state == TASK_STATE_BLOCKED) &&
+                (pTask->waitQueueLink.pOwnerQueue == pWaitQueue))
+            {
+                *ppWaitQueue = pWaitQueue;
+                return;
+            }
+
+            /* Retry until the task is still blocked on the same wait queue whose lock we hold. */
+            taskStateLocksRelease(pWaitQueue, *pTaskIrqState, *pObjectIrqState);
+            continue;
+        }
+
+        *pTaskIrqState = spinLock(&lock);
+        pWaitQueue = pTask->waitQueueLink.pOwnerQueue;
+
+        if ((pTask->state == TASK_STATE_BLOCKED) &&
+            (pWaitQueue != NULL) &&
+            (pWaitQueue->pLock != NULL))
+        {
+            /* The task moved onto an object wait queue before we got the task lock; retry with that lock too. */
+            spinUnlock(&lock, *pTaskIrqState);
+            continue;
+        }
+
+        *ppWaitQueue = NULL;
+        *pObjectIrqState = false;
+        return;
+    }
+}
+
 static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
     int retCode = RET_SUCCESS;
@@ -136,6 +201,11 @@ static int taskSetReadyLocked(taskHandleType *pTask, wakeupReasonType wakeupReas
     if ((pTask == NULL) || (pTask->state == TASK_STATE_TERMINATED))
     {
         return RET_INVAL;
+    }
+
+    if ((pTask->state == TASK_STATE_READY) || (pTask->state == TASK_STATE_RUNNING))
+    {
+        return RET_SUCCESS;
     }
 
     if (pTask->state == TASK_STATE_BLOCKED)
@@ -222,21 +292,26 @@ static int taskBlockLocked(taskHandleType *pTask, blockedReasonType blockedReaso
     return RET_SUCCESS;
 }
 
-int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason)
+static int taskSetReadyInternal(taskHandleType *pTask, wakeupReasonType wakeupReason)
 {
+    taskQueueType *pWaitQueue = NULL;
+
     if (pTask == NULL)
     {
         return RET_INVAL;
     }
 
-    bool irqState = spinLock(&lock);
+    bool taskIrqState;
+    bool objectIrqState;
+
+    taskStateLocksAcquire(pTask, &pWaitQueue, &taskIrqState, &objectIrqState);
     int retCode = taskSetReadyLocked(pTask, wakeupReason);
-    spinUnlock(&lock, irqState);
+    taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
 
     return retCode;
 }
 
-int taskBlock(blockedReasonType blockedReason, uint32_t ticks)
+static int taskBlock(blockedReasonType blockedReason, uint32_t ticks)
 {
     if (portIsInISRContext())
     {
@@ -266,8 +341,73 @@ int taskBlock(blockedReasonType blockedReason, uint32_t ticks)
     return RET_SUCCESS;
 }
 
+int taskSleep(uint32_t sleepTicks)
+{
+    return taskBlock(SLEEP, sleepTicks);
+}
+
+int taskBlockOnWaitQueue(taskQueueType *pWaitQueue,
+                         blockedReasonType blockedReason,
+                         uint32_t ticks,
+                         bool objectIrqState)
+{
+    taskHandleType *pTask;
+    bool taskIrqState;
+    int retCode;
+
+    if ((pWaitQueue == NULL) || (pWaitQueue->pLock == NULL))
+    {
+        return RET_INVAL;
+    }
+
+    pTask = taskGetCurrent();
+    if (pTask == NULL)
+    {
+        spinUnlock(pWaitQueue->pLock, objectIrqState);
+        return RET_INVAL;
+    }
+
+    taskIrqState = spinLock(&lock);
+
+    retCode = waitQueueAdd(pWaitQueue, pTask);
+    if (retCode == RET_SUCCESS)
+    {
+        retCode = taskBlockLocked(pTask, blockedReason, ticks);
+    }
+
+    if (retCode != RET_SUCCESS)
+    {
+        (void)waitQueueRemove(pTask);
+        taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
+        return retCode;
+    }
+
+    taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
+
+    taskYield();
+
+    return RET_SUCCESS;
+}
+
+int taskSetReady(taskHandleType *pTask,
+                 wakeupReasonType wakeupReason)
+{
+    if (pTask == NULL)
+    {
+        return RET_INVAL;
+    }
+
+    bool irqState = spinLock(&lock);
+    int retCode = taskSetReadyLocked(pTask, wakeupReason);
+    spinUnlock(&lock, irqState);
+
+    return retCode;
+}
+
 int taskSuspend(taskHandleType *pTask)
 {
+    taskQueueType *pWaitQueue = NULL;
+
     if (pTask == NULL)
     {
         return RET_INVAL;
@@ -279,7 +419,10 @@ int taskSuspend(taskHandleType *pTask)
     }
 
     int retCode = RET_SUCCESS;
-    bool irqState = spinLock(&lock);
+    bool taskIrqState;
+    bool objectIrqState;
+
+    taskStateLocksAcquire(pTask, &pWaitQueue, &taskIrqState, &objectIrqState);
 
     if (pTask->state == TASK_STATE_READY)
     {
@@ -291,14 +434,14 @@ int taskSuspend(taskHandleType *pTask)
         /* RET_NOTASK is benign here: a wake path may have already detached this link. */
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
-            spinUnlock(&lock, irqState);
+            taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
             return retCode;
         }
 
         retCode = waitQueueRemove(pTask);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
-            spinUnlock(&lock, irqState);
+            taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
             return retCode;
         }
 
@@ -306,7 +449,7 @@ int taskSuspend(taskHandleType *pTask)
     }
     if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
     {
-        spinUnlock(&lock, irqState);
+        taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
         return retCode;
     }
 
@@ -315,7 +458,7 @@ int taskSuspend(taskHandleType *pTask)
     pTask->blockedReason = BLOCK_REASON_NONE;
     pTask->wakeupReason = WAKEUP_REASON_NONE;
 
-    spinUnlock(&lock, irqState);
+    taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
 
     /*If self suspended, give CPU to other tasks*/
     if (pTask == taskGetCurrent())
@@ -340,7 +483,7 @@ int taskResume(taskHandleType *pTask)
 
     if (pTask->state == TASK_STATE_SUSPENDED)
     {
-        return taskSetReady(pTask, RESUME);
+        return taskSetReadyInternal(pTask, RESUME);
     }
 
     return RET_NOTSUSPENDED;
@@ -528,9 +671,7 @@ retry:
         else
         {
             currentTask->notification.value--;
-            currentTask->notification.state = (currentTask->notification.value != 0U) ?
-                                                 TASK_NOTIFY_STATE_RECEIVED :
-                                                 TASK_NOTIFY_STATE_NOT_WAITING;
+            currentTask->notification.state = (currentTask->notification.value != 0U) ? TASK_NOTIFY_STATE_RECEIVED : TASK_NOTIFY_STATE_NOT_WAITING;
         }
         retCode = RET_SUCCESS;
     }
@@ -572,9 +713,7 @@ retry:
             else
             {
                 currentTask->notification.value--;
-                currentTask->notification.state = (currentTask->notification.value != 0U) ?
-                                                     TASK_NOTIFY_STATE_RECEIVED :
-                                                     TASK_NOTIFY_STATE_NOT_WAITING;
+                currentTask->notification.state = (currentTask->notification.value != 0U) ? TASK_NOTIFY_STATE_RECEIVED : TASK_NOTIFY_STATE_NOT_WAITING;
             }
             retCode = RET_SUCCESS;
         }
@@ -698,29 +837,33 @@ int taskCreate(taskHandleType **ppTask, const char *name, uint32_t stackSize,
 int taskDelete(taskHandleType *pTask)
 {
     bool isDynamicTask;
+    taskQueueType *pWaitQueue = NULL;
 
     if (pTask == NULL)
     {
         return RET_INVAL;
     }
 
-    bool irqState = spinLock(&lock);
+    bool taskIrqState;
+    bool objectIrqState;
+
+    taskStateLocksAcquire(pTask, &pWaitQueue, &taskIrqState, &objectIrqState);
 
     if (pTask->state == TASK_STATE_RUNNING)
     {
-        spinUnlock(&lock, irqState);
+        taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
         return RET_BUSY;
     }
 
     if ((pTask->flags & TASK_FLAG_EXIT_PENDING) != 0U)
     {
-        spinUnlock(&lock, irqState);
+        taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
         return RET_BUSY;
     }
 
     if (pTask->state == TASK_STATE_TERMINATED)
     {
-        spinUnlock(&lock, irqState);
+        taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
         return RET_SUCCESS;
     }
 
@@ -729,7 +872,7 @@ int taskDelete(taskHandleType *pTask)
         int retCode = readyQueueRemove(pTask);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
-            spinUnlock(&lock, irqState);
+            taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
             return retCode;
         }
     }
@@ -739,21 +882,21 @@ int taskDelete(taskHandleType *pTask)
         /* RET_NOTASK is benign here: a wake path may have already detached this link. */
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
-            spinUnlock(&lock, irqState);
+            taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
             return retCode;
         }
 
         retCode = waitQueueRemove(pTask);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
-            spinUnlock(&lock, irqState);
+            taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
             return retCode;
         }
 
         retCode = timeoutQueueRemove(pTask);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
-            spinUnlock(&lock, irqState);
+            taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
             return retCode;
         }
     }
@@ -763,7 +906,7 @@ int taskDelete(taskHandleType *pTask)
 
     isDynamicTask = ((pTask->flags & TASK_FLAG_DYNAMIC) != 0U);
 
-    spinUnlock(&lock, irqState);
+    taskStateLocksRelease(pWaitQueue, taskIrqState, objectIrqState);
 
     if (isDynamicTask)
     {
@@ -775,28 +918,28 @@ int taskDelete(taskHandleType *pTask)
 
 void taskProcessExpiredTimeouts(uint32_t currentTick)
 {
-    bool irqState = spinLock(&lock);
-
-    while (!taskQueueEmpty(timeoutQueue()))
+    while (true)
     {
+        bool irqState = spinLock(&lock);
         taskHandleType *pTask = timeoutQueuePeek();
         wakeupReasonType wakeupReason;
         int retCode;
 
         if ((pTask == NULL) || !taskDeadlineReached(currentTick, pTask->deadlineTick))
         {
+            spinUnlock(&lock, irqState);
             break;
         }
 
         wakeupReason = (pTask->blockedReason == SLEEP) ? SLEEP_TIME_TIMEOUT : WAIT_TIMEOUT;
-        retCode = taskSetReadyLocked(pTask, wakeupReason);
-        if (retCode != RET_SUCCESS)
+        spinUnlock(&lock, irqState);
+
+        retCode = taskSetReadyInternal(pTask, wakeupReason);
+        if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
         {
             break;
         }
     }
-
-    spinUnlock(&lock, irqState);
 }
 
 void taskExit(void)

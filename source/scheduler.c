@@ -31,12 +31,13 @@
 #include "sanoRTOS/timer.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/log.h"
+#include "taskInternal.h"
 
 LOG_MODULE_DEFINE(scheduler);
 
 TASK_DEFINE(idleTask0, 1024, idleTaskHandler0, NULL, TASK_LOWEST_PRIORITY, AFFINITY_CORE_0);
 
-static atomic_t lock;
+static atomicType lock;
 static volatile uint32_t systemTickCount;
 
 void idleTaskHandler0(void *params)

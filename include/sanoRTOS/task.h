@@ -246,24 +246,6 @@ extern "C"
     extern taskPoolType taskPool;
 
     /**
-     * @brief Set task state to READY and enqueue it in ready queue.
-     *
-     * @param pTask Pointer to task handle.
-     * @param wakeupReason Reason for waking the task.
-     * @return `RET_SUCCESS` on success, error code otherwise.
-     */
-    int taskSetReady(taskHandleType *pTask, wakeupReasonType wakeupReason);
-
-    /**
-     * @brief Block the current task with a reason and timeout.
-     *
-     * @param blockedReason Reason why the current task is blocked.
-     * @param ticks Ticks to remain blocked, or `TASK_FOREVER_WAIT` to block without a timeout.
-     * @return `RET_SUCCESS` on success, error code otherwise.
-     */
-    int taskBlock(blockedReasonType blockedReason, uint32_t ticks);
-
-    /**
      * @brief Suspend a task.
      *
      * @param pTask Pointer to task handle.
@@ -371,36 +353,12 @@ extern "C"
     }
 
     /**
-     * @brief Reclaim dynamic tasks that have exited and are pending deferred cleanup.
-     *
-     * Internal scheduler/idle path API.
-     */
-    void taskCleanupExited();
-
-    /**
-     * @brief Wake blocked tasks whose timeout deadlines have expired.
-     *
-     * Internal scheduler path API. Called once per RTOS tick with the current scheduler tick count.
-     *
-     * @param currentTick Current monotonic RTOS tick count.
-     */
-    void taskProcessExpiredTimeouts(uint32_t currentTick);
-
-    /**
-     * @brief Check current task stack-overflow guard using the lowest known saved/live stack pointer.
-     */
-    void taskCheckStackOverflow();
-
-    /**
      * @brief Block the current task for a specified number of RTOS ticks.
      *
      * @param sleepTicks Number of RTOS ticks to sleep
      * @return `RET_SUCCESS` on success, error code otherwise.
      */
-    static inline __attribute__((always_inline)) int taskSleep(uint32_t sleepTicks)
-    {
-        return taskBlock(SLEEP, sleepTicks);
-    }
+    int taskSleep(uint32_t sleepTicks);
 
     /**
      * @brief Block the current task for a specified number of milliseconds.
@@ -466,36 +424,9 @@ extern "C"
     }
 
     /**
-     * @brief Check whether a task can preempt the current core immediately.
-     *
-     * A task can preempt the current core only when it is eligible to run on this
-     * core and has an equal or higher priority than the currently running task.
-     *
-     * @param pTask Pointer to the task being evaluated.
-     * @retval `true` if a local yield can switch to this task on the current core.
-     * @retval `false` otherwise.
-     */
-    static inline __attribute__((always_inline)) bool taskCanPreemptCurrentCore(taskHandleType *pTask)
-    {
-        taskHandleType *currentTask = taskPool.currentTask[PORT_CORE_ID()];
-
-        if ((pTask == NULL) || (currentTask == NULL))
-        {
-            return false;
-        }
-#if CONFIG_SMP
-        if ((pTask->coreAffinity != AFFINITY_CORE_ANY) &&
-            (pTask->coreAffinity != PORT_CORE_ID()))
-        {
-            return false;
-        }
-#endif
-
-        return (pTask->priority <= currentTask->priority);
-    }
-
-    /**
      * @brief Set the current task for the core.
+     *
+     * Used by the scheduler and architecture ports when switching to a new running task.
      *
      * @param pTask Pointer to the task handle to set as current
      */

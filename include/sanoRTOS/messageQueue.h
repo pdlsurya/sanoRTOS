@@ -49,8 +49,14 @@ extern "C"
     uint8_t _name##Buffer[length * item_size];     \
     msgQueueHandleType _name = {                   \
         .flags = 0U,                               \
-        .producerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
-        .consumerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
+        .producerWaitQueue = {                     \
+            .head = NULL,                          \
+            .tail = NULL,                          \
+            .pLock = &_name.lock},                \
+        .consumerWaitQueue = {                     \
+            .head = NULL,                          \
+            .tail = NULL,                          \
+            .pLock = &_name.lock},                \
         .buffer = _name##Buffer,                    \
         .queueLength = length,                     \
         .itemSize = item_size,                     \
@@ -73,7 +79,7 @@ extern "C"
         uint32_t itemCount;              ///< Current number of items in the queue.
         uint32_t readIndex;              ///< Index from which the next item will be read.
         uint32_t writeIndex;             ///< Index at which the next item will be written.
-        atomic_t lock;                   ///< Spinlock to ensure atomic access to the queue for both producers and consumers.
+        atomicType lock;                 ///< Spinlock to ensure atomic access to the queue for both producers and consumers.
     } msgQueueHandleType;
 
     int msgQueueCreate(msgQueueHandleType **ppQueueHandle, uint32_t length, uint32_t itemSize);

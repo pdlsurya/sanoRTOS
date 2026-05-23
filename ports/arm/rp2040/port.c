@@ -29,7 +29,7 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 
-static atomic_t lock;
+static atomicType lock;
 
 #if (CONFIG_SMP)
 TASK_DEFINE(idleTask1, 512, idleTaskHandler1, NULL, TASK_LOWEST_PRIORITY, AFFINITY_CORE_1);

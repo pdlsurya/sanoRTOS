@@ -50,8 +50,14 @@ extern "C"
         .flags = 0U,                          \
         .streamBuffer = {                     \
             .flags = 0U,                      \
-            .producerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
-            .consumerWaitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
+            .producerWaitQueue = {            \
+                .head = NULL,                 \
+                .tail = NULL,                 \
+                .pLock = &_name.streamBuffer.lock}, \
+            .consumerWaitQueue = {            \
+                .head = NULL,                 \
+                .tail = NULL,                 \
+                .pLock = &_name.streamBuffer.lock}, \
             .buffer = _name##Buffer,          \
             .bufferSize = _bufferSize,        \
             .usedBytes = 0,                   \

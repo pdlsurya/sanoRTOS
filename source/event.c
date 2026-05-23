@@ -28,6 +28,7 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 #include "sanoRTOS/event.h"
+#include "taskInternal.h"
 #include "objectHelpers.h"
 
 MEM_SLAB_DEFINE(dynamicEventObjectSlab,
@@ -55,6 +56,7 @@ static int eventSetup(eventHandleType *pEvent, uint8_t flags)
 
     memset(pEvent, 0, sizeof(eventHandleType));
     pEvent->flags = flags;
+    pEvent->waitQueue.pLock = &pEvent->lock;
 
     return RET_SUCCESS;
 }
@@ -102,7 +104,7 @@ static inline void eventTaskWaitSetup(taskHandleType *pTask, uint32_t waitMask, 
     pTask->eventState.clearOnExit = clearOnExit ? 1U : 0U;
 }
 
-static int eventWakeMatchingTasks(eventHandleType *pEvent, bool *pContextSwitchRequired)
+static int eventWakeMatchingTasksLocked(eventHandleType *pEvent, bool *pContextSwitchRequired)
 {
     if (pEvent == NULL)
     {
@@ -186,7 +188,7 @@ retry:
     {
         pEvent->events |= setEvents;
 
-        retCode = eventWakeMatchingTasks(pEvent, &contextSwitchRequired);
+        retCode = eventWakeMatchingTasksLocked(pEvent, &contextSwitchRequired);
         if (retCode != RET_SUCCESS)
         {
             spinUnlock(&pEvent->lock, irqState);
@@ -217,29 +219,15 @@ retry:
         /* Save current task's event wait criteria before blocking */
         eventTaskWaitSetup(currentTask, waitEvents, waitAll, clearOnExit);
 
-        /* Add current task to the event object's wait queue */
-        retCode = waitQueueAdd(&pEvent->waitQueue, currentTask);
+        retCode = taskBlockOnWaitQueue(&pEvent->waitQueue,
+                                       WAIT_FOR_EVENT,
+                                       waitTicks,
+                                       irqState);
         if (retCode != RET_SUCCESS)
         {
             eventTaskWaitReset(currentTask);
-            spinUnlock(&pEvent->lock, irqState);
             return retCode;
         }
-
-        spinUnlock(&pEvent->lock, irqState);
-
-        /* Block current task and give CPU to other tasks while waiting for events */
-        retCode = taskBlock(WAIT_FOR_EVENT, waitTicks);
-        if (retCode != RET_SUCCESS)
-        {
-            irqState = spinLock(&pEvent->lock);
-            (void)waitQueueRemove(currentTask);
-            eventTaskWaitReset(currentTask);
-            spinUnlock(&pEvent->lock, irqState);
-            return retCode;
-        }
-
-        irqState = spinLock(&pEvent->lock);
 
         /*Task has been woken up either due to event match or wait timeout */
         if (currentTask->wakeupReason == EVENT_MATCHED)
@@ -258,10 +246,11 @@ retry:
             /*Task might have been suspended while waiting for events and later resumed.
               In this case, retry waiting on the event object again */
             eventTaskWaitReset(currentTask);
-            spinUnlock(&pEvent->lock, irqState);
 
             goto retry;
         }
+
+        return retCode;
     }
 
     spinUnlock(&pEvent->lock, irqState);
@@ -291,7 +280,7 @@ int eventSet(eventHandleType *pEvent, uint32_t events)
 
     pEvent->events |= events;
 
-    int retCode = eventWakeMatchingTasks(pEvent, &contextSwitchRequired);
+    int retCode = eventWakeMatchingTasksLocked(pEvent, &contextSwitchRequired);
 
     spinUnlock(&pEvent->lock, irqState);
 

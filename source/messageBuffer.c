@@ -30,6 +30,7 @@
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
 #include "streamBufferInternal.h"
+#include "taskInternal.h"
 #include "objectHelpers.h"
 
 MEM_SLAB_DEFINE(dynamicMsgBufferObjectSlab,
@@ -60,6 +61,8 @@ static int msgBufferSetup(msgBufferHandleType *pMsgBuffer,
     pMsgBuffer->flags = flags;
     pMsgBuffer->streamBuffer.buffer = pBuffer;
     pMsgBuffer->streamBuffer.bufferSize = bufferSize;
+    pMsgBuffer->streamBuffer.producerWaitQueue.pLock = &pMsgBuffer->streamBuffer.lock;
+    pMsgBuffer->streamBuffer.consumerWaitQueue.pLock = &pMsgBuffer->streamBuffer.lock;
 
     return RET_SUCCESS;
 }
@@ -235,21 +238,12 @@ retry:
             taskHandleType *currentTask = taskGetCurrent();
             bool irqState = spinLock(&pStreamBuffer->lock);
 
-            retCode = waitQueueAdd(&pStreamBuffer->producerWaitQueue, currentTask);
+            retCode = taskBlockOnWaitQueue(&pStreamBuffer->producerWaitQueue,
+                                           WAIT_FOR_STREAM_BUFFER_SPACE,
+                                           waitTicks,
+                                           irqState);
             if (retCode != RET_SUCCESS)
             {
-                spinUnlock(&pStreamBuffer->lock, irqState);
-                return retCode;
-            }
-
-            spinUnlock(&pStreamBuffer->lock, irqState);
-
-            retCode = taskBlock(WAIT_FOR_STREAM_BUFFER_SPACE, waitTicks);
-            if (retCode != RET_SUCCESS)
-            {
-                irqState = spinLock(&pStreamBuffer->lock);
-                (void)waitQueueRemove(currentTask);
-                spinUnlock(&pStreamBuffer->lock, irqState);
                 return retCode;
             }
 
@@ -303,21 +297,12 @@ retry:
             taskHandleType *currentTask = taskGetCurrent();
             bool irqState = spinLock(&pStreamBuffer->lock);
 
-            retCode = waitQueueAdd(&pStreamBuffer->consumerWaitQueue, currentTask);
+            retCode = taskBlockOnWaitQueue(&pStreamBuffer->consumerWaitQueue,
+                                           WAIT_FOR_STREAM_BUFFER_DATA,
+                                           waitTicks,
+                                           irqState);
             if (retCode != RET_SUCCESS)
             {
-                spinUnlock(&pStreamBuffer->lock, irqState);
-                return retCode;
-            }
-
-            spinUnlock(&pStreamBuffer->lock, irqState);
-
-            retCode = taskBlock(WAIT_FOR_STREAM_BUFFER_DATA, waitTicks);
-            if (retCode != RET_SUCCESS)
-            {
-                irqState = spinLock(&pStreamBuffer->lock);
-                (void)waitQueueRemove(currentTask);
-                spinUnlock(&pStreamBuffer->lock, irqState);
                 return retCode;
             }
 

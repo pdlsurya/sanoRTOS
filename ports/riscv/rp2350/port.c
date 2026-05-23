@@ -51,7 +51,7 @@ extern void tickHandler(void);
 
 static uint64_t mtimer_period_ticks;
 
-static atomic_t lock;
+static atomicType lock;
 
 static inline void portTickConfig()
 {

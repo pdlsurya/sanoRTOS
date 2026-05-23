@@ -31,6 +31,7 @@
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/conditionVariable.h"
+#include "taskInternal.h"
 #include "objectHelpers.h"
 
 MEM_SLAB_DEFINE(dynamicCondVarObjectSlab,
@@ -59,6 +60,7 @@ static int condVarSetup(condVarHandleType *pCondVar,
 
     memset(pCondVar, 0, sizeof(condVarHandleType));
     pCondVar->flags = flags;
+    pCondVar->waitQueue.pLock = &pCondVar->lock;
     pCondVar->pMutex = pMutex;
 
     return RET_SUCCESS;
@@ -90,26 +92,14 @@ int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks)
     taskHandleType *currentTask = taskGetCurrent();
 
 wait:
-    retCode = waitQueueAdd(&pCondVar->waitQueue, currentTask);
+    retCode = taskBlockOnWaitQueue(&pCondVar->waitQueue,
+                                   WAIT_FOR_COND_VAR,
+                                   waitTicks,
+                                   irqState);
     if (retCode != RET_SUCCESS)
     {
-        spinUnlock(&pCondVar->lock, irqState);
         return retCode;
     }
-
-    spinUnlock(&pCondVar->lock, irqState);
-
-    /* Block current task and give CPU to other tasks while waiting on condition variable*/
-    retCode = taskBlock(WAIT_FOR_COND_VAR, waitTicks);
-    if (retCode != RET_SUCCESS)
-    {
-        irqState = spinLock(&pCondVar->lock);
-        (void)waitQueueRemove(currentTask);
-        spinUnlock(&pCondVar->lock, irqState);
-        return retCode;
-    }
-
-    irqState = spinLock(&pCondVar->lock);
 
     /*Task has been woken up either due to wait timeout or by another task by signalling the condtion variable.*/
     if (currentTask->wakeupReason == COND_VAR_SIGNALLED)
@@ -124,9 +114,9 @@ wait:
       In this case, retry waiting on condition variable again */
     else
     {
+        irqState = spinLock(&pCondVar->lock);
         goto wait;
     }
-    spinUnlock(&pCondVar->lock, irqState);
 
     /*Re-acquire previously released mutex*/
     if ((retCode == RET_SUCCESS) || (retCode == RET_TIMEOUT))
@@ -155,24 +145,14 @@ int condVarSignal(condVarHandleType *pCondVar)
     int retCode;
 
     bool contextSwitchRequired = false;
-
     taskHandleType *nextSignalTask = NULL;
 
     bool irqState = spinLock(&pCondVar->lock);
-
-    /*Get next highest priority waiting task to unblock*/
-getNextSignalTask:
 
     nextSignalTask = waitQueuePop(&pCondVar->waitQueue);
 
     if (nextSignalTask != NULL)
     {
-        /*Skip stale tasks that are no longer blocked waiting on this condition variable.*/
-        if ((nextSignalTask->state != TASK_STATE_BLOCKED) ||
-            (nextSignalTask->blockedReason != WAIT_FOR_COND_VAR))
-        {
-            goto getNextSignalTask;
-        }
         retCode = taskSetReady(nextSignalTask, COND_VAR_SIGNALLED);
         if (retCode != RET_SUCCESS)
         {
@@ -224,15 +204,11 @@ int condVarBroadcast(condVarHandleType *pCondVar)
 
         while ((pTask = waitQueuePop(&pCondVar->waitQueue)) != NULL)
         {
-            if ((pTask->state == TASK_STATE_BLOCKED) &&
-                (pTask->blockedReason == WAIT_FOR_COND_VAR))
+            retCode = taskSetReady(pTask, COND_VAR_SIGNALLED);
+            if (retCode != RET_SUCCESS)
             {
-                retCode = taskSetReady(pTask, COND_VAR_SIGNALLED);
-                if (retCode != RET_SUCCESS)
-                {
-                    spinUnlock(&pCondVar->lock, irqState);
-                    return retCode;
-                }
+                spinUnlock(&pCondVar->lock, irqState);
+                return retCode;
             }
         }
 

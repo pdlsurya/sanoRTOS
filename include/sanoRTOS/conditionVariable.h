@@ -48,7 +48,10 @@ extern "C"
 #define CONDVAR_DEFINE(_name, p_mutex) \
     condVarHandleType _name = {        \
         .flags = 0U,                   \
-        .waitQueue = TASK_WAIT_QUEUE_INITIALIZER, \
+        .waitQueue = {                 \
+            .head = NULL,              \
+            .tail = NULL,              \
+            .pLock = &_name.lock},    \
         .pMutex = p_mutex,             \
         .lock = 0}
 
@@ -60,7 +63,7 @@ extern "C"
         uint8_t flags;           ///< Dynamic ownership flags.
         taskQueueType waitQueue; ///< Queue of tasks waiting on the condition variable.
         mutexHandleType *pMutex; ///< Pointer to the associated mutex (used to avoid race conditions).
-        atomic_t lock;           ///< Spinlock to ensure atomic access to the condition variable's internal state.
+        atomicType lock;         ///< Spinlock to ensure atomic access to the condition variable's internal state.
     } condVarHandleType;
 
     int condVarCreate(condVarHandleType **ppCondVar, mutexHandleType *pMutex);

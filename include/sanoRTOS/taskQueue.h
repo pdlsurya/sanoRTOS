@@ -30,6 +30,7 @@
 #include "sanoRTOS/config.h"
 #include "sanoRTOS/port.h"
 #include "sanoRTOS/retCodes.h"
+#include "sanoRTOS/spinLock.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -48,6 +49,7 @@ extern "C"
     {
         taskHandleType *head; ///< Pointer to the head of the task queue linked list.
         taskHandleType *tail; ///< Pointer to the tail of the task queue linked list.
+        atomicType *pLock;    ///< Optional object lock protecting this wait queue.
     } taskQueueType;
 
 #if CONFIG_READY_QUEUE_PRIORITY_MULTIQ
@@ -78,8 +80,9 @@ extern "C"
 
 #define TASK_WAIT_QUEUE_INITIALIZER \
     {                               \
-        .head = NULL,                \
-        .tail = NULL}
+        .head = NULL,               \
+        .tail = NULL,               \
+        .pLock = NULL}
 
     /**
      * @brief Get the global ready queue.

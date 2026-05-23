@@ -147,14 +147,11 @@ Tasks that exit or are deleted are terminal. They cannot be restarted later with
 - `taskSleep(ticks)`
 - `taskSleepMS(ms)`
 - `taskSleepUS(us)`
-- `taskBlock(blockedReasonType blockedReason, uint32_t ticks)`
 - `taskYield()`
 - `taskSuspend(taskHandleType *pTask)`
 - `taskResume(taskHandleType *pTask)`
 - `taskGetCurrent()`
 - `taskGetName()`
-
-`taskBlock()` blocks only the currently running task. Most applications should prefer higher-level wait APIs such as semaphores, events, queues, and `taskSleep*()` unless they are integrating directly with a custom kernel-style primitive.
 
 Example:
 
@@ -247,13 +244,13 @@ void submitWork(taskHandleType *worker)
 
 Defined in [`spinLock.h`](include/sanoRTOS/spinLock.h). This is a low-level primitive mainly for kernel or driver code.
 
-- `spinLock(atomic_t *pLock)` returns the previous IRQ state
-- `spinUnlock(atomic_t *pLock, bool irqState)`
+- `spinLock(atomicType *pLock)` returns the previous IRQ state
+- `spinUnlock(atomicType *pLock, bool irqState)`
 
 Example:
 
 ```c
-static atomic_t myLock;
+static atomicType myLock;
 static uint32_t sharedValue;
 
 void updateSharedValue(uint32_t value)

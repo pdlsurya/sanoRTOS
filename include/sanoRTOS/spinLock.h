@@ -35,7 +35,7 @@ extern "C"
 {
 #endif
 
-        typedef uint32_t atomic_t;
+        typedef uint32_t atomicType;
 
         /**
          * @brief Lock the specified spinlock.
@@ -48,7 +48,7 @@ extern "C"
          *         - `true` if interrupts were previously enabled before locking.
          *         - `false` if interrupts were previously disabled before locking.
          */
-        static inline __attribute__((always_inline)) bool spinLock(atomic_t *pLock)
+        static inline __attribute__((always_inline)) bool spinLock(atomicType *pLock)
         {
                 if (pLock == NULL)
                 {
@@ -82,7 +82,7 @@ extern "C"
          * @param pLock  Pointer to the lock variable. This should point to an atomic lock variable.
          * @param irqState The flag that indicates whether interrupts were enabled prior to unlocking, used to restore the interrupt state.
          */
-        static inline __attribute__((always_inline)) void spinUnlock(atomic_t *pLock, bool irqState)
+        static inline __attribute__((always_inline)) void spinUnlock(atomicType *pLock, bool irqState)
         {
                 if (pLock == NULL)
                 {

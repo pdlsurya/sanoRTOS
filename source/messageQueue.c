@@ -31,6 +31,7 @@
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
+#include "taskInternal.h"
 #include "objectHelpers.h"
 
 MEM_SLAB_DEFINE(dynamicMsgQueueObjectSlab,
@@ -60,6 +61,8 @@ static int msgQueueSetup(msgQueueHandleType *pQueueHandle,
 
     memset(pQueueHandle, 0, sizeof(msgQueueHandleType));
     pQueueHandle->flags = flags;
+    pQueueHandle->producerWaitQueue.pLock = &pQueueHandle->lock;
+    pQueueHandle->consumerWaitQueue.pLock = &pQueueHandle->lock;
     pQueueHandle->buffer = pBuffer;
     pQueueHandle->queueLength = length;
     pQueueHandle->itemSize = itemSize;
@@ -67,29 +70,20 @@ static int msgQueueSetup(msgQueueHandleType *pQueueHandle,
     return RET_SUCCESS;
 }
 
-static int msgQueueWakeWaitingTasks(taskQueueType *pWaitQueue,
-                                    blockedReasonType blockedReason,
-                                    wakeupReasonType wakeupReason,
-                                    bool *pContextSwitchRequired,
-                                    bool wakeAll)
+static int msgQueueWakeWaitingTasksLocked(taskQueueType *pWaitQueue,
+                                          wakeupReasonType wakeupReason,
+                                          bool *pContextSwitchRequired,
+                                          bool wakeAll)
 {
     if ((pWaitQueue == NULL) || (pContextSwitchRequired == NULL))
     {
         return RET_INVAL;
     }
 
-    taskHandleType *pTask = NULL;
+    taskHandleType *pTask;
 
-getNextWaitingTask:
-    pTask = waitQueuePop(pWaitQueue);
-    if (pTask != NULL)
+    while ((pTask = waitQueuePop(pWaitQueue)) != NULL)
     {
-        if ((pTask->state != TASK_STATE_BLOCKED) ||
-            (pTask->blockedReason != blockedReason))
-        {
-            goto getNextWaitingTask;
-        }
-
         int retCode = taskSetReady(pTask, wakeupReason);
         if (retCode != RET_SUCCESS)
         {
@@ -101,9 +95,9 @@ getNextWaitingTask:
             *pContextSwitchRequired = true;
         }
 
-        if (wakeAll)
+        if (!wakeAll)
         {
-            goto getNextWaitingTask;
+            break;
         }
     }
 
@@ -127,11 +121,10 @@ static int msgQueueBufferWrite(msgQueueHandleType *pQueueHandle, void *pItem)
         pQueueHandle->writeIndex = (pQueueHandle->writeIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
         pQueueHandle->itemCount++;
 
-        retCode = msgQueueWakeWaitingTasks(&pQueueHandle->consumerWaitQueue,
-                                           WAIT_FOR_MSG_QUEUE_DATA,
-                                           MSG_QUEUE_DATA_AVAILABLE,
-                                           &contextSwitchRequired,
-                                           false);
+        retCode = msgQueueWakeWaitingTasksLocked(&pQueueHandle->consumerWaitQueue,
+                                                 MSG_QUEUE_DATA_AVAILABLE,
+                                                 &contextSwitchRequired,
+                                                 false);
     }
     else
     {
@@ -165,11 +158,10 @@ static int msgQueueBufferRead(msgQueueHandleType *pQueueHandle, void *pItem)
         pQueueHandle->readIndex = (pQueueHandle->readIndex + pQueueHandle->itemSize) % (pQueueHandle->queueLength * pQueueHandle->itemSize);
         pQueueHandle->itemCount--;
 
-        retCode = msgQueueWakeWaitingTasks(&pQueueHandle->producerWaitQueue,
-                                           WAIT_FOR_MSG_QUEUE_SPACE,
-                                           MSG_QUEUE_SPACE_AVAILABE,
-                                           &contextSwitchRequired,
-                                           false);
+        retCode = msgQueueWakeWaitingTasksLocked(&pQueueHandle->producerWaitQueue,
+                                                 MSG_QUEUE_SPACE_AVAILABE,
+                                                 &contextSwitchRequired,
+                                                 false);
     }
     else
     {
@@ -200,11 +192,10 @@ int msgQueueReset(msgQueueHandleType *pQueueHandle)
     pQueueHandle->readIndex = 0U;
     pQueueHandle->writeIndex = 0U;
 
-    int retCode = msgQueueWakeWaitingTasks(&pQueueHandle->producerWaitQueue,
-                                           WAIT_FOR_MSG_QUEUE_SPACE,
-                                           MSG_QUEUE_SPACE_AVAILABE,
-                                           &contextSwitchRequired,
-                                           true);
+    int retCode = msgQueueWakeWaitingTasksLocked(&pQueueHandle->producerWaitQueue,
+                                                 MSG_QUEUE_SPACE_AVAILABE,
+                                                 &contextSwitchRequired,
+                                                 true);
 
     spinUnlock(&pQueueHandle->lock, irqState);
 
@@ -245,22 +236,12 @@ retry:
 
             bool irqState = spinLock(&pQueueHandle->lock);
 
-            retCode = waitQueueAdd(&pQueueHandle->producerWaitQueue, currentTask);
+            retCode = taskBlockOnWaitQueue(&pQueueHandle->producerWaitQueue,
+                                           WAIT_FOR_MSG_QUEUE_SPACE,
+                                           waitTicks,
+                                           irqState);
             if (retCode != RET_SUCCESS)
             {
-                spinUnlock(&pQueueHandle->lock, irqState);
-                return retCode;
-            }
-
-            spinUnlock(&pQueueHandle->lock, irqState);
-
-            /* Block current task and  give CPU to other tasks while waiting for space to be available */
-            retCode = taskBlock(WAIT_FOR_MSG_QUEUE_SPACE, waitTicks);
-            if (retCode != RET_SUCCESS)
-            {
-                irqState = spinLock(&pQueueHandle->lock);
-                (void)waitQueueRemove(currentTask);
-                spinUnlock(&pQueueHandle->lock, irqState);
                 return retCode;
             }
 
@@ -316,22 +297,12 @@ retry:
 
             bool irqState = spinLock(&pQueueHandle->lock);
 
-            retCode = waitQueueAdd(&pQueueHandle->consumerWaitQueue, currentTask);
+            retCode = taskBlockOnWaitQueue(&pQueueHandle->consumerWaitQueue,
+                                           WAIT_FOR_MSG_QUEUE_DATA,
+                                           waitTicks,
+                                           irqState);
             if (retCode != RET_SUCCESS)
             {
-                spinUnlock(&pQueueHandle->lock, irqState);
-                return retCode;
-            }
-
-            spinUnlock(&pQueueHandle->lock, irqState);
-
-            /* Block current task and give CPU to other tasks while waiting for data to be available */
-            retCode = taskBlock(WAIT_FOR_MSG_QUEUE_DATA, waitTicks);
-            if (retCode != RET_SUCCESS)
-            {
-                irqState = spinLock(&pQueueHandle->lock);
-                (void)waitQueueRemove(currentTask);
-                spinUnlock(&pQueueHandle->lock, irqState);
                 return retCode;
             }
 

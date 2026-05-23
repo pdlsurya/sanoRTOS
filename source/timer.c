@@ -35,7 +35,7 @@
 #define TIMER_TASK_PRIORITY TASK_HIGHEST_PRIORITY /* timer task has the highest possible priority [lower the value, higher the priority] */
 static timerListType timerList = {0}; /* List of running timers */
 static timeoutHandlerQueueType timeoutHandlerQueue = {0}; /* Queue of timeout handlers to be executed */
-static atomic_t lock; /* Protects timer list and timeout handler queue */
+static atomicType lock; /* Protects timer list and timeout handler queue */
 MEM_SLAB_DEFINE(timeoutHandlerNodeSlab, sizeof(timeoutHandlerNodeType), CONFIG_TIMER_TIMEOUT_NODE_SLAB_BLOCKS);
 MEM_SLAB_DEFINE(dynamicTimerObjectSlab,
                 sizeof(timerNodeType),

@@ -28,7 +28,7 @@
 #include "sanoRTOS/memHeap.h"
 #include "sanoRTOS/spinLock.h"
 
-static atomic_t lock;
+static atomicType lock;
 
 void *memHeapAlloc(size_t size)
 {

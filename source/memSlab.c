@@ -28,6 +28,7 @@
 #include "sanoRTOS/scheduler.h"
 #include "sanoRTOS/taskQueue.h"
 #include "sanoRTOS/spinLock.h"
+#include "taskInternal.h"
 
 static int memSlabInitLocked(memSlabHandleType *pMemSlab)
 {
@@ -35,6 +36,8 @@ static int memSlabInitLocked(memSlabHandleType *pMemSlab)
     {
         return RET_INVAL;
     }
+
+    pMemSlab->waitQueue.pLock = &pMemSlab->lock;
 
     if (pMemSlab->initialized)
     {
@@ -116,18 +119,9 @@ static int memSlabWakeWaitingTaskLocked(memSlabHandleType *pMemSlab, bool *pCont
         return RET_INVAL;
     }
 
-    taskHandleType *pTask = NULL;
-
-getNextWaitingTask:
-    pTask = waitQueuePop(&pMemSlab->waitQueue);
+    taskHandleType *pTask = waitQueuePop(&pMemSlab->waitQueue);
     if (pTask != NULL)
     {
-        if ((pTask->state != TASK_STATE_BLOCKED) ||
-            (pTask->blockedReason != WAIT_FOR_MEM_SLAB))
-        {
-            goto getNextWaitingTask;
-        }
-
         int retCode = taskSetReady(pTask, MEM_SLAB_AVAILABLE);
         if (retCode != RET_SUCCESS)
         {
@@ -183,21 +177,12 @@ retry:
     {
         taskHandleType *currentTask = taskGetCurrent();
 
-        retCode = waitQueueAdd(&pMemSlab->waitQueue, currentTask);
+        retCode = taskBlockOnWaitQueue(&pMemSlab->waitQueue,
+                                       WAIT_FOR_MEM_SLAB,
+                                       waitTicks,
+                                       irqState);
         if (retCode != RET_SUCCESS)
         {
-            spinUnlock(&pMemSlab->lock, irqState);
-            return retCode;
-        }
-
-        spinUnlock(&pMemSlab->lock, irqState);
-
-        retCode = taskBlock(WAIT_FOR_MEM_SLAB, waitTicks);
-        if (retCode != RET_SUCCESS)
-        {
-            irqState = spinLock(&pMemSlab->lock);
-            (void)waitQueueRemove(currentTask);
-            spinUnlock(&pMemSlab->lock, irqState);
             return retCode;
         }
 

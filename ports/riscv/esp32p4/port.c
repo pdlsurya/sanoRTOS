@@ -34,7 +34,7 @@
 /*RTOS tick handler function*/
 extern void tickHandler(void);
 
-static atomic_t lock;
+static atomicType lock;
 
 #if (CONFIG_SMP)
 
