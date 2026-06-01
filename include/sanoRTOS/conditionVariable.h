@@ -73,35 +73,37 @@ extern "C"
      * @brief Wait on a condition variable.
      *
      * The current task blocks until the condition variable is signaled,
-     * broadcast, or the timeout expires.
-     * This API must not be called from ISR context.
+     * broadcast, or the timeout expires. This API is intended for task
+     * context only. It cannot be called from ISR context.
      *
      * @param pCondVar Pointer to condition variable handle.
      * @param waitTicks Maximum ticks to wait (`TASK_FOREVER_WAIT` for infinite wait).
-     * @return `RET_SUCCESS` if signaled, `RET_TIMEOUT` on timeout, `RET_INVAL` if called
-     *         from ISR context or arguments are invalid, error code otherwise.
+     * @return `RET_SUCCESS` if signaled, `RET_TIMEOUT` on timeout, `RET_INVAL`
+     *         if arguments are invalid, error code otherwise.
      */
     int condVarWait(condVarHandleType *pCondVar, uint32_t waitTicks);
 
      /**
      * @brief Signal a condition variable and wake one waiting task.
      *
-     * This API must not be called from ISR context.
+     * Condition variables are paired with task-owned mutex state. This API is
+     * intended for task context only. It cannot be called from ISR context.
      *
      * @param pCondVar Pointer to condition variable handle.
-     * @return `RET_SUCCESS` on success, `RET_INVAL` if called from ISR context or arguments
-     *         are invalid, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_INVAL` if arguments are invalid,
+     *         error code otherwise.
      */
     int condVarSignal(condVarHandleType *pCondVar);
 
      /**
      * @brief Broadcast a condition variable and wake all waiting tasks.
      *
-     * This API must not be called from ISR context.
+     * Condition variables are paired with task-owned mutex state. This API is
+     * intended for task context only. It cannot be called from ISR context.
      *
      * @param pCondVar Pointer to condition variable handle.
-     * @return `RET_SUCCESS` on success, `RET_INVAL` if called from ISR context or arguments
-     *         are invalid, error code otherwise.
+     * @return `RET_SUCCESS` on success, `RET_INVAL` if arguments are invalid,
+     *         error code otherwise.
      */
     int condVarBroadcast(condVarHandleType *pCondVar);
 

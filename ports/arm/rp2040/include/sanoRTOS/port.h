@@ -143,17 +143,6 @@ extern "C"
         return irqState;
     }
 
-    /**
-     * @brief Check whether the current execution context is interrupt/exception handler mode.
-     *
-     * @retval `true` Current context is ISR/handler context.
-     * @retval `false` Current context is normal task/thread context.
-     */
-    static inline bool portIsInISRContext()
-    {
-        return (__get_IPSR() != 0U);
-    }
-
     static inline uint32_t portGetCurrentStackPointer()
     {
         return __get_PSP();

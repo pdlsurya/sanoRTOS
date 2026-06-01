@@ -147,10 +147,6 @@ int mailboxSend(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, uint32_t wait
     {
         return RET_INVAL;
     }
-    if (portIsInISRContext())
-    {
-        return RET_INVAL;
-    }
     if ((pMsg->size > 0U) && (pMsg->pTxData == NULL))
     {
         return RET_INVAL;
@@ -271,10 +267,6 @@ retry:
 int mailboxReceive(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, void *pBuffer, uint32_t waitTicks)
 {
     if ((pMailbox == NULL) || (pMsg == NULL))
-    {
-        return RET_INVAL;
-    }
-    if (portIsInISRContext())
     {
         return RET_INVAL;
     }

@@ -69,6 +69,7 @@ extern "C"
         workItemType work;               ///< Work item submitted to the target work queue on timeout.
         timerNodeType timer;             ///< One-shot timer used to delay work submission.
         workQueueHandleType *pWorkQueue; ///< Target work queue used when the timer expires.
+        atomicType lock;                 ///< Spinlock protecting delayed-work state.
         bool scheduled;                  ///< Non-zero while delay timeout is still pending.
     } delayedWorkType;
 
@@ -140,6 +141,7 @@ extern "C"
             .mode = TIMER_MODE_SINGLE_SHOT,                 \
             .isRunning = false},                            \
         .pWorkQueue = NULL,                                 \
+        .lock = 0,                                          \
         .scheduled = false}
 
     /**
@@ -198,6 +200,7 @@ extern "C"
         pDelayedWork->timer.mode = TIMER_MODE_SINGLE_SHOT;
         pDelayedWork->timer.isRunning = false;
         pDelayedWork->pWorkQueue = NULL;
+        pDelayedWork->lock = 0U;
         pDelayedWork->scheduled = false;
 
         return RET_SUCCESS;
@@ -222,10 +225,7 @@ extern "C"
      * @retval `true` if delayed work is scheduled or queued.
      * @retval `false` otherwise.
      */
-    static inline __attribute__((always_inline)) bool delayedWorkPending(delayedWorkType *pDelayedWork)
-    {
-        return (pDelayedWork != NULL) && (pDelayedWork->scheduled || workPending(&pDelayedWork->work));
-    }
+    bool delayedWorkPending(delayedWorkType *pDelayedWork);
 
     /**
      * @brief Start the worker task for a statically defined work queue.

@@ -84,7 +84,7 @@ extern "C"
      * @brief Send a message through a mailbox.
      *
      * The caller blocks until a compatible receiver consumes the message or the timeout expires.
-     * Mailboxes are thread-only objects and cannot be used from ISR context.
+     * Mailboxes are intended for task context only. They cannot be used from ISR context.
      * `pMsg->pSourceTask` is ignored by mailboxSend().
      *
      * @param pMailbox Pointer to mailbox handle.
@@ -100,7 +100,7 @@ extern "C"
      * @brief Receive a message from a mailbox.
      *
      * The caller blocks until a compatible sender is available or the timeout expires.
-     * Mailboxes are thread-only objects and cannot be used from ISR context.
+     * Mailboxes are intended for task context only. They cannot be used from ISR context.
      * `pMsg->pTargetTask` is ignored by mailboxReceive().
      *
      * @param pMailbox Pointer to mailbox handle.

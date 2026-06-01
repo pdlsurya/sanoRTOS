@@ -143,30 +143,9 @@ extern "C"
         return (RV_READ_CSR(mstatus) & MSTATUS_MIE);
     }
 
-    /**
-     * @brief Check whether the current execution context is interrupt/exception handler mode.
-     *
-     * @retval `true` Current context is ISR/handler context.
-     * @retval `false` Current context is normal task/thread context.
-     */
-    static inline bool portIsInISRContext()
-    {
-        uint32_t mstatus = RV_READ_CSR(mstatus);
-        uint32_t mcause = RV_READ_CSR(mcause);
-        return (((mstatus & MSTATUS_MIE) == 0U) && (((mcause >> 31U) & 0x1U) != 0U));
-    }
-
     static inline uint32_t portGetCurrentStackPointer()
     {
         uint32_t stackPointer;
-
-#if defined(USE_ISR_STACK) && USE_ISR_STACK
-        if (portIsInISRContext())
-        {
-            asm volatile("csrr %0, mscratch" : "=r"(stackPointer));
-            return stackPointer;
-        }
-#endif
 
         asm volatile("mv %0, sp" : "=r"(stackPointer));
         return stackPointer;

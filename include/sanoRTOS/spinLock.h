@@ -94,8 +94,7 @@ extern "C"
 #endif
 
                 portIrqUnlock(irqState); ///< Restore the interrupt state (whether interrupts were enabled before unlocking).
-
-                PORT_MEM_FENCE(); ///< Ensure proper memory ordering. This ensures that any changes to the lock are visible to other processors or tasks.
+                PORT_MEM_FENCE();
         }
 
 #ifdef __cplusplus

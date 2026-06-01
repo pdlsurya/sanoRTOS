@@ -1,7 +1,7 @@
 # sanoRTOS
 sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-M and RISC-V microcontrollers. This implementation provides a simple yet effective API for task management, synchronization, and communication, enabling efficient and predictable multitasking in embedded systems.
 
-## 🚀 Features
+## Features
 
 - **Priority-Based Preemptive Scheduling**  
   Efficient task management with support for preemptive scheduling based on task priority levels.
@@ -46,6 +46,9 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 
 - **Current-Task Blocking Path**
   Internal task blocking resolves the current task inside the task layer, so wait-object call sites stay focused on the blocking reason and timeout instead of passing the current task around. Finite waits are inserted into a global timeout queue ordered by absolute deadline, while `TASK_FOREVER_WAIT` blocks without consuming a timeout-queue slot. The scheduler owns the monotonic system tick count used to evaluate those deadlines.
+
+- **Delayed Work State**
+  Delayed work keeps its own lock for the timer-armed state, while the target work queue lock continues to protect queued work items. Immediate submit, timeout submit, cancel, and pending checks now update delayed-work state before the worker task is notified, so delayed-work callers do not yield while still holding the delayed-work lock.
 
 - **Software Timers Use O(1) Unlink**
   Active software timers are tracked in a doubly linked list so `timerStop()` can remove a running timer directly without scanning from the head of the timer list.

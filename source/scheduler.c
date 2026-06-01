@@ -37,7 +37,6 @@ LOG_MODULE_DEFINE(scheduler);
 
 TASK_DEFINE(idleTask0, 1024, idleTaskHandler0, NULL, TASK_LOWEST_PRIORITY, AFFINITY_CORE_0);
 
-static atomicType lock;
 static volatile uint32_t systemTickCount;
 
 void idleTaskHandler0(void *params)
@@ -102,19 +101,9 @@ static int selectNextTask(void)
 
 void taskYield()
 {
-    /*Do not trigger context-switch interrupt from ISR context.
-      The current port's software-switch handler saves task context and is not safe to invoke
-      while running inside a C ISR handler frame. Preemption will occur on the next tick. */
-    if (portIsInISRContext())
-    {
-        return;
-    }
-
-    taskCleanupExited();
-
     bool contextSwitchRequired = false;
 
-    bool irqState = spinLock(&lock);
+    bool irqState = spinLock(&taskStateLock);
 
     contextSwitchRequired = (selectNextTask() == RET_SUCCESS);
 
@@ -123,7 +112,7 @@ void taskYield()
         /*Trigger platform specific context switch mechanism*/
         PORT_TRIGGER_CONTEXT_SWITCH();
     }
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 }
 
 uint32_t schedulerGetTickCount(void)
@@ -133,9 +122,6 @@ uint32_t schedulerGetTickCount(void)
 
 void tickHandler()
 {
-
-    bool irqState = spinLock(&lock);
-
     bool contextSwitchRequired = false;
 
     /*Handle timers and task timeouts on Core 0 only*/
@@ -147,6 +133,8 @@ void tickHandler()
         taskProcessExpiredTimeouts(systemTickCount);
     }
 
+    bool irqState = spinLock(&taskStateLock);
+
     /*Perform context switch if required*/
     contextSwitchRequired = (selectNextTask() == RET_SUCCESS);
 
@@ -155,7 +143,7 @@ void tickHandler()
         /*Trigger platform specific context switch mechanism*/
         PORT_TRIGGER_CONTEXT_SWITCH();
     }
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 }
 
 void schedulerStart()

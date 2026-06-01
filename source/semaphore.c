@@ -71,10 +71,6 @@ int semaphoreTake(semaphoreHandleType *pSem, uint32_t waitTicks)
     {
         return RET_INVAL;
     }
-    if (portIsInISRContext() && (waitTicks != TASK_NO_WAIT))
-    {
-        return RET_INVAL;
-    }
 
     int retCode;
     bool irqState;

@@ -10,8 +10,8 @@ This guide covers the public application-facing APIs for the main sanoRTOS kerne
 - `TASK_FOREVER_WAIT` means "wait indefinitely".
 - Kernel objects can be defined statically with `*_DEFINE(...)`. Most kernel objects also support dynamic `Create()` / `Delete()` APIs; public memory slabs remain static-only.
 - Only tasks keep runtime names. Other kernel objects no longer store names internally.
-- APIs documented as thread-only must not be called from ISR context.
-- APIs that allow ISR use require `waitTicks == TASK_NO_WAIT` when called from ISR context.
+- APIs that may block are intended for task context only. They cannot be called from ISR context.
+- APIs that never block and only submit or signal work may also be used from interrupt handlers when the surrounding port and application flow allow it.
 - `TASK_DEFINE`, `TIMER_DEFINE`, `WORK_DEFINE`, and `DELAYED_WORK_DEFINE` declare their entry or handler function for you.
 
 ## Basic Setup
@@ -307,7 +307,7 @@ Defined in [`mutex.h`](include/sanoRTOS/mutex.h).
 - `mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)`
 - `mutexUnlock(mutexHandleType *pMutex)`
 
-This is a thread-only object.
+This object is intended for task context only. It cannot be used from ISR context because lock acquisition can block.
 
 Example:
 
@@ -335,7 +335,7 @@ Defined in [`conditionVariable.h`](include/sanoRTOS/conditionVariable.h).
 - `condVarSignal(condVarHandleType *pCondVar)`
 - `condVarBroadcast(condVarHandleType *pCondVar)`
 
-This is a thread-only object and uses an associated mutex.
+This object is intended for task context only. It cannot be used from ISR context and uses an associated mutex.
 
 Example:
 
@@ -567,7 +567,7 @@ Defined in [`mailbox.h`](include/sanoRTOS/mailbox.h).
 - `mailboxSend(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, uint32_t waitTicks)`
 - `mailboxReceive(mailboxHandleType *pMailbox, mailboxMsgType *pMsg, void *pBuffer, uint32_t waitTicks)`
 
-Mailboxes match senders and receivers directly. They are thread-only objects.
+Mailboxes match senders and receivers directly. They are intended for task context only and cannot be used from ISR context because send and receive may block.
 When calling `mailboxSend()`, `pSourceTask` does not need to be set.
 When calling `mailboxReceive()`, `pTargetTask` does not need to be set.
 

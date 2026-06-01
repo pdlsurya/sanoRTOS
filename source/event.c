@@ -168,11 +168,6 @@ static int eventWaitCommon(eventHandleType *pEvent, uint32_t waitEvents,
         return RET_INVAL;
     }
 
-    if (portIsInISRContext() && (waitTicks != TASK_NO_WAIT))
-    {
-        return RET_INVAL;
-    }
-
     *pMatchedEvents = 0U;
 
     bool contextSwitchRequired;

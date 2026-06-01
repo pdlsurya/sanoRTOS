@@ -76,17 +76,22 @@ static workItemType *workQueuePop(workQueueHandleType *pWorkQueue)
     return pWork;
 }
 
-int workQueueStart(workQueueHandleType *pWorkQueue)
+static bool delayedWorkIsQueued(delayedWorkType *pDelayedWork)
 {
-    if ((pWorkQueue == NULL) || (pWorkQueue->pWorkerTask == NULL))
+    if ((pDelayedWork == NULL) || (pDelayedWork->pWorkQueue == NULL))
     {
-        return RET_INVAL;
+        return false;
     }
 
-    return taskStart(pWorkQueue->pWorkerTask);
+    bool pending;
+    bool irqState = spinLock(&pDelayedWork->pWorkQueue->lock);
+    pending = pDelayedWork->work.pending;
+    spinUnlock(&pDelayedWork->pWorkQueue->lock, irqState);
+
+    return pending;
 }
 
-int workSubmit(workQueueHandleType *pWorkQueue, workItemType *pWork)
+static int workQueueSubmitInternal(workQueueHandleType *pWorkQueue, workItemType *pWork)
 {
     if ((pWorkQueue == NULL) || (pWorkQueue->pWorkerTask == NULL) ||
         (pWork == NULL) || (pWork->handler == NULL))
@@ -109,6 +114,23 @@ int workSubmit(workQueueHandleType *pWorkQueue, workItemType *pWork)
 
     spinUnlock(&pWorkQueue->lock, irqState);
 
+    return retCode;
+}
+
+int workQueueStart(workQueueHandleType *pWorkQueue)
+{
+    if ((pWorkQueue == NULL) || (pWorkQueue->pWorkerTask == NULL))
+    {
+        return RET_INVAL;
+    }
+
+    return taskStart(pWorkQueue->pWorkerTask);
+}
+
+int workSubmit(workQueueHandleType *pWorkQueue, workItemType *pWork)
+{
+    int retCode = workQueueSubmitInternal(pWorkQueue, pWork);
+
     if (retCode == RET_SUCCESS)
     {
         retCode = taskNotify(pWorkQueue->pWorkerTask, 0U, TASK_NOTIFY_INCREMENT);
@@ -125,27 +147,37 @@ int delayedWorkSchedule(workQueueHandleType *pWorkQueue, delayedWorkType *pDelay
         return RET_INVAL;
     }
 
-    if (pDelayedWork->scheduled || pDelayedWork->work.pending)
+    bool irqState = spinLock(&pDelayedWork->lock);
+
+    if (pDelayedWork->scheduled || delayedWorkIsQueued(pDelayedWork))
     {
+        spinUnlock(&pDelayedWork->lock, irqState);
         return RET_BUSY;
     }
 
     pDelayedWork->pWorkQueue = pWorkQueue;
-    pDelayedWork->scheduled = true;
 
     if (delayTicks == 0U)
     {
-        int retCode = workSubmit(pWorkQueue, &pDelayedWork->work);
-        pDelayedWork->scheduled = false;
+        int retCode = workQueueSubmitInternal(pWorkQueue, &pDelayedWork->work);
+        spinUnlock(&pDelayedWork->lock, irqState);
+
+        if (retCode == RET_SUCCESS)
+        {
+            retCode = taskNotify(pWorkQueue->pWorkerTask, 0U, TASK_NOTIFY_INCREMENT);
+        }
 
         return retCode;
     }
 
+    pDelayedWork->scheduled = true;
     int retCode = timerStart(&pDelayedWork->timer, delayTicks);
     if (retCode != RET_SUCCESS)
     {
         pDelayedWork->scheduled = false;
     }
+
+    spinUnlock(&pDelayedWork->lock, irqState);
 
     return retCode;
 }
@@ -158,6 +190,7 @@ int delayedWorkCancel(delayedWorkType *pDelayedWork)
     }
 
     int retCode;
+    bool irqState = spinLock(&pDelayedWork->lock);
 
     if (pDelayedWork->scheduled)
     {
@@ -171,7 +204,7 @@ int delayedWorkCancel(delayedWorkType *pDelayedWork)
             retCode = RET_BUSY;
         }
     }
-    else if (pDelayedWork->work.pending)
+    else if (delayedWorkIsQueued(pDelayedWork))
     {
         retCode = RET_BUSY;
     }
@@ -180,28 +213,54 @@ int delayedWorkCancel(delayedWorkType *pDelayedWork)
         retCode = RET_NOTACTIVE;
     }
 
+    spinUnlock(&pDelayedWork->lock, irqState);
+
     return retCode;
 }
 
 void delayedWorkTimeoutHandler(void *pArg)
 {
     delayedWorkType *pDelayedWork = (delayedWorkType *)pArg;
+    workQueueHandleType *pWorkQueue;
+    int retCode;
 
-    if ((pDelayedWork == NULL) || (pDelayedWork->pWorkQueue == NULL))
+    if (pDelayedWork == NULL)
     {
         return;
     }
 
-    if (!pDelayedWork->scheduled)
+    bool irqState = spinLock(&pDelayedWork->lock);
+
+    if (!pDelayedWork->scheduled || (pDelayedWork->pWorkQueue == NULL))
     {
+        spinUnlock(&pDelayedWork->lock, irqState);
         return;
     }
 
-    workQueueHandleType *pWorkQueue = pDelayedWork->pWorkQueue;
-
-    (void)workSubmit(pWorkQueue, &pDelayedWork->work);
-
+    pWorkQueue = pDelayedWork->pWorkQueue;
+    retCode = workQueueSubmitInternal(pWorkQueue, &pDelayedWork->work);
     pDelayedWork->scheduled = false;
+    spinUnlock(&pDelayedWork->lock, irqState);
+
+    if (retCode == RET_SUCCESS)
+    {
+        (void)taskNotify(pWorkQueue->pWorkerTask, 0U, TASK_NOTIFY_INCREMENT);
+    }
+}
+
+bool delayedWorkPending(delayedWorkType *pDelayedWork)
+{
+    if (pDelayedWork == NULL)
+    {
+        return false;
+    }
+
+    bool pending;
+    bool irqState = spinLock(&pDelayedWork->lock);
+    pending = pDelayedWork->scheduled || delayedWorkIsQueued(pDelayedWork);
+    spinUnlock(&pDelayedWork->lock, irqState);
+
+    return pending;
 }
 
 void workQueueTask(void *pArgs)

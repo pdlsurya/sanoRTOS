@@ -436,6 +436,14 @@ extern "C"
     }
 
     /**
+     * @brief Reclaim exited dynamic-task resources after the current core has
+     * switched away from their stack.
+     *
+     * Ports typically call this from the idle task.
+     */
+    void taskCleanupExited(void);
+
+    /**
      * @brief Assign a core affinity to the specified task.
      *
      * @param pTask Pointer to the task

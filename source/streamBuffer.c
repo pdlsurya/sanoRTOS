@@ -270,10 +270,6 @@ int streamBufferSend(streamBufferHandleType *pStreamBuffer, const void *pData, u
     {
         return RET_INVAL;
     }
-    if (portIsInISRContext() && (waitTicks != TASK_NO_WAIT))
-    {
-        return RET_INVAL;
-    }
     if ((length > 0U) && (pData == NULL))
     {
         return RET_INVAL;
@@ -344,10 +340,6 @@ retry:
 int streamBufferReceive(streamBufferHandleType *pStreamBuffer, void *pData, uint32_t *pLength, uint32_t waitTicks)
 {
     if ((pStreamBuffer == NULL) || (pLength == NULL))
-    {
-        return RET_INVAL;
-    }
-    if (portIsInISRContext() && (waitTicks != TASK_NO_WAIT))
     {
         return RET_INVAL;
     }

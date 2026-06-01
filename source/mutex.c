@@ -108,10 +108,6 @@ int mutexLock(mutexHandleType *pMutex, uint32_t waitTicks)
     {
         return RET_INVAL;
     }
-    if (portIsInISRContext())
-    {
-        return RET_INVAL;
-    }
 
     int retCode;
     bool irqState;
@@ -178,10 +174,6 @@ int mutexUnlock(mutexHandleType *pMutex)
     {
         return RET_INVAL;
     }
-    if (portIsInISRContext())
-    {
-        return RET_INVAL;
-    }
 
     int retCode;
 
@@ -244,7 +236,9 @@ int mutexUnlock(mutexHandleType *pMutex)
 
     spinUnlock(&pMutex->lock, irqState);
 
-    if (contextSwitchRequired)
+    /* If interrupts were already disabled on entry, an outer critical section
+       will decide when rescheduling can happen safely. */
+    if (contextSwitchRequired && irqState)
     {
         taskYield();
     }

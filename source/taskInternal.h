@@ -11,7 +11,8 @@ extern "C"
 {
 #endif
 
-    void taskCleanupExited(void);
+    extern atomicType taskStateLock; /* Shared scheduler/task state lock. */
+
     void taskProcessExpiredTimeouts(uint32_t currentTick);
     void taskCheckStackOverflow(void);
 

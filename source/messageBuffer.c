@@ -212,10 +212,6 @@ int msgBufferSend(msgBufferHandleType *pMsgBuffer, const void *pData, uint32_t l
     {
         return RET_INVAL;
     }
-    if (portIsInISRContext() && (waitTicks != TASK_NO_WAIT))
-    {
-        return RET_INVAL;
-    }
     if ((length > 0U) && (pData == NULL))
     {
         return RET_INVAL;
@@ -268,10 +264,6 @@ retry:
 int msgBufferReceive(msgBufferHandleType *pMsgBuffer, void *pData, uint32_t *pLength, uint32_t waitTicks)
 {
     if ((pMsgBuffer == NULL) || (pLength == NULL))
-    {
-        return RET_INVAL;
-    }
-    if (portIsInISRContext() && (waitTicks != TASK_NO_WAIT))
     {
         return RET_INVAL;
     }

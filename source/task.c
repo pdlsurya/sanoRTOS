@@ -46,7 +46,8 @@ taskHandleType *currentTask[PORT_CORE_COUNT];
 /*Next task to be scheduled*/
 taskHandleType *nextTask[PORT_CORE_COUNT];
 
-static atomicType lock;
+/* Shared by task.c and scheduler.c to serialize task state and scheduler queues. */
+atomicType taskStateLock;
 static taskHandleType *exitedTask[PORT_CORE_COUNT];
 
 MEM_SLAB_DEFINE(dynamicTaskTcbSlab, sizeof(taskHandleType), CONFIG_DYNAMIC_TASK_TCB_SLAB_BLOCKS);
@@ -108,12 +109,7 @@ void taskCleanupExited()
     taskHandleType *pTaskToDestroy = NULL;
     uint8_t coreIndex = PORT_CORE_ID();
 
-    if (portIsInISRContext())
-    {
-        return;
-    }
-
-    bool irqState = spinLock(&lock);
+    bool irqState = spinLock(&taskStateLock);
 
     taskHandleType *pTask = exitedTask[coreIndex];
     if ((pTask != NULL) && (pTask != taskPool.currentTask[coreIndex]))
@@ -122,7 +118,7 @@ void taskCleanupExited()
         pTaskToDestroy = pTask;
     }
 
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 
     if (pTaskToDestroy != NULL)
     {
@@ -134,7 +130,7 @@ static void taskStateLocksRelease(taskQueueType *pWaitQueue,
                                   bool taskIrqState,
                                   bool objectIrqState)
 {
-    spinUnlock(&lock, taskIrqState);
+    spinUnlock(&taskStateLock, taskIrqState);
 
     if ((pWaitQueue != NULL) && (pWaitQueue->pLock != NULL))
     {
@@ -163,7 +159,7 @@ static void taskStateLocksAcquire(taskHandleType *pTask,
             (pWaitQueue->pLock != NULL))
         {
             *pObjectIrqState = spinLock(pWaitQueue->pLock);
-            *pTaskIrqState = spinLock(&lock);
+            *pTaskIrqState = spinLock(&taskStateLock);
             if ((pTask->state == TASK_STATE_BLOCKED) &&
                 (pTask->waitQueueLink.pOwnerQueue == pWaitQueue))
             {
@@ -176,7 +172,7 @@ static void taskStateLocksAcquire(taskHandleType *pTask,
             continue;
         }
 
-        *pTaskIrqState = spinLock(&lock);
+        *pTaskIrqState = spinLock(&taskStateLock);
         pWaitQueue = pTask->waitQueueLink.pOwnerQueue;
 
         if ((pTask->state == TASK_STATE_BLOCKED) &&
@@ -184,7 +180,7 @@ static void taskStateLocksAcquire(taskHandleType *pTask,
             (pWaitQueue->pLock != NULL))
         {
             /* The task moved onto an object wait queue before we got the task lock; retry with that lock too. */
-            spinUnlock(&lock, *pTaskIrqState);
+            spinUnlock(&taskStateLock, *pTaskIrqState);
             continue;
         }
 
@@ -313,22 +309,17 @@ static int taskSetReadyInternal(taskHandleType *pTask, wakeupReasonType wakeupRe
 
 static int taskBlock(blockedReasonType blockedReason, uint32_t ticks)
 {
-    if (portIsInISRContext())
-    {
-        return RET_INVAL;
-    }
-
-    bool irqState = spinLock(&lock);
+    bool irqState = spinLock(&taskStateLock);
     taskHandleType *pTask = taskGetCurrent();
 
     if (pTask == NULL)
     {
-        spinUnlock(&lock, irqState);
+        spinUnlock(&taskStateLock, irqState);
         return RET_INVAL;
     }
 
     int retCode = taskBlockLocked(pTask, blockedReason, ticks);
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 
     if (retCode != RET_SUCCESS)
     {
@@ -367,7 +358,7 @@ int taskBlockOnWaitQueue(taskQueueType *pWaitQueue,
         return RET_INVAL;
     }
 
-    taskIrqState = spinLock(&lock);
+    taskIrqState = spinLock(&taskStateLock);
 
     retCode = waitQueueAdd(pWaitQueue, pTask);
     if (retCode == RET_SUCCESS)
@@ -397,9 +388,9 @@ int taskSetReady(taskHandleType *pTask,
         return RET_INVAL;
     }
 
-    bool irqState = spinLock(&lock);
+    bool irqState = spinLock(&taskStateLock);
     int retCode = taskSetReadyLocked(pTask, wakeupReason);
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 
     return retCode;
 }
@@ -498,7 +489,7 @@ int taskNotify(taskHandleType *pTask, uint32_t value, taskNotifyActionType actio
 
     int retCode = RET_SUCCESS;
     bool contextSwitchRequired = false;
-    bool irqState = spinLock(&lock);
+    bool irqState = spinLock(&taskStateLock);
 
     /* Reject no-overwrite updates when a previous notification is still pending. */
     if ((action == TASK_NOTIFY_SET_VALUE_WITHOUT_OVERWRITE) &&
@@ -548,7 +539,7 @@ int taskNotify(taskHandleType *pTask, uint32_t value, taskNotifyActionType actio
         }
     }
 
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 
     if (contextSwitchRequired)
     {
@@ -570,15 +561,10 @@ int taskNotifyWait(uint32_t clearMaskOnEntry, uint32_t clearMaskOnExit,
         return RET_INVAL;
     }
 
-    if (portIsInISRContext())
-    {
-        return RET_INVAL;
-    }
-
     currentTask = taskGetCurrent();
 
 retry:
-    irqState = spinLock(&lock);
+    irqState = spinLock(&taskStateLock);
 
     /* Clear requested bits before checking whether a notification is pending. */
     currentTask->notification.value &= ~clearMaskOnEntry;
@@ -603,15 +589,15 @@ retry:
         if (retCode != RET_SUCCESS)
         {
             currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
-            spinUnlock(&lock, irqState);
+            spinUnlock(&taskStateLock, irqState);
             return retCode;
         }
 
-        spinUnlock(&lock, irqState);
+        spinUnlock(&taskStateLock, irqState);
 
         taskYield();
 
-        irqState = spinLock(&lock);
+        irqState = spinLock(&taskStateLock);
 
         if (currentTask->notification.state == TASK_NOTIFY_STATE_RECEIVED)
         {
@@ -628,14 +614,14 @@ retry:
         else
         {
             currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
-            spinUnlock(&lock, irqState);
+            spinUnlock(&taskStateLock, irqState);
 
             /* The task may have been resumed while waiting. Retry the notification wait. */
             goto retry;
         }
     }
 
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 
     return retCode;
 }
@@ -646,15 +632,10 @@ int taskNotifyTake(bool clearCountOnExit, uint32_t *pPreviousValue, uint32_t wai
     bool irqState;
     int retCode;
 
-    if (portIsInISRContext())
-    {
-        return RET_INVAL;
-    }
-
     currentTask = taskGetCurrent();
 
 retry:
-    irqState = spinLock(&lock);
+    irqState = spinLock(&taskStateLock);
 
     if (currentTask->notification.value != 0U)
     {
@@ -688,15 +669,15 @@ retry:
         if (retCode != RET_SUCCESS)
         {
             currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
-            spinUnlock(&lock, irqState);
+            spinUnlock(&taskStateLock, irqState);
             return retCode;
         }
 
-        spinUnlock(&lock, irqState);
+        spinUnlock(&taskStateLock, irqState);
 
         taskYield();
 
-        irqState = spinLock(&lock);
+        irqState = spinLock(&taskStateLock);
 
         if (currentTask->notification.value != 0U)
         {
@@ -725,14 +706,14 @@ retry:
         else
         {
             currentTask->notification.state = TASK_NOTIFY_STATE_NOT_WAITING;
-            spinUnlock(&lock, irqState);
+            spinUnlock(&taskStateLock, irqState);
 
             /* The task may have been resumed while waiting. Retry the notification take. */
             goto retry;
         }
     }
 
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 
     return retCode;
 }
@@ -750,13 +731,13 @@ int taskStart(taskHandleType *pTask)
     }
 
     int retCode;
-    bool irqState = spinLock(&lock);
+    bool irqState = spinLock(&taskStateLock);
 
     pTask->coreAffinity = taskNormalizeCoreAffinity(pTask->coreAffinity);
 
     retCode = readyQueueAdd(pTask);
 
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 
     return retCode;
 }
@@ -920,19 +901,19 @@ void taskProcessExpiredTimeouts(uint32_t currentTick)
 {
     while (true)
     {
-        bool irqState = spinLock(&lock);
+        bool irqState = spinLock(&taskStateLock);
         taskHandleType *pTask = timeoutQueuePeek();
         wakeupReasonType wakeupReason;
         int retCode;
 
         if ((pTask == NULL) || !taskDeadlineReached(currentTick, pTask->deadlineTick))
         {
-            spinUnlock(&lock, irqState);
+            spinUnlock(&taskStateLock, irqState);
             break;
         }
 
         wakeupReason = (pTask->blockedReason == SLEEP) ? SLEEP_TIME_TIMEOUT : WAIT_TIMEOUT;
-        spinUnlock(&lock, irqState);
+        spinUnlock(&taskStateLock, irqState);
 
         retCode = taskSetReadyInternal(pTask, wakeupReason);
         if ((retCode != RET_SUCCESS) && (retCode != RET_NOTASK))
@@ -946,22 +927,14 @@ void taskExit(void)
 {
     taskCleanupExited();
 
-    if (portIsInISRContext())
-    {
-        while (1)
-        {
-            PORT_NOP();
-        }
-    }
-
     taskHandleType *pCurrentTask;
 
-    bool irqState = spinLock(&lock);
+    bool irqState = spinLock(&taskStateLock);
 
     pCurrentTask = taskGetCurrent();
     if (pCurrentTask == NULL)
     {
-        spinUnlock(&lock, irqState);
+        spinUnlock(&taskStateLock, irqState);
         while (1)
         {
             PORT_NOP();
@@ -977,7 +950,7 @@ void taskExit(void)
         exitedTask[PORT_CORE_ID()] = pCurrentTask;
     }
 
-    spinUnlock(&lock, irqState);
+    spinUnlock(&taskStateLock, irqState);
 
     taskYield();
 

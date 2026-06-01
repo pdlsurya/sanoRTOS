@@ -60,13 +60,6 @@ void portSchedulerStart()
 
     portConfig();
 
-#if USE_ISR_STACK
-    /*Save main sp to mscratch so that exception/interrupt handler can retrieve it during an
-     exception/interrupt and use its own stack*/
-    __asm__ volatile("csrw mscratch, sp");
-
-#endif
-
     taskHandleType *pCurrentTask = currentTask[coreId];
 
     __asm__ volatile(" mv sp, %0" ::"r"(pCurrentTask->stackPointer));
