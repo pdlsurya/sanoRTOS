@@ -26,35 +26,7 @@ sanoRTOS is a minimal Real-Time Operating System (RTOS) designed for ARM Cortex-
 
 - **Minimalistic and Lightweight Design**  
   Designed for embedded systems with limited resources — small footprint, fast context switches, and no unnecessary bloat.
-
-## Kernel Internals
-
-- **Intrusive Task Queues**
-  The ready queue uses bitmap-backed intrusive FIFO buckets with 16 configured priority levels by default, so ready insertion and highest-priority lookup stay constant-time. Blocked, timeout, and object wait queues remain intrusive doubly linked lists, and each task embeds one link for state queues, one for kernel-object wait queues, and one for the global timeout queue.
-
-- **Global vs Object Queue APIs**
-  The scheduler exposes singleton ready and blocked queues through the task-queue layer, so ready/blocked operations do not require callers to pass queue pointers. Ready-task selection also respects core affinity by splitting the ready queue into per-priority buckets for each affinity class. Object-owned wait queues still take explicit queue arguments because each kernel object maintains its own waiter list.
-
-- **Kernel Objects Still Own Wait Queues**
-  Semaphores, mutexes, events, mailboxes, message queues, stream buffers, message buffers, condition variables, and memory slabs still keep wait queues in their object state. The queue stores head and tail anchors, while the task carries the intrusive links.
-
-- **Wait-Queue Lock Handoff**
-  Object wait queues optionally carry a pointer to the object lock that protects them. When a task blocks on one of those queues, the task layer links the task into both the object wait queue and the scheduler blocked/timeout queues before releasing the object lock. Scheduler-side wake, timeout, suspend, and delete paths then use the same queue-owned lock when they need to detach a blocked task from an object wait queue.
-
-- **Static And Dynamic Object Lifetime**
-  Kernel objects continue to support zero-overhead static definition through the existing `*_DEFINE(...)` macros. Dynamic object handles are allocated from internal per-object slab-backed pools, while variable-sized backing buffers still use the heap when needed. Public `memSlab` objects themselves remain static-only. Dynamic deletion is conservative: it returns `RET_BUSY` when waiters or active use would make destruction unsafe. Runtime names are now kept only for tasks.
-
-- **Current-Task Blocking Path**
-  Internal task blocking resolves the current task inside the task layer, so wait-object call sites stay focused on the blocking reason and timeout instead of passing the current task around. Finite waits are inserted into a global timeout queue ordered by absolute deadline, while `TASK_FOREVER_WAIT` blocks without consuming a timeout-queue slot. The scheduler owns the monotonic system tick count used to evaluate those deadlines.
-
-- **Delayed Work State**
-  Delayed work keeps its own lock for the timer-armed state, while the target work queue lock continues to protect queued work items. Immediate submit, timeout submit, cancel, and pending checks now update delayed-work state before the worker task is notified, so delayed-work callers do not yield while still holding the delayed-work lock.
-
-- **Software Timers Use O(1) Unlink**
-  Active software timers are tracked in a doubly linked list so `timerStop()` can remove a running timer directly without scanning from the head of the timer list.
-
-- **Internal Locking Naming**
-  Internal helpers that end with `Locked` expect the caller to already hold the relevant lock. Helpers without the `Locked` suffix either acquire the lock internally or do not rely on a caller-held lock as part of their contract.
+  
 
 ## API Reference
 
