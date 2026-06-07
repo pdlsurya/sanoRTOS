@@ -173,25 +173,31 @@ static int msgBufferRead(msgBufferHandleType *pMsgBuffer, void *pData, uint32_t 
                                              &messageLength,
                                              sizeof(uint32_t),
                                              &bytesRead);
-            if ((retCode == RET_SUCCESS) && (bytesRead == sizeof(uint32_t)))
+            if (retCode == RET_SUCCESS)
             {
-                retCode = streamBufferReadLocked(pStreamBuffer,
-                                                 pData,
-                                                 messageLength,
-                                                 &bytesRead);
-                if ((retCode == RET_SUCCESS) && (bytesRead == messageLength))
-                {
-                    *pLength = messageLength;
-                    retCode = streamBufferWakeSpaceAvailableLocked(pStreamBuffer, &contextSwitchRequired);
-                }
-                else if (retCode == RET_SUCCESS)
+                if (bytesRead != sizeof(uint32_t))
                 {
                     retCode = RET_INVAL;
                 }
-            }
-            else if (retCode == RET_SUCCESS)
-            {
-                retCode = RET_INVAL;
+                else
+                {
+                    retCode = streamBufferReadLocked(pStreamBuffer,
+                                                     pData,
+                                                     messageLength,
+                                                     &bytesRead);
+                    if (retCode == RET_SUCCESS)
+                    {
+                        if (bytesRead != messageLength)
+                        {
+                            retCode = RET_INVAL;
+                        }
+                        else
+                        {
+                            *pLength = messageLength;
+                            retCode = streamBufferWakeSpaceAvailableLocked(pStreamBuffer, &contextSwitchRequired);
+                        }
+                    }
+                }
             }
         }
     }
